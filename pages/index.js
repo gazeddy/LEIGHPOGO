@@ -10,8 +10,7 @@ export default function Home({ entries }) {
         <ul>
           {entries.map((entry) => (
             <li key={entry.id}>
-              <strong>{entry.owner.ign}</strong>: {entry.code} (
-              {new Date(entry.createdAt).toLocaleString()})
+              <strong>{entry.owner.ign}</strong>: {entry.code}
             </li>
           ))}
         </ul>
@@ -33,7 +32,14 @@ export async function getServerSideProps() {
     },
   })
 
+  // Serialize dates to strings for JSON
+  const serializedEntries = entries.map(entry => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+  }))
+
   return {
-    props: { entries },
+    props: { entries: serializedEntries },
   }
 }
