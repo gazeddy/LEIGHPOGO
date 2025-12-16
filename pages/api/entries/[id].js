@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     try {
       const updatedEntry = await prisma.entry.update({
         where: { id: entryId },
-        data: { trainerName, friendCode },
+        data: { trainerName, code: friendCode },
       });
       res.status(200).json(updatedEntry);
     } catch (err) {

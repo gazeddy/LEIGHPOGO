@@ -1,11 +1,17 @@
+import bcrypt from "bcryptjs"
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
+import { ensureNextAuthUrl, getNextAuthSecret } from "../../../lib/env"
 import prisma from "../../../lib/prisma"
-import bcrypt from "bcryptjs"
+
+// Ensure critical env defaults exist so production builds can boot even when
+// NEXTAUTH_URL or NEXTAUTH_SECRET are not explicitly set.
+ensureNextAuthUrl()
+const nextAuthSecret = getNextAuthSecret()
 
 export const authOptions = {
   session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextAuthSecret,
   providers: [
     CredentialsProvider({
       name: "Credentials",

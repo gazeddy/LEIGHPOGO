@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth/next";
 import { useSession } from "next-auth/react";
+import { useState } from "react";
 import prisma from "../lib/prisma";
 import { authOptions } from "./api/auth/[...nextauth]";
 
 export default function Admin({ users, entries, searchStrings }) {
   const { data: session } = useSession();
+  const [entryList, setEntryList] = useState(entries);
+  const [editingEntryId, setEditingEntryId] = useState(null);
+  const [editForm, setEditForm] = useState({ trainerName: "", friendCode: "" });
 
   if (!session || session.user.role !== "admin") {
     return <p>Access denied</p>;
@@ -25,6 +29,48 @@ export default function Admin({ users, entries, searchStrings }) {
 
     await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
     location.reload();
+  };
+
+  const startEdit = (entry) => {
+    setEditingEntryId(entry.id);
+    setEditForm({ trainerName: entry.trainerName, friendCode: entry.code });
+  };
+
+  const cancelEdit = () => {
+    setEditingEntryId(null);
+    setEditForm({ trainerName: "", friendCode: "" });
+  };
+
+  const handleEntrySave = async (id) => {
+    const res = await fetch(`/api/admin/entries/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+
+    if (!res.ok) {
+      alert("Failed to update entry");
+      return;
+    }
+
+    const updated = await res.json();
+    setEntryList((current) =>
+      current.map((entry) => (entry.id === id ? { ...entry, ...updated } : entry))
+    );
+    cancelEdit();
+  };
+
+  const handleEntryDelete = async (id) => {
+    if (!confirm("Are you sure you want to delete this entry?")) return;
+
+    const res = await fetch(`/api/admin/entries/${id}`, { method: "DELETE" });
+
+    if (!res.ok) {
+      alert("Failed to delete entry");
+      return;
+    }
+
+    setEntryList((current) => current.filter((entry) => entry.id !== id));
   };
 
   return (
@@ -75,15 +121,59 @@ export default function Admin({ users, entries, searchStrings }) {
               <th>Trainer</th>
               <th>Friend Code</th>
               <th>Owner IGN</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
+            {entryList.map((entry) => (
               <tr key={entry.id}>
                 <td>{entry.id}</td>
-                <td>{entry.trainerName}</td>
-                <td>{entry.code}</td>
+                <td>
+                  {editingEntryId === entry.id ? (
+                    <input
+                      type="text"
+                      value={editForm.trainerName}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          trainerName: e.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    entry.trainerName
+                  )}
+                </td>
+                <td>
+                  {editingEntryId === entry.id ? (
+                    <input
+                      type="text"
+                      value={editForm.friendCode}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          friendCode: e.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    entry.code
+                  )}
+                </td>
                 <td>{entry.owner.ign}</td>
+                <td>
+                  {editingEntryId === entry.id ? (
+                    <>
+                      <button onClick={() => handleEntrySave(entry.id)}>Save</button>
+                      <button onClick={cancelEdit}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEdit(entry)}>Edit</button>
+                      <button onClick={() => handleEntryDelete(entry.id)}>Delete</button>
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
