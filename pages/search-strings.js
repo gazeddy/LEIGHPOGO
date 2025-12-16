@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./api/auth/[...nextauth]";
+import prisma from "../lib/prisma";
 
 const checkboxOptions = [
   { key: "includeShiny", label: "Include shiny", token: "shiny" },
@@ -62,6 +65,7 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin, loading }) {
     );
   }
 
+function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
   if (!savedStrings.length) {
     return (
       <div className="card">
@@ -98,6 +102,8 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin, loading }) {
 
 export default function SearchStrings() {
   const { data: session, status: sessionStatus } = useSession();
+export default function SearchStrings({ initialSavedStrings }) {
+  const { data: session } = useSession();
   const [pokemonNames, setPokemonNames] = useState("");
   const [cpMin, setCpMin] = useState("");
   const [cpMax, setCpMax] = useState("");
@@ -149,6 +155,12 @@ export default function SearchStrings() {
       loadSaved();
     }
   }, [session, sessionStatus]);
+  const [savedStrings, setSavedStrings] = useState(initialSavedStrings || []);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    setSavedStrings(initialSavedStrings || []);
+  }, [initialSavedStrings]);
 
   const searchString = useMemo(
     () =>
@@ -172,16 +184,20 @@ export default function SearchStrings() {
     await navigator.clipboard.writeText(value);
     setStatusMessage("Copied to clipboard");
     setTimeout(() => setStatusMessage(""), 2000);
+    setStatus("Copied to clipboard");
+    setTimeout(() => setStatus(""), 2000);
   };
 
   const handleSave = async () => {
     if (!session) {
       setStatusMessage("Login to save your search string.");
+      setStatus("Login to save your search string.");
       return;
     }
 
     if (!searchString.trim()) {
       setStatusMessage("Build a search string before saving.");
+      setStatus("Build a search string before saving.");
       return;
     }
 
@@ -194,12 +210,14 @@ export default function SearchStrings() {
     if (!response.ok) {
       const error = await response.json();
       setStatusMessage(error.error || "Unable to save search.");
+      setStatus(error.error || "Unable to save search.");
       return;
     }
 
     const saved = await response.json();
     setSavedStrings((prev) => [saved, ...prev]);
     setStatusMessage("Saved!");
+    setStatus("Saved!");
   };
 
   const handleDelete = async (id) => {
@@ -212,6 +230,9 @@ export default function SearchStrings() {
       setStatusMessage("Deleted");
     } else {
       setStatusMessage("Unable to delete search");
+      setStatus("Deleted");
+    } else {
+      setStatus("Unable to delete search");
     }
   };
 
@@ -344,6 +365,7 @@ export default function SearchStrings() {
         </div>
 
         {statusMessage && <p className="status">{statusMessage}</p>}
+        {status && <p className="status">{status}</p>}
       </div>
 
       <h2>Saved searches</h2>
@@ -356,4 +378,27 @@ export default function SearchStrings() {
       />
     </div>
   );
+}
+
+export async function getServerSideProps(context) {
+  const session = await getServerSession(context.req, context.res, authOptions);
+
+  if (!session) {
+    return { props: { initialSavedStrings: [] } };
+  }
+
+  const isAdmin = session.user.role === "admin";
+  const searchStrings = await prisma.searchString.findMany({
+    where: isAdmin ? {} : { ownerId: session.user.id },
+    include: { owner: { select: { id: true, ign: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const initialSavedStrings = searchStrings.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+  }));
+
+  return { props: { initialSavedStrings } };
 }
