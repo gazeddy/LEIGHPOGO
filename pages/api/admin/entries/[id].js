@@ -15,10 +15,15 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "PUT") {
-    const { title, code } = req.body;
+    const { trainerName, friendCode } = req.body;
+
+    if (!trainerName || !friendCode) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
     const updated = await prisma.entry.update({
       where: { id: Number(id) },
-      data: { title, code },
+      data: { trainerName, code: friendCode },
     });
     return res.json(updated);
   }
