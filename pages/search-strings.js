@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "./api/auth/[...nextauth]";
-import prisma from "../lib/prisma";
 
 const checkboxOptions = [
   { key: "includeShiny", label: "Include shiny", token: "shiny" },
@@ -14,6 +11,14 @@ const checkboxOptions = [
   { key: "includeMega", label: "Mega eligible", token: "mega" },
   { key: "favoritesOnly", label: "Favorites only", token: "favorite" },
   { key: "excludeTraded", label: "Exclude traded", token: "!traded" },
+];
+
+const ivPresetOptions = [
+  { key: "fourStar", label: "4*" },
+  { key: "threeStar", label: "3*" },
+  { key: "pvp", label: "PvP" },
+  { key: "custom", label: "Custom" },
+  { key: "none", label: "None" },
 ];
 
 function buildSearchString({
@@ -29,7 +34,6 @@ function buildSearchString({
   defenseMax,
   hpMin,
   hpMax,
-  ivFilter,
   toggles,
 }) {
   const tokens = [];
@@ -38,17 +42,9 @@ function buildSearchString({
     .map((value) => value.trim())
     .filter(Boolean);
 
-  if (nameTokens.length) {
-    tokens.push(nameTokens.join(","));
-  }
-
-  if (cpMin || cpMax) {
-    tokens.push(`cp${cpMin || ""}-${cpMax || ""}`);
-  }
-
-  if (ageMin || ageMax) {
-    tokens.push(`age${ageMin || ""}-${ageMax || ""}`);
-  }
+  if (nameTokens.length) tokens.push(nameTokens.join(","));
+  if (cpMin || cpMax) tokens.push(`cp${cpMin || ""}-${cpMax || ""}`);
+  if (ageMin || ageMax) tokens.push(`age${ageMin || ""}-${ageMax || ""}`);
 
   if (ivMode === "fourStar") tokens.push("4*");
   if (ivMode === "threeStar") tokens.push("3*");
@@ -60,28 +56,15 @@ function buildSearchString({
     const hasDefenseRange = defenseMin !== "" || defenseMax !== "";
     const hasHpRange = hpMin !== "" || hpMax !== "";
 
-    if (hasAttackRange) {
-      ivTokens.push(`atk${attackMin || ""}-${attackMax || ""}`);
-    }
-    if (hasDefenseRange) {
-      ivTokens.push(`def${defenseMin || ""}-${defenseMax || ""}`);
-    }
-    if (hasHpRange) {
-      ivTokens.push(`hp${hpMin || ""}-${hpMax || ""}`);
-    }
+    if (hasAttackRange) ivTokens.push(`atk${attackMin || ""}-${attackMax || ""}`);
+    if (hasDefenseRange) ivTokens.push(`def${defenseMin || ""}-${defenseMax || ""}`);
+    if (hasHpRange) ivTokens.push(`hp${hpMin || ""}-${hpMax || ""}`);
 
-    if (ivTokens.length) {
-      tokens.push(ivTokens.join(" & "));
-    }
+    if (ivTokens.length) tokens.push(ivTokens.join(" & "));
   }
-  if (ivFilter === "fourStar") tokens.push("4*");
-  if (ivFilter === "threeStar") tokens.push("3*");
-  if (ivFilter === "nundo") tokens.push("0* & !shiny");
 
   checkboxOptions.forEach((option) => {
-    if (toggles[option.key]) {
-      tokens.push(option.token);
-    }
+    if (toggles[option.key]) tokens.push(option.token);
   });
 
   return tokens.join(" & ");
@@ -96,7 +79,6 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin, loading }) {
     );
   }
 
-function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
   if (!savedStrings.length) {
     return (
       <div className="card">
@@ -113,9 +95,7 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
             <div>
               <h3>{item.title}</h3>
               <p className="muted">{new Date(item.updatedAt).toLocaleString()}</p>
-              {isAdmin && item.owner && (
-                <p className="muted">Owner: {item.owner.ign}</p>
-              )}
+              {isAdmin && item.owner && <p className="muted">Owner: {item.owner.ign}</p>}
             </div>
             <div className="saved-actions">
               <button onClick={() => onCopy(item.query)}>Copy</button>
@@ -133,12 +113,6 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
 
 export default function SearchStrings() {
   const { data: session, status: sessionStatus } = useSession();
-function SearchStrings() {
-  const { data: session, status: sessionStatus } = useSession();
-export default function SearchStrings() {
-  const { data: session, status: sessionStatus } = useSession();
-export default function SearchStrings({ initialSavedStrings }) {
-  const { data: session } = useSession();
   const [pokemonNames, setPokemonNames] = useState("");
   const [cpMin, setCpMin] = useState("");
   const [cpMax, setCpMax] = useState("");
@@ -151,7 +125,6 @@ export default function SearchStrings({ initialSavedStrings }) {
   const [defenseMax, setDefenseMax] = useState("15");
   const [hpMin, setHpMin] = useState("15");
   const [hpMax, setHpMax] = useState("15");
-  const [ivFilter, setIvFilter] = useState("fourStar");
   const [toggles, setToggles] = useState({
     includeShiny: true,
     includeShadow: false,
@@ -179,9 +152,7 @@ export default function SearchStrings({ initialSavedStrings }) {
 
       try {
         const response = await fetch("/api/search-strings");
-        if (!response.ok) {
-          throw new Error("Unable to load saved searches");
-        }
+        if (!response.ok) throw new Error("Unable to load saved searches");
 
         const searches = await response.json();
         setSavedStrings(searches);
@@ -197,12 +168,6 @@ export default function SearchStrings({ initialSavedStrings }) {
       loadSaved();
     }
   }, [session, sessionStatus]);
-  const [savedStrings, setSavedStrings] = useState(initialSavedStrings || []);
-  const [status, setStatus] = useState("");
-
-  useEffect(() => {
-    setSavedStrings(initialSavedStrings || []);
-  }, [initialSavedStrings]);
 
   const searchString = useMemo(
     () =>
@@ -280,12 +245,6 @@ export default function SearchStrings({ initialSavedStrings }) {
     setter(event.target.value);
   };
 
-        ivFilter,
-        toggles,
-      }),
-    [pokemonNames, cpMin, cpMax, ageMin, ageMax, ivFilter, toggles]
-  );
-
   const handleToggle = (key) => {
     setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -294,20 +253,16 @@ export default function SearchStrings({ initialSavedStrings }) {
     await navigator.clipboard.writeText(value);
     setStatusMessage("Copied to clipboard");
     setTimeout(() => setStatusMessage(""), 2000);
-    setStatus("Copied to clipboard");
-    setTimeout(() => setStatus(""), 2000);
   };
 
   const handleSave = async () => {
     if (!session) {
       setStatusMessage("Login to save your search string.");
-      setStatus("Login to save your search string.");
       return;
     }
 
     if (!searchString.trim()) {
       setStatusMessage("Build a search string before saving.");
-      setStatus("Build a search string before saving.");
       return;
     }
 
@@ -320,14 +275,12 @@ export default function SearchStrings({ initialSavedStrings }) {
     if (!response.ok) {
       const error = await response.json();
       setStatusMessage(error.error || "Unable to save search.");
-      setStatus(error.error || "Unable to save search.");
       return;
     }
 
     const saved = await response.json();
     setSavedStrings((prev) => [saved, ...prev]);
     setStatusMessage("Saved!");
-    setStatus("Saved!");
   };
 
   const handleDelete = async (id) => {
@@ -340,9 +293,6 @@ export default function SearchStrings({ initialSavedStrings }) {
       setStatusMessage("Deleted");
     } else {
       setStatusMessage("Unable to delete search");
-      setStatus("Deleted");
-    } else {
-      setStatus("Unable to delete search");
     }
   };
 
@@ -368,6 +318,7 @@ export default function SearchStrings({ initialSavedStrings }) {
               onChange={(e) => setPokemonNames(e.target.value)}
             />
           </div>
+
           <div className="dual-inputs">
             <div>
               <label htmlFor="cpMin">CP min</label>
@@ -390,9 +341,10 @@ export default function SearchStrings({ initialSavedStrings }) {
               />
             </div>
           </div>
+
           <div className="dual-inputs">
             <div>
-              <label htmlFor="ageMin">Age min (days)</label>
+              <label htmlFor="ageMin">Age (days) min</label>
               <input
                 id="ageMin"
                 type="number"
@@ -402,7 +354,7 @@ export default function SearchStrings({ initialSavedStrings }) {
               />
             </div>
             <div>
-              <label htmlFor="ageMax">Age max (days)</label>
+              <label htmlFor="ageMax">Age (days) max</label>
               <input
                 id="ageMax"
                 type="number"
@@ -412,24 +364,15 @@ export default function SearchStrings({ initialSavedStrings }) {
               />
             </div>
           </div>
+
           <div>
-            <label>IV Filter</label>
-            <div className="iv-presets">
-              {[
-                { key: "fourStar", label: "4★ (Hundo)" },
-                { key: "threeStar", label: "3★+" },
-                { key: "nundo", label: "0★ non-shiny" },
-                {
-                  key: "pvp",
-                  label: "PvP bulk (0-2 / 13-15 / 13-15)",
-                },
-                { key: "custom", label: "Custom" },
-                { key: "none", label: "No IV filter" },
-              ].map((option) => (
+            <p className="label">IV presets</p>
+            <div className="preset-chips">
+              {ivPresetOptions.map((option) => (
                 <button
                   key={option.key}
                   type="button"
-                  className={`chip ${ivMode === option.key ? "active" : ""}`}
+                  className={ivMode === option.key ? "chip active" : "chip"}
                   onClick={() => applyIvPreset(option.key)}
                 >
                   {option.label}
@@ -505,18 +448,8 @@ export default function SearchStrings({ initialSavedStrings }) {
                 </div>
               </div>
             </div>
-            <label htmlFor="ivFilter">IV Filter</label>
-            <select
-              id="ivFilter"
-              value={ivFilter}
-              onChange={(e) => setIvFilter(e.target.value)}
-            >
-              <option value="fourStar">4★ (Hundo)</option>
-              <option value="threeStar">3★+</option>
-              <option value="nundo">0★ non-shiny</option>
-              <option value="">No IV filter</option>
-            </select>
           </div>
+
           <div className="checkboxes">
             {checkboxOptions.map((option) => (
               <label key={option.key} className="checkbox">
@@ -539,11 +472,7 @@ export default function SearchStrings({ initialSavedStrings }) {
                 Combine filters to mirror https://pogosearchgenerator.com/ behaviour.
               </p>
             </div>
-            <button
-              type="button"
-              disabled={!searchString}
-              onClick={() => handleCopy(searchString)}
-            >
+            <button type="button" disabled={!searchString} onClick={() => handleCopy(searchString)}>
               Copy
             </button>
           </div>
@@ -567,7 +496,6 @@ export default function SearchStrings({ initialSavedStrings }) {
         </div>
 
         {statusMessage && <p className="status">{statusMessage}</p>}
-        {status && <p className="status">{status}</p>}
       </div>
 
       <h2>Saved searches</h2>
@@ -580,28 +508,4 @@ export default function SearchStrings({ initialSavedStrings }) {
       />
     </div>
   );
-}
-
-export default SearchStrings;
-export async function getServerSideProps(context) {
-  const session = await getServerSession(context.req, context.res, authOptions);
-
-  if (!session) {
-    return { props: { initialSavedStrings: [] } };
-  }
-
-  const isAdmin = session.user.role === "admin";
-  const searchStrings = await prisma.searchString.findMany({
-    where: isAdmin ? {} : { ownerId: session.user.id },
-    include: { owner: { select: { id: true, ign: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  const initialSavedStrings = searchStrings.map((entry) => ({
-    ...entry,
-    createdAt: entry.createdAt.toISOString(),
-    updatedAt: entry.updatedAt.toISOString(),
-  }));
-
-  return { props: { initialSavedStrings } };
 }
