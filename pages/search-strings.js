@@ -119,12 +119,12 @@ export default function SearchStrings() {
   const [ageMin, setAgeMin] = useState("");
   const [ageMax, setAgeMax] = useState("");
   const [ivMode, setIvMode] = useState("fourStar");
-  const [attackMin, setAttackMin] = useState("15");
-  const [attackMax, setAttackMax] = useState("15");
-  const [defenseMin, setDefenseMin] = useState("15");
-  const [defenseMax, setDefenseMax] = useState("15");
-  const [hpMin, setHpMin] = useState("15");
-  const [hpMax, setHpMax] = useState("15");
+  const [attackMin, setAttackMin] = useState("4");
+  const [attackMax, setAttackMax] = useState("4");
+  const [defenseMin, setDefenseMin] = useState("4");
+  const [defenseMax, setDefenseMax] = useState("4");
+  const [hpMin, setHpMin] = useState("4");
+  const [hpMax, setHpMax] = useState("4");
   const [toggles, setToggles] = useState({
     includeShiny: true,
     includeShadow: false,
@@ -207,22 +207,22 @@ export default function SearchStrings() {
     setIvMode(preset);
 
     if (preset === "fourStar") {
-      setAttackMin("15");
-      setAttackMax("15");
-      setDefenseMin("15");
-      setDefenseMax("15");
-      setHpMin("15");
-      setHpMax("15");
+      setAttackMin("4");
+      setAttackMax("4");
+      setDefenseMin("4");
+      setDefenseMax("4");
+      setHpMin("4");
+      setHpMax("4");
       return;
     }
 
     if (preset === "pvp") {
       setAttackMin("0");
-      setAttackMax("2");
-      setDefenseMin("13");
-      setDefenseMax("15");
-      setHpMin("13");
-      setHpMax("15");
+      setAttackMax("1");
+      setDefenseMin("3");
+      setDefenseMax("4");
+      setHpMin("3");
+      setHpMax("4");
       return;
     }
 
@@ -388,7 +388,7 @@ export default function SearchStrings() {
                     id="atkRange"
                     type="number"
                     min="0"
-                    max="15"
+                    max="4"
                     placeholder="Min"
                     value={attackMin}
                     onChange={handleIvRangeChange(setAttackMin)}
@@ -396,7 +396,7 @@ export default function SearchStrings() {
                   <input
                     type="number"
                     min="0"
-                    max="15"
+                    max="4"
                     placeholder="Max"
                     value={attackMax}
                     onChange={handleIvRangeChange(setAttackMax)}
@@ -410,7 +410,7 @@ export default function SearchStrings() {
                     id="defRange"
                     type="number"
                     min="0"
-                    max="15"
+                    max="4"
                     placeholder="Min"
                     value={defenseMin}
                     onChange={handleIvRangeChange(setDefenseMin)}
@@ -418,7 +418,7 @@ export default function SearchStrings() {
                   <input
                     type="number"
                     min="0"
-                    max="15"
+                    max="4"
                     placeholder="Max"
                     value={defenseMax}
                     onChange={handleIvRangeChange(setDefenseMax)}
@@ -432,7 +432,7 @@ export default function SearchStrings() {
                     id="hpRange"
                     type="number"
                     min="0"
-                    max="15"
+                    max="4"
                     placeholder="Min"
                     value={hpMin}
                     onChange={handleIvRangeChange(setHpMin)}
@@ -440,7 +440,7 @@ export default function SearchStrings() {
                   <input
                     type="number"
                     min="0"
-                    max="15"
+                    max="4"
                     placeholder="Max"
                     value={hpMax}
                     onChange={handleIvRangeChange(setHpMax)}
