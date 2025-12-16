@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build",
     "start": "next start -p 3000 -H 0.0.0.0",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
@@ -17,6 +18,8 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
+    "node-mocks-http": "^1.16.2",
     "eslint": "^8.48.0",
     "eslint-config-next": "^15.5.7",
     "prisma": "^5.8.0"
