@@ -1,5 +1,7 @@
-import { getSession, useSession } from "next-auth/react";
+import { getServerSession } from "next-auth/next";
+import { useSession } from "next-auth/react";
 import prisma from "../lib/prisma";
+import { authOptions } from "./api/auth/[...nextauth]";
 
 export default function Admin({ users, entries }) {
   const { data: session } = useSession();
@@ -91,7 +93,11 @@ export default function Admin({ users, entries }) {
 }
 
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
+  const session = await getServerSession(
+    context.req,
+    context.res,
+    authOptions
+  );
 
   if (!session || session.user.role !== "admin") {
     return {
