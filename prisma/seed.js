@@ -20,7 +20,7 @@ async function main() {
     },
   })
 
-  console.log("✅ Seeded user:", { ign, passwordPlain })
+  console.log("✅ Seeded default user", ign)
 }
 
 main()
