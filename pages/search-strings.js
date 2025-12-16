@@ -347,14 +347,6 @@ export default function SearchStrings() {
       </div>
 
       <h2>Saved searches</h2>
-      {!session && (
-        <div className="card">
-          <p className="muted">
-            You can build and copy searches without an account. Sign in to save
-            them for later or let an admin review them.
-          </p>
-        </div>
-      )}
       <SavedSearchList
         savedStrings={savedStrings}
         onCopy={handleCopy}
