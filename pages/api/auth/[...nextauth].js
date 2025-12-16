@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "../../../lib/prisma"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 
 export const authOptions = {
   session: { strategy: "jwt" },
@@ -14,6 +14,18 @@ export const authOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+// 🔴 ADD LOGGING HERE
+        console.log("=== AUTHORIZE CALLED ===")
+        console.log("credentials:", credentials)
+
+        if (!credentials) {
+          console.log("❌ No credentials received")
+          return null
+        }
+
+       
+
+        console.log("✅ Login successful")
         const user = await prisma.user.findUnique({
           where: { ign: credentials.ign },
         })
@@ -44,6 +56,10 @@ export const authOptions = {
         ...baseSession,
         user: {
           ...(baseSession.user ?? {}),
+      return {
+        ...session,
+        user: {
+          ...session?.user,
           id: token.id,
           ign: token.ign,
           role: token.role,

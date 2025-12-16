@@ -1,0 +1,169 @@
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background: #0d1117;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Page layout */
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+}
+
+/* Cards (same style as login box) */
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  padding: 20px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  transition: transform 0.15s ease;
+}
+
+.card:hover {
+  transform: scale(1.01);
+}
+
+/* Buttons */
+button {
+  background: #238636;
+  border: none;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:hover {
+  background: #2ea043;
+}
+
+/* Forms */
+input, select, textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #fff;
+}
+
+label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Responsive rules */
+@media (max-width: 600px) {
+  .container {
+    padding: 10px;
+  }
+  .card {
+    padding: 16px;
+  }
+  button {
+    width: 100%;
+  }
+}
+/* NAVBAR */
+.navbar {
+  width: 100%;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 10px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.nav-inner {
+  max-width: 900px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  font-size: 20px;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.nav-item {
+  color: #c9d1d9;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.nav-item:hover {
+  color: #fff;
+}
+
+.nav-btn {
+  background: #d73a49;
+  color: #fff;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-btn:hover {
+  background: #f85149;
+}
+
+/* Mobile Nav */
+.nav-toggle {
+  display: none;
+  font-size: 26px;
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .nav-toggle {
+    display: block;
+  }
+
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    background: #161b22;
+    border-top: 1px solid #30363d;
+    margin-top: 10px;
+    padding: 10px 0;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-item, .nav-btn {
+    width: 100%;
+    text-align: center;
+    padding: 12px 0;
+  }
+}

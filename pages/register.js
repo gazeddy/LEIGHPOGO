@@ -1,60 +1,49 @@
-import { useState } from "react";
-import { useRouter } from "next/router";
+import prisma from "../../../lib/prisma"
+import bcrypt from "bcryptjs"
 
-export default function Register() {
-  const [name, setName] = useState("");
-  const [ign, setIgn] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" })
+  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const { name, ign, password } = req.body
 
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, ign, password }),
-    });
+  if (!name || !ign || !password) {
+    return res.status(400).json({ error: "Missing required fields" })
+  }
 
-    setLoading(false);
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 8 characters" })
+  }
 
-    if (res.ok) {
-      router.push("/login"); // redirect after registration
-    } else {
-      const data = await res.json();
-      alert(data.error || "Registration failed");
+  try {
+    // Check if IGN already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { ign },
+    })
+
+    if (existingUser) {
+      return res.status(409).json({ error: "IGN already registered" })
     }
-  };
 
-  return (
-    <div style={{ maxWidth: "400px", margin: "50px auto" }}>
-      <h1>Register</h1>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        <input
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <input
-          placeholder="In-Game Name"
-          value={ign}
-          onChange={(e) => setIgn(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Registering..." : "Register"}
-        </button>
-      </form>
-    </div>
-  );
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Create user
+    await prisma.user.create({
+      data: {
+        name,
+        ign,
+        password: hashedPassword,
+        role: "user",
+      },
+    })
+
+    return res.status(201).json({ success: true })
+  } catch (err) {
+    console.error("REGISTER ERROR:", err)
+    return res.status(500).json({ error: "Internal server error" })
+  }
 }
