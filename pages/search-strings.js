@@ -22,6 +22,13 @@ function buildSearchString({
   cpMax,
   ageMin,
   ageMax,
+  ivMode,
+  attackMin,
+  attackMax,
+  defenseMin,
+  defenseMax,
+  hpMin,
+  hpMax,
   ivFilter,
   toggles,
 }) {
@@ -43,6 +50,30 @@ function buildSearchString({
     tokens.push(`age${ageMin || ""}-${ageMax || ""}`);
   }
 
+  if (ivMode === "fourStar") tokens.push("4*");
+  if (ivMode === "threeStar") tokens.push("3*");
+  if (ivMode === "nundo") tokens.push("0* & !shiny");
+
+  if (["custom", "pvp"].includes(ivMode)) {
+    const ivTokens = [];
+    const hasAttackRange = attackMin !== "" || attackMax !== "";
+    const hasDefenseRange = defenseMin !== "" || defenseMax !== "";
+    const hasHpRange = hpMin !== "" || hpMax !== "";
+
+    if (hasAttackRange) {
+      ivTokens.push(`atk${attackMin || ""}-${attackMax || ""}`);
+    }
+    if (hasDefenseRange) {
+      ivTokens.push(`def${defenseMin || ""}-${defenseMax || ""}`);
+    }
+    if (hasHpRange) {
+      ivTokens.push(`hp${hpMin || ""}-${hpMax || ""}`);
+    }
+
+    if (ivTokens.length) {
+      tokens.push(ivTokens.join(" & "));
+    }
+  }
   if (ivFilter === "fourStar") tokens.push("4*");
   if (ivFilter === "threeStar") tokens.push("3*");
   if (ivFilter === "nundo") tokens.push("0* & !shiny");
@@ -55,6 +86,15 @@ function buildSearchString({
 
   return tokens.join(" & ");
 }
+
+function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin, loading }) {
+  if (loading) {
+    return (
+      <div className="card">
+        <p>Loading saved searches...</p>
+      </div>
+    );
+  }
 
 function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
   if (!savedStrings.length) {
@@ -91,6 +131,8 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
   );
 }
 
+export default function SearchStrings() {
+  const { data: session, status: sessionStatus } = useSession();
 export default function SearchStrings({ initialSavedStrings }) {
   const { data: session } = useSession();
   const [pokemonNames, setPokemonNames] = useState("");
@@ -98,6 +140,13 @@ export default function SearchStrings({ initialSavedStrings }) {
   const [cpMax, setCpMax] = useState("");
   const [ageMin, setAgeMin] = useState("");
   const [ageMax, setAgeMax] = useState("");
+  const [ivMode, setIvMode] = useState("fourStar");
+  const [attackMin, setAttackMin] = useState("15");
+  const [attackMax, setAttackMax] = useState("15");
+  const [defenseMin, setDefenseMin] = useState("15");
+  const [defenseMax, setDefenseMax] = useState("15");
+  const [hpMin, setHpMin] = useState("15");
+  const [hpMax, setHpMax] = useState("15");
   const [ivFilter, setIvFilter] = useState("fourStar");
   const [toggles, setToggles] = useState({
     includeShiny: true,
@@ -111,6 +160,39 @@ export default function SearchStrings({ initialSavedStrings }) {
     excludeTraded: true,
   });
   const [title, setTitle] = useState("Raid ready shinies");
+  const [savedStrings, setSavedStrings] = useState([]);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [loadingSaved, setLoadingSaved] = useState(false);
+
+  useEffect(() => {
+    const loadSaved = async () => {
+      if (!session) {
+        setSavedStrings([]);
+        return;
+      }
+
+      setLoadingSaved(true);
+
+      try {
+        const response = await fetch("/api/search-strings");
+        if (!response.ok) {
+          throw new Error("Unable to load saved searches");
+        }
+
+        const searches = await response.json();
+        setSavedStrings(searches);
+      } catch (error) {
+        console.error(error);
+        setStatusMessage("Could not load saved searches.");
+      } finally {
+        setLoadingSaved(false);
+      }
+    };
+
+    if (sessionStatus !== "loading") {
+      loadSaved();
+    }
+  }, [session, sessionStatus]);
   const [savedStrings, setSavedStrings] = useState(initialSavedStrings || []);
   const [status, setStatus] = useState("");
 
@@ -126,6 +208,74 @@ export default function SearchStrings({ initialSavedStrings }) {
         cpMax,
         ageMin,
         ageMax,
+        ivMode,
+        attackMin,
+        attackMax,
+        defenseMin,
+        defenseMax,
+        hpMin,
+        hpMax,
+        toggles,
+      }),
+    [
+      pokemonNames,
+      cpMin,
+      cpMax,
+      ageMin,
+      ageMax,
+      ivMode,
+      attackMin,
+      attackMax,
+      defenseMin,
+      defenseMax,
+      hpMin,
+      hpMax,
+      toggles,
+    ]
+  );
+
+  const applyIvPreset = (preset) => {
+    setIvMode(preset);
+
+    if (preset === "fourStar") {
+      setAttackMin("15");
+      setAttackMax("15");
+      setDefenseMin("15");
+      setDefenseMax("15");
+      setHpMin("15");
+      setHpMax("15");
+      return;
+    }
+
+    if (preset === "pvp") {
+      setAttackMin("0");
+      setAttackMax("2");
+      setDefenseMin("13");
+      setDefenseMax("15");
+      setHpMin("13");
+      setHpMax("15");
+      return;
+    }
+
+    if (preset === "custom") {
+      return;
+    }
+
+    if (preset === "none") {
+      setAttackMin("");
+      setAttackMax("");
+      setDefenseMin("");
+      setDefenseMax("");
+      setHpMin("");
+      setHpMax("");
+    }
+  };
+
+  const handleIvRangeChange = (setter) => (event) => {
+    setIvMode("custom");
+    setter(event.target.value);
+  };
+
         ivFilter,
         toggles,
       }),
@@ -138,17 +288,21 @@ export default function SearchStrings({ initialSavedStrings }) {
 
   const handleCopy = async (value) => {
     await navigator.clipboard.writeText(value);
+    setStatusMessage("Copied to clipboard");
+    setTimeout(() => setStatusMessage(""), 2000);
     setStatus("Copied to clipboard");
     setTimeout(() => setStatus(""), 2000);
   };
 
   const handleSave = async () => {
     if (!session) {
+      setStatusMessage("Login to save your search string.");
       setStatus("Login to save your search string.");
       return;
     }
 
     if (!searchString.trim()) {
+      setStatusMessage("Build a search string before saving.");
       setStatus("Build a search string before saving.");
       return;
     }
@@ -161,12 +315,14 @@ export default function SearchStrings({ initialSavedStrings }) {
 
     if (!response.ok) {
       const error = await response.json();
+      setStatusMessage(error.error || "Unable to save search.");
       setStatus(error.error || "Unable to save search.");
       return;
     }
 
     const saved = await response.json();
     setSavedStrings((prev) => [saved, ...prev]);
+    setStatusMessage("Saved!");
     setStatus("Saved!");
   };
 
@@ -177,6 +333,9 @@ export default function SearchStrings({ initialSavedStrings }) {
 
     if (response.ok) {
       setSavedStrings((prev) => prev.filter((item) => item.id !== id));
+      setStatusMessage("Deleted");
+    } else {
+      setStatusMessage("Unable to delete search");
       setStatus("Deleted");
     } else {
       setStatus("Unable to delete search");
@@ -250,6 +409,98 @@ export default function SearchStrings({ initialSavedStrings }) {
             </div>
           </div>
           <div>
+            <label>IV Filter</label>
+            <div className="iv-presets">
+              {[
+                { key: "fourStar", label: "4★ (Hundo)" },
+                { key: "threeStar", label: "3★+" },
+                { key: "nundo", label: "0★ non-shiny" },
+                {
+                  key: "pvp",
+                  label: "PvP bulk (0-2 / 13-15 / 13-15)",
+                },
+                { key: "custom", label: "Custom" },
+                { key: "none", label: "No IV filter" },
+              ].map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`chip ${ivMode === option.key ? "active" : ""}`}
+                  onClick={() => applyIvPreset(option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="iv-grid">
+              <div>
+                <label htmlFor="atkRange">Attack</label>
+                <div className="dual-inputs compact-inputs">
+                  <input
+                    id="atkRange"
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Min"
+                    value={attackMin}
+                    onChange={handleIvRangeChange(setAttackMin)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Max"
+                    value={attackMax}
+                    onChange={handleIvRangeChange(setAttackMax)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="defRange">Defense</label>
+                <div className="dual-inputs compact-inputs">
+                  <input
+                    id="defRange"
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Min"
+                    value={defenseMin}
+                    onChange={handleIvRangeChange(setDefenseMin)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Max"
+                    value={defenseMax}
+                    onChange={handleIvRangeChange(setDefenseMax)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="hpRange">HP</label>
+                <div className="dual-inputs compact-inputs">
+                  <input
+                    id="hpRange"
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Min"
+                    value={hpMin}
+                    onChange={handleIvRangeChange(setHpMin)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Max"
+                    value={hpMax}
+                    onChange={handleIvRangeChange(setHpMax)}
+                  />
+                </div>
+              </div>
+            </div>
             <label htmlFor="ivFilter">IV Filter</label>
             <select
               id="ivFilter"
@@ -311,6 +562,7 @@ export default function SearchStrings({ initialSavedStrings }) {
           </button>
         </div>
 
+        {statusMessage && <p className="status">{statusMessage}</p>}
         {status && <p className="status">{status}</p>}
       </div>
 
@@ -320,6 +572,7 @@ export default function SearchStrings({ initialSavedStrings }) {
         onCopy={handleCopy}
         onDelete={handleDelete}
         isAdmin={isAdmin}
+        loading={loadingSaved}
       />
     </div>
   );

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth/next";
 import { useSession } from "next-auth/react";
 import prisma from "../lib/prisma";
@@ -91,6 +92,21 @@ export default function Admin({ users, entries, searchStrings }) {
 
       <section>
         <h2>Saved search strings</h2>
+
+        <div className="info-callout">
+          <div>
+            <h3>Generate a new search</h3>
+            <p className="muted">
+              Use the Storage Search Builder to assemble a string, copy it, and
+              save it to appear in this admin table. Only the creator and
+              admins can view saved strings.
+            </p>
+          </div>
+          <Link className="nav-item" href="/search-strings">
+            Open Storage Search Builder
+          </Link>
+        </div>
+
         <table>
           <thead>
             <tr>
