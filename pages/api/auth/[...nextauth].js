@@ -48,18 +48,16 @@ export const authOptions = {
       return token
     },
     async session({ session, token }) {
-      if (!token?.id) return session
+      if (!token?.id) {
+        return session ?? null
+      }
 
-      const baseSession = session ?? { user: {} }
+      const baseSession = session ?? {}
 
       return {
         ...baseSession,
         user: {
           ...(baseSession.user ?? {}),
-      return {
-        ...session,
-        user: {
-          ...session?.user,
           id: token.id,
           ign: token.ign,
           role: token.role,
