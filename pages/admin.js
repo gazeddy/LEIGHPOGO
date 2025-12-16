@@ -114,14 +114,11 @@ export async function getServerSideProps(context) {
     orderBy: { createdAt: "desc" },
   });
 
-  // ✅ Convert Date objects to strings so Next.js can serialize props
+  // ✅ Convert Date objects to strings so Next.js can serialize props (both timestamps exist)
   const entries = rawEntries.map((entry) => ({
     ...entry,
     createdAt: entry.createdAt.toISOString(),
-    // Only include updatedAt if it exists in your schema
-    ...(entry.updatedAt !== undefined
-      ? { updatedAt: entry.updatedAt ? entry.updatedAt.toISOString() : null }
-      : {}),
+    updatedAt: entry.updatedAt.toISOString(),
   }));
 
   return { props: { users, entries } };
