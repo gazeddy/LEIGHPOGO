@@ -4,13 +4,28 @@ import prisma from "../../../lib/prisma";
 export default async function handler(req, res) {
   const session = await getSession({ req });
 
-  if (!session || session.user.role !== "admin") {
+  if (!session) {
     return res.status(403).json({ error: "Access denied" });
   }
 
   const entryId = parseInt(req.query.id);
 
+  const existingEntry = await prisma.entry.findUnique({
+    where: { id: entryId },
+  });
+
+  if (!existingEntry) {
+    return res.status(404).json({ error: "Entry not found" });
+  }
+
+  const isOwner = existingEntry.ownerId === session.user.id;
+  const isAdmin = session.user.role === "admin";
+
   if (req.method === "PATCH") {
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     const { trainerName, friendCode } = req.body;
 
     if (!trainerName || !friendCode) {
@@ -29,6 +44,10 @@ export default async function handler(req, res) {
     }
 
   } else if (req.method === "DELETE") {
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     try {
       await prisma.entry.delete({ where: { id: entryId } });
       res.status(200).json({ message: "Entry deleted" });
