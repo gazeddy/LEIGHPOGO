@@ -9,7 +9,7 @@ datasource db {
 
 model User {
   id       Int     @id @default(autoincrement())
-  name     String
+  name     String?
   ign      String  @unique
   password String
   entries  Entry[] // back-relation to Entry
