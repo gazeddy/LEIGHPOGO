@@ -109,10 +109,20 @@ export async function getServerSideProps(context) {
     select: { id: true, ign: true, role: true },
   });
 
-  const entries = await prisma.entry.findMany({
+  const rawEntries = await prisma.entry.findMany({
     include: { owner: { select: { ign: true } } },
     orderBy: { createdAt: "desc" },
   });
+
+  // ✅ Convert Date objects to strings so Next.js can serialize props
+  const entries = rawEntries.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    // Only include updatedAt if it exists in your schema
+    ...(entry.updatedAt !== undefined
+      ? { updatedAt: entry.updatedAt ? entry.updatedAt.toISOString() : null }
+      : {}),
+  }));
 
   return { props: { users, entries } };
 }

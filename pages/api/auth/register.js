@@ -1,21 +1,48 @@
-
-import prisma from '../../../lib/prisma'
-import bcrypt from 'bcrypt'
+import prisma from "../../../lib/prisma"
+import bcrypt from "bcryptjs"
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end()
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" })
+  }
 
-  const { email, password, name } = req.body
-  if (!email || !password) return res.status(400).json({ error: 'Missing fields' })
+  const { name, ign, password } = req.body
 
-  const existing = await prisma.user.findUnique({ where: { email } })
-  if (existing) return res.status(400).json({ error: 'Email already exists' })
+  // ✅ Only IGN + password are required
+  if (!ign || !password) {
+    return res.status(400).json({ error: "IGN and password are required" })
+  }
 
-  const hashed = await bcrypt.hash(password, 10)
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 8 characters" })
+  }
 
-  const user = await prisma.user.create({
-    data: { email, name, password: hashed, role: 'user' }
-  })
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { ign },
+    })
 
-  return res.status(201).json({ success: true })
+    if (existingUser) {
+      return res.status(409).json({ error: "IGN already registered" })
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    await prisma.user.create({
+      data: {
+        // ✅ Default name to IGN if not provided
+        name: name && name.trim() ? name.trim() : ign,
+        ign,
+        password: hashedPassword,
+        role: "user",
+      },
+    })
+
+    return res.status(201).json({ success: true })
+  } catch (err) {
+    console.error("REGISTER ERROR:", err)
+    return res.status(500).json({ error: "Internal server error" })
+  }
 }
