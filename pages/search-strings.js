@@ -131,6 +131,8 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
   );
 }
 
+export default function SearchStrings() {
+  const { data: session, status: sessionStatus } = useSession();
 function SearchStrings() {
   const { data: session, status: sessionStatus } = useSession();
 export default function SearchStrings() {
