@@ -22,6 +22,13 @@ function buildSearchString({
   cpMax,
   ageMin,
   ageMax,
+  ivMode,
+  attackMin,
+  attackMax,
+  defenseMin,
+  defenseMax,
+  hpMin,
+  hpMax,
   ivFilter,
   toggles,
 }) {
@@ -43,6 +50,30 @@ function buildSearchString({
     tokens.push(`age${ageMin || ""}-${ageMax || ""}`);
   }
 
+  if (ivMode === "fourStar") tokens.push("4*");
+  if (ivMode === "threeStar") tokens.push("3*");
+  if (ivMode === "nundo") tokens.push("0* & !shiny");
+
+  if (["custom", "pvp"].includes(ivMode)) {
+    const ivTokens = [];
+    const hasAttackRange = attackMin !== "" || attackMax !== "";
+    const hasDefenseRange = defenseMin !== "" || defenseMax !== "";
+    const hasHpRange = hpMin !== "" || hpMax !== "";
+
+    if (hasAttackRange) {
+      ivTokens.push(`atk${attackMin || ""}-${attackMax || ""}`);
+    }
+    if (hasDefenseRange) {
+      ivTokens.push(`def${defenseMin || ""}-${defenseMax || ""}`);
+    }
+    if (hasHpRange) {
+      ivTokens.push(`hp${hpMin || ""}-${hpMax || ""}`);
+    }
+
+    if (ivTokens.length) {
+      tokens.push(ivTokens.join(" & "));
+    }
+  }
   if (ivFilter === "fourStar") tokens.push("4*");
   if (ivFilter === "threeStar") tokens.push("3*");
   if (ivFilter === "nundo") tokens.push("0* & !shiny");
@@ -102,6 +133,10 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
 
 export default function SearchStrings() {
   const { data: session, status: sessionStatus } = useSession();
+function SearchStrings() {
+  const { data: session, status: sessionStatus } = useSession();
+export default function SearchStrings() {
+  const { data: session, status: sessionStatus } = useSession();
 export default function SearchStrings({ initialSavedStrings }) {
   const { data: session } = useSession();
   const [pokemonNames, setPokemonNames] = useState("");
@@ -109,6 +144,13 @@ export default function SearchStrings({ initialSavedStrings }) {
   const [cpMax, setCpMax] = useState("");
   const [ageMin, setAgeMin] = useState("");
   const [ageMax, setAgeMax] = useState("");
+  const [ivMode, setIvMode] = useState("fourStar");
+  const [attackMin, setAttackMin] = useState("15");
+  const [attackMax, setAttackMax] = useState("15");
+  const [defenseMin, setDefenseMin] = useState("15");
+  const [defenseMax, setDefenseMax] = useState("15");
+  const [hpMin, setHpMin] = useState("15");
+  const [hpMax, setHpMax] = useState("15");
   const [ivFilter, setIvFilter] = useState("fourStar");
   const [toggles, setToggles] = useState({
     includeShiny: true,
@@ -170,6 +212,74 @@ export default function SearchStrings({ initialSavedStrings }) {
         cpMax,
         ageMin,
         ageMax,
+        ivMode,
+        attackMin,
+        attackMax,
+        defenseMin,
+        defenseMax,
+        hpMin,
+        hpMax,
+        toggles,
+      }),
+    [
+      pokemonNames,
+      cpMin,
+      cpMax,
+      ageMin,
+      ageMax,
+      ivMode,
+      attackMin,
+      attackMax,
+      defenseMin,
+      defenseMax,
+      hpMin,
+      hpMax,
+      toggles,
+    ]
+  );
+
+  const applyIvPreset = (preset) => {
+    setIvMode(preset);
+
+    if (preset === "fourStar") {
+      setAttackMin("15");
+      setAttackMax("15");
+      setDefenseMin("15");
+      setDefenseMax("15");
+      setHpMin("15");
+      setHpMax("15");
+      return;
+    }
+
+    if (preset === "pvp") {
+      setAttackMin("0");
+      setAttackMax("2");
+      setDefenseMin("13");
+      setDefenseMax("15");
+      setHpMin("13");
+      setHpMax("15");
+      return;
+    }
+
+    if (preset === "custom") {
+      return;
+    }
+
+    if (preset === "none") {
+      setAttackMin("");
+      setAttackMax("");
+      setDefenseMin("");
+      setDefenseMax("");
+      setHpMin("");
+      setHpMax("");
+    }
+  };
+
+  const handleIvRangeChange = (setter) => (event) => {
+    setIvMode("custom");
+    setter(event.target.value);
+  };
+
         ivFilter,
         toggles,
       }),
@@ -303,6 +413,98 @@ export default function SearchStrings({ initialSavedStrings }) {
             </div>
           </div>
           <div>
+            <label>IV Filter</label>
+            <div className="iv-presets">
+              {[
+                { key: "fourStar", label: "4★ (Hundo)" },
+                { key: "threeStar", label: "3★+" },
+                { key: "nundo", label: "0★ non-shiny" },
+                {
+                  key: "pvp",
+                  label: "PvP bulk (0-2 / 13-15 / 13-15)",
+                },
+                { key: "custom", label: "Custom" },
+                { key: "none", label: "No IV filter" },
+              ].map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`chip ${ivMode === option.key ? "active" : ""}`}
+                  onClick={() => applyIvPreset(option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="iv-grid">
+              <div>
+                <label htmlFor="atkRange">Attack</label>
+                <div className="dual-inputs compact-inputs">
+                  <input
+                    id="atkRange"
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Min"
+                    value={attackMin}
+                    onChange={handleIvRangeChange(setAttackMin)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Max"
+                    value={attackMax}
+                    onChange={handleIvRangeChange(setAttackMax)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="defRange">Defense</label>
+                <div className="dual-inputs compact-inputs">
+                  <input
+                    id="defRange"
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Min"
+                    value={defenseMin}
+                    onChange={handleIvRangeChange(setDefenseMin)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Max"
+                    value={defenseMax}
+                    onChange={handleIvRangeChange(setDefenseMax)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="hpRange">HP</label>
+                <div className="dual-inputs compact-inputs">
+                  <input
+                    id="hpRange"
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Min"
+                    value={hpMin}
+                    onChange={handleIvRangeChange(setHpMin)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="Max"
+                    value={hpMax}
+                    onChange={handleIvRangeChange(setHpMax)}
+                  />
+                </div>
+              </div>
+            </div>
             <label htmlFor="ivFilter">IV Filter</label>
             <select
               id="ivFilter"
@@ -380,6 +582,7 @@ export default function SearchStrings({ initialSavedStrings }) {
   );
 }
 
+export default SearchStrings;
 export async function getServerSideProps(context) {
   const session = await getServerSession(context.req, context.res, authOptions);
 
