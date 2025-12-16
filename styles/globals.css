@@ -65,6 +65,120 @@ label {
   display: block;
 }
 
+.muted {
+  color: #8b949e;
+  margin-top: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.dual-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.result-card {
+  background: #0d1117;
+  border: 1px dashed #30363d;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.query-preview {
+  display: block;
+  background: #161b22;
+  border: 1px solid #30363d;
+  padding: 12px;
+  border-radius: 8px;
+  color: #9ecbff;
+  white-space: pre-wrap;
+}
+
+.save-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.save-row input {
+  min-width: 260px;
+}
+
+.status {
+  margin-top: 10px;
+  color: #a5d6ff;
+}
+
+.saved-list {
+  display: grid;
+  gap: 12px;
+}
+
+.saved-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.saved-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.info-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+}
+
+.info-callout h3 {
+  margin: 0 0 4px 0;
+}
+
+.info-callout a {
+  white-space: nowrap;
+}
+
+.danger {
+  background: #b62324;
+}
+
 /* Responsive rules */
 @media (max-width: 600px) {
   .container {
@@ -75,6 +189,15 @@ label {
   }
   button {
     width: 100%;
+  }
+
+  .dual-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .save-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 /* NAVBAR */
