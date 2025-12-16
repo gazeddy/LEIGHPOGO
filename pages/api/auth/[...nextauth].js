@@ -70,6 +70,6 @@ export const authOptions = {
   pages: {
     signIn: "/login", // your custom login page
   },
-}
+};
 
-export default NextAuth(authOptions)
+export default NextAuth(authOptions);
