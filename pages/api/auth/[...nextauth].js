@@ -14,18 +14,10 @@ export const authOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-// 🔴 ADD LOGGING HERE
-        console.log("=== AUTHORIZE CALLED ===")
-        console.log("credentials:", credentials)
-
         if (!credentials) {
-          console.log("❌ No credentials received")
           return null
         }
 
-       
-
-        console.log("✅ Login successful")
         const user = await prisma.user.findUnique({
           where: { ign: credentials.ign },
         })
