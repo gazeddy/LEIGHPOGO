@@ -131,6 +131,8 @@ function SavedSearchList({ savedStrings, onCopy, onDelete, isAdmin }) {
   );
 }
 
+function SearchStrings() {
+  const { data: session, status: sessionStatus } = useSession();
 export default function SearchStrings() {
   const { data: session, status: sessionStatus } = useSession();
 export default function SearchStrings({ initialSavedStrings }) {
@@ -578,6 +580,7 @@ export default function SearchStrings({ initialSavedStrings }) {
   );
 }
 
+export default SearchStrings;
 export async function getServerSideProps(context) {
   const session = await getServerSession(context.req, context.res, authOptions);
 
