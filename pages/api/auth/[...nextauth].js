@@ -36,15 +36,26 @@ export const authOptions = {
       return token
     },
     async session({ session, token }) {
-      session.user.id = token.id
-      session.user.ign = token.ign
-      session.user.role = token.role
-      return session
+      if (!token?.id) {
+        return session ?? null
+      }
+
+      const baseSession = session ?? {}
+
+      return {
+        ...baseSession,
+        user: {
+          ...(baseSession.user ?? {}),
+          id: token.id,
+          ign: token.ign,
+          role: token.role,
+        },
+      }
     },
   },
   pages: {
     signIn: "/login", // your custom login page
   },
-}
+};
 
-export default NextAuth(authOptions)
+export default NextAuth(authOptions);

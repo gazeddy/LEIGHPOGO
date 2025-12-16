@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import prisma from "../../lib/prisma";
 
 export async function getServerSideProps(context) {
@@ -34,7 +35,7 @@ export default function EntryPage({ entry }) {
       <p><strong>Trainer Name:</strong> {entry.trainerName}</p>
       <p><strong>Friend Code:</strong> {entry.friendCode}</p>
 
-      <a href="/entries">← Back to entries</a>
+      <Link href="/entries">← Back to entries</Link>
     </div>
   );
 }
