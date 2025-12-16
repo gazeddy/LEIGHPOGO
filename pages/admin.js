@@ -3,7 +3,7 @@ import { useSession } from "next-auth/react";
 import prisma from "../lib/prisma";
 import { authOptions } from "./api/auth/[...nextauth]";
 
-export default function Admin({ users, entries }) {
+export default function Admin({ users, entries, searchStrings }) {
   const { data: session } = useSession();
 
   if (!session || session.user.role !== "admin") {
@@ -81,8 +81,36 @@ export default function Admin({ users, entries }) {
               <tr key={entry.id}>
                 <td>{entry.id}</td>
                 <td>{entry.trainerName}</td>
-                <td>{entry.friendCode}</td>
+                <td>{entry.code}</td>
                 <td>{entry.owner.ign}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Saved search strings</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Owner</th>
+              <th>Last updated</th>
+              <th>Query</th>
+            </tr>
+          </thead>
+          <tbody>
+            {searchStrings.map((saved) => (
+              <tr key={saved.id}>
+                <td>{saved.id}</td>
+                <td>{saved.title}</td>
+                <td>{saved.owner.ign}</td>
+                <td>{new Date(saved.updatedAt).toLocaleString()}</td>
+                <td>
+                  <code>{saved.query}</code>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -114,6 +142,11 @@ export async function getServerSideProps(context) {
     orderBy: { createdAt: "desc" },
   });
 
+  const rawSearchStrings = await prisma.searchString.findMany({
+    include: { owner: { select: { ign: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+
   // ✅ Convert Date objects to strings so Next.js can serialize props (both timestamps exist)
   const entries = rawEntries.map((entry) => ({
     ...entry,
@@ -121,5 +154,11 @@ export async function getServerSideProps(context) {
     updatedAt: entry.updatedAt.toISOString(),
   }));
 
-  return { props: { users, entries } };
+  const searchStrings = rawSearchStrings.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+  }));
+
+  return { props: { users, entries, searchStrings } };
 }
