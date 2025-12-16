@@ -14,6 +14,7 @@ model User {
   password String
   entries  Entry[] // back-relation to Entry
   role     String  @default("user")
+  searchStrings SearchString[]
 }
 
 model Entry {
@@ -24,4 +25,14 @@ model Entry {
   owner       User     @relation(fields: [ownerId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model SearchString {
+  id        Int      @id @default(autoincrement())
+  title     String
+  query     String
+  ownerId   Int
+  owner     User     @relation(fields: [ownerId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
