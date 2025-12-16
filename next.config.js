@@ -9,6 +9,7 @@ const nextConfig = {
   allowedDevOrigins: [
     "http://192.168.2.254:3000",
     "http://localhost:3000",
+    "https://dev.leighpogo.co.uk",
   ],
 };
 

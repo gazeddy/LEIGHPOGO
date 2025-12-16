@@ -1,8 +1,9 @@
-import { getSession } from "next-auth/react";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./auth/[...nextauth]";
 import prisma from "../../lib/prisma"; // adjust path if needed
 
 export default async function handler(req, res) {
-  const session = await getSession({ req });
+  const session = await getServerSession(req, res, authOptions);
 
   if (!session) {
     return res.status(401).json({ error: "You must be logged in." });
@@ -10,17 +11,16 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const { trainerName, friendCode, code } = req.body;
+      const { trainerName, friendCode } = req.body;
 
-      if (!trainerName || !friendCode || !code) {
+      if (!trainerName || !friendCode) {
         return res.status(400).json({ error: "All fields are required." });
       }
 
       const entry = await prisma.entry.create({
         data: {
           trainerName,
-          friendCode,
-          code,
+          code: friendCode,
           ownerId: session.user.id,
         },
         include: {
