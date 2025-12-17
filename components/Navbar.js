@@ -14,7 +14,12 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="nav-inner">
         <Link href="/" className="nav-logo">
-          Pokémon GO Codes
+          <img
+    src="./favicon.ico"
+    
+    className="nav-favicon"
+  />
+  <span>Leigh Pokemon Go Community</span>
         </Link>
 
         <button className="nav-toggle" onClick={() => setOpen(!open)}>
