@@ -29,6 +29,7 @@ export default function Navbar() {
           {session && (
             <>
               <Link href="/entries/add" className="nav-item">Add Entry</Link>
+              <Link href="/account" className="nav-item">Account</Link>
               {isAdmin && <Link href="/admin" className="nav-item">Admin Panel</Link>}
               <button
                 className="nav-btn"

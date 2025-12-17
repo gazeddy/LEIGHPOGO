@@ -10,6 +10,7 @@ export default function Admin({ users, entries, searchStrings }) {
   const [entryList, setEntryList] = useState(entries);
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editForm, setEditForm] = useState({ trainerName: "", friendCode: "" });
+  const [passwordResets, setPasswordResets] = useState({});
 
   if (!session || session.user.role !== "admin") {
     return <p>Access denied</p>;
@@ -22,6 +23,29 @@ export default function Admin({ users, entries, searchStrings }) {
       body: JSON.stringify({ role: newRole }),
     });
     location.reload(); // simple way to refresh page
+  };
+
+  const handlePasswordReset = async (id) => {
+    const newPassword = passwordResets[id] ?? "";
+
+    if (newPassword.length < 8) {
+      alert("Password must be at least 8 characters long");
+      return;
+    }
+
+    const res = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: newPassword }),
+    });
+
+    if (!res.ok) {
+      alert("Failed to reset password");
+      return;
+    }
+
+    alert("Password updated");
+    setPasswordResets((current) => ({ ...current, [id]: "" }));
   };
 
   const handleDelete = async (id) => {
@@ -85,6 +109,7 @@ export default function Admin({ users, entries, searchStrings }) {
               <th>ID</th>
               <th>IGN</th>
               <th>Role</th>
+              <th>Reset password</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -94,6 +119,22 @@ export default function Admin({ users, entries, searchStrings }) {
                 <td>{user.id}</td>
                 <td>{user.ign}</td>
                 <td>{user.role}</td>
+                <td>
+                  <input
+                    type="password"
+                    placeholder="New password"
+                    value={passwordResets[user.id] ?? ""}
+                    onChange={(e) =>
+                      setPasswordResets((current) => ({
+                        ...current,
+                        [user.id]: e.target.value,
+                      }))
+                    }
+                  />
+                  <button onClick={() => handlePasswordReset(user.id)}>
+                    Save
+                  </button>
+                </td>
                 <td>
                   {user.role === "user" ? (
                     <button onClick={() => handleRoleChange(user.id, "admin")}>
