@@ -76,6 +76,12 @@ label {
   gap: 16px;
 }
 
+.stack {
+  display: grid;
+  gap: 12px;
+  max-width: 460px;
+}
+
 .dual-inputs {
   display: grid;
   grid-template-columns: 1fr 1fr;
