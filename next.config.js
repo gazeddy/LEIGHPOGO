@@ -10,6 +10,8 @@ const nextConfig = {
     "http://192.168.2.254:3000",
     "http://localhost:3000",
     "https://dev.leighpogo.co.uk",
+    "https://leighpogo.co.uk",
+    "https://www.leighpogo.co.uk",
   ],
 };
 
