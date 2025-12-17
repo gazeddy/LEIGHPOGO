@@ -24,6 +24,7 @@ export default function Navbar() {
         <div className={`nav-links ${open ? "open" : ""}`}>
           <Link href="/" className="nav-item">Home</Link>
           <Link href="/search-strings" className="nav-item">Search Builder</Link>
+          <Link href="/pokedex" className="nav-item">Pokédex</Link>
 
           {session && (
             <>
