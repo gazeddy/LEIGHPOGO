@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
+import favicon from "./favicon.ico";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -14,12 +16,12 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="nav-inner">
         <Link href="/" className="nav-logo">
-          <img
-    src="./favicon.ico"
-    
-    className="nav-favicon"
-  />
-  <span>Leigh Pokemon Go Community</span>
+          <Image
+            src={favicon}
+            alt="Leigh Pokémon Go Community"
+            className="nav-favicon"
+          />
+          <span>Leigh Pokemon Go Community</span>
         </Link>
 
         <button className="nav-toggle" onClick={() => setOpen(!open)}>
@@ -33,7 +35,6 @@ export default function Navbar() {
 
           {session && (
             <>
-              <Link href="/entries/add" className="nav-item">Add Entry</Link>
               <Link href="/account" className="nav-item">Account</Link>
               {isAdmin && <Link href="/admin" className="nav-item">Admin Panel</Link>}
               <button

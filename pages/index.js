@@ -1,20 +1,100 @@
+import { useSession } from "next-auth/react"
+import { useState } from "react"
 import prisma from "../lib/prisma"
 
 export default function Home({ entries }) {
+  const { data: session } = useSession()
+  const [trainerName, setTrainerName] = useState("")
+  const [friendCode, setFriendCode] = useState("")
+  const [message, setMessage] = useState("")
+  const [entryList, setEntryList] = useState(entries)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!session) {
+      setMessage("You must be logged in to add a friend code.")
+      return
+    }
+
+    const res = await fetch("/api/entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trainerName,
+        friendCode,
+      }),
+    })
+
+    if (res.ok) {
+      const newEntry = await res.json()
+      setEntryList((prev) => [newEntry, ...prev])
+      setTrainerName("")
+      setFriendCode("")
+      setMessage("Entry added!")
+    } else {
+      const err = await res.json()
+      setMessage(err.error || "Failed to add entry.")
+    }
+  }
+
   return (
     <div className="container">
-      <h1>Pokémon GO Friend Codes</h1>
-      {entries.length === 0 ? (
-        <p>No entries yet.</p>
-      ) : (
-        <ul>
-          {entries.map((entry) => (
-            <li key={entry.id}>
-              <strong>{entry.owner.ign}</strong>: {entry.code}
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="card">
+        <h1>Pokémon GO Friend Codes</h1>
+        <p className="muted">
+          Browse the latest codes from the community and add your own to let others
+          connect with you.
+        </p>
+      </div>
+
+      <div className="card">
+        <h2>Add your friend code</h2>
+        {session ? (
+          <form className="stack" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="trainerName">Trainer Name</label>
+              <input
+                id="trainerName"
+                type="text"
+                placeholder="Trainer Name"
+                value={trainerName}
+                onChange={(e) => setTrainerName(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="friendCode">Friend Code</label>
+              <input
+                id="friendCode"
+                type="text"
+                placeholder="Friend Code"
+                value={friendCode}
+                onChange={(e) => setFriendCode(e.target.value)}
+                required
+              />
+            </div>
+            <button type="submit">Submit</button>
+          </form>
+        ) : (
+          <p className="muted">Log in to add your friend code.</p>
+        )}
+        {message && <p className="status">{message}</p>}
+      </div>
+
+      <div className="card">
+        <h2>Community friend codes</h2>
+        {entryList.length === 0 ? (
+          <p>No entries yet.</p>
+        ) : (
+          <ul>
+            {entryList.map((entry) => (
+              <li key={entry.id}>
+                <strong>{entry.owner.ign}</strong>: {entry.code}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
