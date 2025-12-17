@@ -139,7 +139,7 @@ export default function PokedexPage() {
       <div className="card pokedex-hero">
         <div>
           <h1>Pokédex Tracker</h1>
-          <p className="muted">Mark Pokémon you've obtained by National Dex order, grouped by region.</p>
+          <p className="muted">Mark Pokémon you’ve obtained by National Dex order, grouped by region.</p>
           <p className="muted">
             Progress: {caughtCount} / {flatPokemonList.length} ({caughtPercentage}%)
           </p>
