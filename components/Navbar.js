@@ -29,10 +29,12 @@ export default function Navbar() {
         <div className={`nav-links ${open ? "open" : ""}`}>
           <Link href="/" className="nav-item">Home</Link>
           <Link href="/search-strings" className="nav-item">Search Builder</Link>
+          <Link href="/pokedex" className="nav-item">Pokédex</Link>
 
           {session && (
             <>
-              <Link href="/entries/add" className="nav-item">Add Code</Link>
+              <Link href="/entries/add" className="nav-item">Add Entry</Link>
+              <Link href="/account" className="nav-item">Account</Link>
               {isAdmin && <Link href="/admin" className="nav-item">Admin Panel</Link>}
               <button
                 className="nav-btn"
