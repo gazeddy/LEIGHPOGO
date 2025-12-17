@@ -3,6 +3,7 @@ import { useSession } from "next-auth/react"
 import pokedexByRegion, { flatPokemonList } from "../lib/pokedexData"
 
 function PokedexRegion({ region, caughtSet, onToggle }) {
+  const [isOpen, setIsOpen] = useState(true)
   const caughtCount = useMemo(
     () => region.pokemon.filter((pokemon) => caughtSet.has(pokemon.dexNumber)).length,
     [region.pokemon, caughtSet]
@@ -10,31 +11,45 @@ function PokedexRegion({ region, caughtSet, onToggle }) {
 
   return (
     <div className="card pokedex-region">
-      <div className="region-header">
+      <button
+        type="button"
+        className="region-header"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+      >
         <div>
           <h2>{region.region}</h2>
-          <p className="muted">
-            {caughtCount} / {region.pokemon.length} caught
+          <p className="muted region-count">
+            {caughtCount}:{region.pokemon.length} caught
           </p>
         </div>
-        <p className="muted">#{region.pokemon[0].dexNumber} - #{region.pokemon[region.pokemon.length - 1].dexNumber}</p>
-      </div>
-      <div className="pokedex-grid">
-        {region.pokemon.map((pokemon) => {
-          const checked = caughtSet.has(pokemon.dexNumber)
-          return (
-            <label key={pokemon.dexNumber} className={`pokedex-item ${checked ? "caught" : ""}`}>
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => onToggle(pokemon.dexNumber)}
-              />
-              <span className="dex-number">#{pokemon.dexNumber.toString().padStart(3, "0")}</span>
-              <span className="pokemon-name">{pokemon.name}</span>
-            </label>
-          )
-        })}
-      </div>
+        <div className="region-meta">
+          <p className="muted">
+            #{region.pokemon[0].dexNumber} - #{region.pokemon[region.pokemon.length - 1].dexNumber}
+          </p>
+          <span className={`chevron ${isOpen ? "open" : ""}`} aria-hidden="true">
+            ▾
+          </span>
+        </div>
+      </button>
+      {isOpen && (
+        <div className="pokedex-grid">
+          {region.pokemon.map((pokemon) => {
+            const checked = caughtSet.has(pokemon.dexNumber)
+            return (
+              <label key={pokemon.dexNumber} className={`pokedex-item ${checked ? "caught" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggle(pokemon.dexNumber)}
+                />
+                <span className="dex-number">#{pokemon.dexNumber.toString().padStart(3, "0")}</span>
+                <span className="pokemon-name">{pokemon.name}</span>
+              </label>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

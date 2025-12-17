@@ -317,8 +317,36 @@ label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
   gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 0;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+
+.region-header:hover h2 {
+  color: #9ecbff;
+}
+
+.region-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.region-count {
+  font-weight: 700;
+}
+
+.chevron {
+  transition: transform 0.15s ease;
+}
+
+.chevron.open {
+  transform: rotate(180deg);
 }
 
 .pokedex-grid {
