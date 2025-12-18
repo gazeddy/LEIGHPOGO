@@ -9,6 +9,7 @@ export default async function handler(req, res) {
   }
 
   const entryId = parseInt(req.query.id);
+  const userId = Number(session.user.id);
 
   const existingEntry = await prisma.entry.findUnique({
     where: { id: entryId },
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Entry not found" });
   }
 
-  const isOwner = existingEntry.ownerId === session.user.id;
+  const isOwner = !Number.isNaN(userId) && existingEntry.ownerId === userId;
   const isAdmin = session.user.role === "admin";
 
   if (req.method === "PATCH") {
