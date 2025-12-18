@@ -1,16 +1,14 @@
-import { getServerSession } from "next-auth";
+import { getSession } from "next-auth/react";
 import prisma from "../../../lib/prisma";
-import { authOptions } from "../auth/[...nextauth]";
 
 export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
+  const session = await getSession({ req });
 
   if (!session) {
     return res.status(403).json({ error: "Access denied" });
   }
 
   const entryId = parseInt(req.query.id);
-  const userId = Number(session.user.id);
 
   const existingEntry = await prisma.entry.findUnique({
     where: { id: entryId },
@@ -20,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Entry not found" });
   }
 
-  const isOwner = !Number.isNaN(userId) && existingEntry.ownerId === userId;
+  const isOwner = existingEntry.ownerId === session.user.id;
   const isAdmin = session.user.role === "admin";
 
   if (req.method === "PATCH") {
@@ -28,42 +26,16 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    const { trainerName, friendCode, team } = req.body;
-    const updates = {};
+    const { trainerName, friendCode } = req.body;
 
-    if (trainerName !== undefined) {
-      if (!trainerName) {
-        return res.status(400).json({ error: "Trainer name is required" });
-      }
-      updates.trainerName = trainerName;
-    }
-
-    if (friendCode !== undefined) {
-      if (!friendCode) {
-        return res.status(400).json({ error: "Friend code is required" });
-      }
-      updates.code = friendCode;
-    }
-
-    if (team !== undefined) {
-      const normalizedTeam = String(team).toUpperCase();
-      const validTeams = ["INSTINCT", "MYSTIC", "VALOR"];
-
-      if (!validTeams.includes(normalizedTeam)) {
-        return res.status(400).json({ error: "Invalid team selection" });
-      }
-
-      updates.team = normalizedTeam;
-    }
-
-    if (!Object.keys(updates).length) {
-      return res.status(400).json({ error: "No fields provided for update" });
+    if (!trainerName || !friendCode) {
+      return res.status(400).json({ error: "Missing fields" });
     }
 
     try {
       const updatedEntry = await prisma.entry.update({
         where: { id: entryId },
-        data: updates,
+        data: { trainerName, code: friendCode },
       });
       res.status(200).json(updatedEntry);
     } catch (err) {

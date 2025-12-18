@@ -9,7 +9,7 @@ export default function Admin({ users, entries, searchStrings }) {
 
   const [entryList, setEntryList] = useState(entries);
   const [editingEntryId, setEditingEntryId] = useState(null);
-  const [editForm, setEditForm] = useState({ trainerName: "", friendCode: "", team: "MYSTIC" });
+  const [editForm, setEditForm] = useState({ trainerName: "", friendCode: "" });
   const [passwordResets, setPasswordResets] = useState({});
 
   // Sidebar "accordion" state (matches your production look: green buttons on the left)
@@ -67,16 +67,12 @@ export default function Admin({ users, entries, searchStrings }) {
 
   const startEdit = (entry) => {
     setEditingEntryId(entry.id);
-    setEditForm({
-      trainerName: entry.trainerName,
-      friendCode: entry.code,
-      team: entry.team || "INSTINCT",
-    });
+    setEditForm({ trainerName: entry.trainerName, friendCode: entry.code });
   };
 
   const cancelEdit = () => {
     setEditingEntryId(null);
-    setEditForm({ trainerName: "", friendCode: "", team: "MYSTIC" });
+    setEditForm({ trainerName: "", friendCode: "" });
   };
 
   const handleEntrySave = async (id) => {
@@ -147,7 +143,6 @@ export default function Admin({ users, entries, searchStrings }) {
                     <th>ID</th>
                     <th>Trainer</th>
                     <th>Friend Code</th>
-                    <th>Team</th>
                     <th>Owner IGN</th>
                     <th>Actions</th>
                   </tr>
@@ -186,22 +181,6 @@ export default function Admin({ users, entries, searchStrings }) {
                           />
                         ) : (
                           entry.code
-                        )}
-                      </td>
-                      <td>
-                        {editingEntryId === entry.id ? (
-                          <select
-                            value={editForm.team}
-                            onChange={(e) =>
-                              setEditForm((prev) => ({ ...prev, team: e.target.value }))
-                            }
-                          >
-                            <option value="INSTINCT">Instinct (Yellow)</option>
-                            <option value="MYSTIC">Mystic (Blue)</option>
-                            <option value="VALOR">Valor (Red)</option>
-                          </select>
-                        ) : (
-                          entry.team
                         )}
                       </td>
                       <td>{entry.owner?.ign}</td>
