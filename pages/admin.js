@@ -279,11 +279,6 @@ export async function getServerSideProps(context) {
     orderBy: { createdAt: "desc" },
   });
 
-  const rawSearchStrings = await prisma.searchString.findMany({
-    include: { owner: { select: { ign: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
-
   // ✅ Convert Date objects to strings so Next.js can serialize props (both timestamps exist)
   const entries = rawEntries.map((entry) => ({
     ...entry,
