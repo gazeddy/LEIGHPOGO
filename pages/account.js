@@ -9,7 +9,9 @@ export default function Account({ entries }) {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [status, setStatus] = useState({ type: "", message: "" })
-  const [ownedEntries, setOwnedEntries] = useState(entries || [])
+  const [ownedEntries, setOwnedEntries] = useState(
+    (entries || []).map((entry) => ({ ...entry, team: entry.team || "INSTINCT" }))
+  )
   const [entryStatuses, setEntryStatuses] = useState({})
 
   const handlePasswordSubmit = async (event) => {
@@ -200,7 +202,7 @@ export async function getServerSideProps(context) {
   }
 
   const ownedEntries = await prisma.entry.findMany({
-    where: { ownerId: session.user.id },
+    where: { ownerId: Number(session.user.id) },
     orderBy: { createdAt: "desc" },
     select: { id: true, trainerName: true, code: true, team: true },
   })

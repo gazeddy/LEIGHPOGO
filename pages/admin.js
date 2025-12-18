@@ -67,7 +67,11 @@ export default function Admin({ users, entries, searchStrings }) {
 
   const startEdit = (entry) => {
     setEditingEntryId(entry.id);
-    setEditForm({ trainerName: entry.trainerName, friendCode: entry.code, team: entry.team });
+    setEditForm({
+      trainerName: entry.trainerName,
+      friendCode: entry.code,
+      team: entry.team || "INSTINCT",
+    });
   };
 
   const cancelEdit = () => {
