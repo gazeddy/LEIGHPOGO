@@ -220,6 +220,35 @@ export default function Admin({ users, entries }) {
         </table>
       </section>
 
+      <section>
+        <h2>Saved search strings</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Owner</th>
+              <th>Last updated</th>
+              <th>Query</th>
+            </tr>
+          </thead>
+          <tbody>
+            {searchStrings.map((saved) => (
+              <tr key={saved.id}>
+                <td>{saved.id}</td>
+                <td>{saved.title}</td>
+                <td>{saved.owner.ign}</td>
+                <td>{new Date(saved.updatedAt).toLocaleString()}</td>
+                <td>
+                  <code>{saved.query}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
     </div>
   );
 }
