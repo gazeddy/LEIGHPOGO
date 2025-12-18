@@ -1,6 +1,7 @@
 import { useSession } from "next-auth/react"
 import { useState } from "react"
 import prisma from "../lib/prisma"
+import TeamBadge from "../components/TeamBadge"
 
 export default function Home({ entries }) {
   const { data: session } = useSession()
@@ -86,10 +87,14 @@ export default function Home({ entries }) {
         {entryList.length === 0 ? (
           <p>No entries yet.</p>
         ) : (
-          <ul>
+          <ul className="entry-list">
             {entryList.map((entry) => (
-              <li key={entry.id}>
-                <strong>{entry.trainerName}</strong>: {entry.code}
+              <li key={entry.id} className="entry-row">
+                <div className="entry-meta">
+                  <TeamBadge team={entry.owner.team} />
+                  <strong>{entry.owner.ign}</strong>
+                </div>
+                <div className="entry-code">{entry.code || entry.owner.friendCode || "No code provided"}</div>
               </li>
             ))}
           </ul>
@@ -103,6 +108,15 @@ export default function Home({ entries }) {
 export async function getServerSideProps() {
   const entries = await prisma.entry.findMany({
     orderBy: { createdAt: "desc" },
+    include: {
+      owner: {
+        select: {
+          ign: true,
+          team: true,
+          friendCode: true,
+        },
+      },
+    },
   })
 
   // Serialize dates to strings for JSON
