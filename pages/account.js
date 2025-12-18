@@ -4,13 +4,13 @@ import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
 
-export default function Account({ profile }) {
+export default function Account({ entry }) {
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [status, setStatus] = useState({ type: "", message: "" })
-  const [friendCode, setFriendCode] = useState(profile?.friendCode || "")
-  const [team, setTeam] = useState(profile?.team || "MYSTIC")
+  const [friendCode, setFriendCode] = useState(entry?.friendCode || "")
+  const [team, setTeam] = useState(entry?.team || "MYSTIC")
   const [profileStatus, setProfileStatus] = useState({ type: "", message: "" })
 
   const handlePasswordSubmit = async (event) => {
@@ -60,6 +60,9 @@ export default function Account({ profile }) {
       })
       return
     }
+
+    if (data.team) setTeam(data.team)
+    if (typeof data.friendCode === "string") setFriendCode(data.friendCode)
 
     setProfileStatus({ type: "success", message: "Trainer profile updated" })
   }
@@ -155,10 +158,17 @@ export async function getServerSideProps(context) {
     }
   }
 
-  const profile = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { ign: true, team: true, friendCode: true },
+  const latestEntry = await prisma.entry.findFirst({
+    where: { ownerId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    select: { trainerName: true, code: true, team: true },
   })
 
-  return { props: { profile } }
+  return {
+    props: {
+      entry: latestEntry
+        ? { friendCode: latestEntry.code, team: latestEntry.team, trainerName: latestEntry.trainerName }
+        : null,
+    },
+  }
 }

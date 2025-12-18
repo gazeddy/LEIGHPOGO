@@ -1,7 +1,7 @@
 # LEIGHPOGO
 
-## Updating the database for new user fields
-The latest schema adds `team` and `friendCode` to the `User` model. Apply the Prisma migration so your database includes these columns:
+## Updating the database for entry-based team data
+The latest schema moves the `team` field to the `Entry` model (and removes `team`/`friendCode` from `User`). Apply the Prisma migration so your database reflects this layout:
 
 ### Local development
 1. Install dependencies (installs Prisma CLI):
@@ -12,7 +12,7 @@ The latest schema adds `team` and `friendCode` to the `User` model. Apply the Pr
    ```bash
    npx prisma migrate dev
    ```
-   This runs the pending migration (e.g. `20251218154957_add_team_and_friendcode`) and updates `node_modules/@prisma/client`.
+   This runs the pending migration (e.g. `20251218162628_move_team_to_entry`) and updates `node_modules/@prisma/client`.
 
 ### Production or deployed environments
 The project already runs `prisma migrate deploy` during `npm install` (via `postinstall`). If you need to run it manually:
@@ -26,4 +26,4 @@ If you want default values for current users, add a seed script in `prisma/seed.
 ```bash
 npx prisma db seed
 ```
-Set `team` to `"MYSTIC" | "INSTINCT" | "VALOR"` and `friendCode` to a sanitized string matching the new schema constraints.
+Set `team` on each entry to `"MYSTIC" | "INSTINCT" | "VALOR"` to match the new schema constraints.

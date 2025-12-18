@@ -11,15 +11,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "You must be logged in." })
   }
 
-  if (req.method === "GET") {
-    const profile = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { ign: true, team: true, friendCode: true },
-    })
-
-    return res.status(200).json(profile)
-  }
-
   if (req.method === "PUT") {
     const { friendCode, team } = req.body
 
@@ -29,36 +20,30 @@ export default async function handler(req, res) {
 
     try {
       const normalizedTeam = (team || "MYSTIC").toUpperCase()
-
-      const updatedUser = await prisma.user.update({
-        where: { id: session.user.id },
-        data: { friendCode: friendCode || null, team: normalizedTeam },
-        select: { id: true, ign: true, team: true, friendCode: true },
+      const latestEntry = await prisma.entry.findFirst({
+        where: { ownerId: session.user.id },
+        orderBy: { createdAt: "desc" },
       })
 
-      if (friendCode) {
-        const latestEntry = await prisma.entry.findFirst({
-          where: { ownerId: session.user.id },
-          orderBy: { createdAt: "desc" },
-        })
-
-        if (latestEntry) {
-          await prisma.entry.update({
+      const updatedEntry = latestEntry
+        ? await prisma.entry.update({
             where: { id: latestEntry.id },
-            data: { code: friendCode },
+            data: { code: friendCode || latestEntry.code, team: normalizedTeam },
           })
-        } else {
-          await prisma.entry.create({
+        : await prisma.entry.create({
             data: {
-              trainerName: updatedUser.ign,
-              code: friendCode,
+              trainerName: session.user.ign,
+              code: friendCode || "",
+              team: normalizedTeam,
               ownerId: session.user.id,
             },
           })
-        }
-      }
 
-      return res.status(200).json(updatedUser)
+      return res.status(200).json({
+        friendCode: updatedEntry.code,
+        team: updatedEntry.team,
+        trainerName: updatedEntry.trainerName,
+      })
     } catch (error) {
       console.error("Failed to update profile", error)
       return res.status(500).json({ error: "Unable to update account" })

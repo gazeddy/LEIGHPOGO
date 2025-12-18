@@ -7,6 +7,7 @@ export default function Home({ entries }) {
   const { data: session } = useSession()
   const [trainerName, setTrainerName] = useState("")
   const [friendCode, setFriendCode] = useState("")
+  const [team, setTeam] = useState("MYSTIC")
   const [message, setMessage] = useState("")
   const [entryList, setEntryList] = useState(entries)
 
@@ -23,6 +24,7 @@ export default function Home({ entries }) {
       body: JSON.stringify({
         trainerName,
         friendCode,
+        team,
       }),
     })
 
@@ -31,6 +33,7 @@ export default function Home({ entries }) {
       setEntryList((prev) => [newEntry, ...prev])
       setTrainerName("")
       setFriendCode("")
+      setTeam("MYSTIC")
       setMessage("Entry added!")
     } else {
       const err = await res.json()
@@ -74,6 +77,14 @@ export default function Home({ entries }) {
                 required
               />
             </div>
+            <div>
+              <label htmlFor="team">Team</label>
+              <select id="team" value={team} onChange={(e) => setTeam(e.target.value)}>
+                <option value="INSTINCT">Instinct (Yellow)</option>
+                <option value="MYSTIC">Mystic (Blue)</option>
+                <option value="VALOR">Valor (Red)</option>
+              </select>
+            </div>
             <button type="submit">Submit</button>
           </form>
         ) : (
@@ -91,10 +102,10 @@ export default function Home({ entries }) {
             {entryList.map((entry) => (
               <li key={entry.id} className="entry-row">
                 <div className="entry-meta">
-                  <TeamBadge team={entry.owner.team} />
-                  <strong>{entry.owner.ign}</strong>
+                  <TeamBadge team={entry.team} />
+                  <strong>{entry.trainerName || entry.owner.ign}</strong>
                 </div>
-                <div className="entry-code">{entry.code || entry.owner.friendCode || "No code provided"}</div>
+                <div className="entry-code">{entry.code || "No code provided"}</div>
               </li>
             ))}
           </ul>
@@ -112,8 +123,6 @@ export async function getServerSideProps() {
       owner: {
         select: {
           ign: true,
-          team: true,
-          friendCode: true,
         },
       },
     },

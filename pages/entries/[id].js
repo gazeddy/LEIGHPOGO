@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import TeamBadge from "../../components/TeamBadge";
 import prisma from "../../lib/prisma";
 
 export async function getServerSideProps(context) {
@@ -32,8 +33,11 @@ export default function EntryPage({ entry }) {
     <div style={{ padding: "2rem" }}>
       <h1>Friend Code Entry #{entry.id}</h1>
 
-      <p><strong>Trainer Name:</strong> {entry.trainerName}</p>
-      <p><strong>Friend Code:</strong> {entry.friendCode}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <TeamBadge team={entry.team} />
+        <p style={{ margin: 0 }}><strong>Trainer Name:</strong> {entry.trainerName}</p>
+      </div>
+      <p><strong>Friend Code:</strong> {entry.code}</p>
 
       <Link href="/entries">← Back to entries</Link>
     </div>

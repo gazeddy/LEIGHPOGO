@@ -36,8 +36,6 @@ export const authOptions = {
           id: user.id,
           ign: user.ign,
           role: user.role,
-          team: user.team,
-          friendCode: user.friendCode,
         }
       },
     }),

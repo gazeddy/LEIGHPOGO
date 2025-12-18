@@ -24,6 +24,7 @@ model Entry {
   id          Int      @id @default(autoincrement())
   trainerName String
   code        String
+  team        String   @default("MYSTIC")
   ownerId     Int
   owner       User     @relation(fields: [ownerId], references: [id])
   createdAt   DateTime @default(now())
