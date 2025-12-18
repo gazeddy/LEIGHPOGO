@@ -4,8 +4,8 @@ import { PrismaClient } from "@prisma/client"
 const prisma = new PrismaClient()
 
 async function main() {
-  const ign = "Angryspanner"            // change to your user's IGN
-  const newPassword = "newpassword123"
+  const ign = "IGN GOES HERE"            // change to your user's IGN
+  const newPassword = "newpassword123" // set password here
 
   const hash = await bcrypt.hash(newPassword, 10)
 

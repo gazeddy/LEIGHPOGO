@@ -2,6 +2,21 @@ import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import pokedexByRegion, { flatPokemonList } from "../lib/pokedexData"
 
+const buildSpriteUrl = (name) => {
+  const slug = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/♀/g, "-f")
+    .replace(/♂/g, "-m")
+    .replace(/[\u2019']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .replace(/-{2,}/g, "-")
+
+  return `https://img.pokemondb.net/sprites/home/normal/2x/${slug}.jpg`
+}
+
 function PokedexRegion({ region, caughtSet, onToggle }) {
   const [isOpen, setIsOpen] = useState(true)
   const caughtCount = useMemo(
@@ -43,8 +58,16 @@ function PokedexRegion({ region, caughtSet, onToggle }) {
                   checked={checked}
                   onChange={() => onToggle(pokemon.dexNumber)}
                 />
-                <span className="dex-number">#{pokemon.dexNumber.toString().padStart(3, "0")}</span>
-                <span className="pokemon-name">{pokemon.name}</span>
+                <img
+                  src={buildSpriteUrl(pokemon.name)}
+                  alt={pokemon.name}
+                  className="pokemon-sprite"
+                  loading="lazy"
+                />
+                <div className="pokemon-info">
+                  <span className="dex-number">#{pokemon.dexNumber.toString().padStart(3, "0")}</span>
+                  <span className="pokemon-name">{pokemon.name}</span>
+                </div>
               </label>
             )
           })}
@@ -139,7 +162,7 @@ export default function PokedexPage() {
       <div className="card pokedex-hero">
         <div>
           <h1>Pokédex Tracker</h1>
-          <p className="muted">Mark Pokémon you've obtained by National Dex order, grouped by region.</p>
+          <p className="muted">Mark Pokémon you’ve obtained by National Dex order, grouped by region.</p>
           <p className="muted">
             Progress: {caughtCount} / {flatPokemonList.length} ({caughtPercentage}%)
           </p>
