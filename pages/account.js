@@ -97,7 +97,12 @@ export default function Account({ entries }) {
               <form key={entry.id} onSubmit={(event) => handleEntrySubmit(event, entry.id)} className="stack">
                 <label>
                   Trainer name
-                  <input type="text" value={entry.trainerName} disabled />
+                  <input
+                    type="text"
+                    value={entry.trainerName}
+                    onChange={(e) => handleEntryChange(entry.id, "trainerName", e.target.value)}
+                    required
+                  />
                 </label>
 
                 <label>
