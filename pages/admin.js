@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth/next";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
@@ -6,11 +5,15 @@ import prisma from "../lib/prisma";
 import { authOptions } from "./api/auth/[...nextauth]";
 
 export default function Admin({ users, entries, searchStrings }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [entryList, setEntryList] = useState(entries);
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editForm, setEditForm] = useState({ trainerName: "", friendCode: "" });
   const [passwordResets, setPasswordResets] = useState({});
+
+  if (status === "loading") {
+    return <p>Loading...</p>;
+  }
 
   if (!session || session.user.role !== "admin") {
     return <p>Access denied</p>;
@@ -224,20 +227,6 @@ export default function Admin({ users, entries, searchStrings }) {
       <section>
         <h2>Saved search strings</h2>
 
-        <div className="info-callout">
-          <div>
-            <h3>Generate a new search</h3>
-            <p className="muted">
-              Use the Storage Search Builder to assemble a string, copy it, and
-              save it to appear in this admin table. Only the creator and
-              admins can view saved strings.
-            </p>
-          </div>
-          <Link className="nav-item" href="/search-strings">
-            Open Storage Search Builder
-          </Link>
-        </div>
-
         <table>
           <thead>
             <tr>
@@ -263,6 +252,7 @@ export default function Admin({ users, entries, searchStrings }) {
           </tbody>
         </table>
       </section>
+
     </div>
   );
 }
@@ -307,5 +297,5 @@ export async function getServerSideProps(context) {
     updatedAt: entry.updatedAt.toISOString(),
   }));
 
-  return { props: { users, entries, searchStrings } };
+  return { props: { session, users, entries, searchStrings } };
 }
