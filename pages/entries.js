@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import TeamBadge from "../components/TeamBadge";
 
 export default function EntriesPage() {
   const [entries, setEntries] = useState([]);
@@ -22,15 +23,20 @@ export default function EntriesPage() {
         {entries.length === 0 && <p>No entries yet…</p>}
 
         {entries.map((entry) => (
-          <div key={entry.id} style={{
-            border: "1px solid #ccc",
-            padding: "15px",
-            margin: "10px 0",
-            borderRadius: "8px"
-          }}>
-            <h2>{entry.trainerName}</h2>
-            <p><strong>Game:</strong> {entry.gameName}</p>
-            <p><strong>Friend Code:</strong> {entry.friendCode}</p>
+          <div
+            key={entry.id}
+            style={{
+              border: "1px solid #ccc",
+              padding: "15px",
+              margin: "10px 0",
+              borderRadius: "8px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <TeamBadge team={entry.team} />
+              <h2 style={{ margin: 0 }}>{entry.trainerName || entry.owner?.ign}</h2>
+            </div>
+            <p style={{ margin: "0.5rem 0" }}><strong>Friend Code:</strong> {entry.code}</p>
           </div>
         ))}
       </div>

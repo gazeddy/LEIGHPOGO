@@ -11,16 +11,24 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const { trainerName, friendCode } = req.body;
+      const { trainerName, friendCode, team } = req.body;
+
+      const normalizedTeam = String(team || "MYSTIC").toUpperCase();
+      const validTeams = ["INSTINCT", "MYSTIC", "VALOR"];
 
       if (!trainerName || !friendCode) {
         return res.status(400).json({ error: "All fields are required." });
+      }
+
+      if (!validTeams.includes(normalizedTeam)) {
+        return res.status(400).json({ error: "Invalid team selection." });
       }
 
       const entry = await prisma.entry.create({
         data: {
           trainerName,
           code: friendCode,
+          team: normalizedTeam,
           ownerId: session.user.id,
         },
         include: {
