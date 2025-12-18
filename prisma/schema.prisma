@@ -14,6 +14,8 @@ model User {
   password String
   entries  Entry[] // back-relation to Entry
   role     String  @default("user")
+  friendCode String?
+  team     String  @default("MYSTIC")
   searchStrings SearchString[]
   pokedexEntries PokedexEntry[]
 }

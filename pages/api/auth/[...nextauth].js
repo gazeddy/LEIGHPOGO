@@ -32,7 +32,13 @@ export const authOptions = {
         const isValid = await bcrypt.compare(credentials.password, user.password)
         if (!isValid) return null
 
-        return { id: user.id, ign: user.ign, role: user.role }
+        return {
+          id: user.id,
+          ign: user.ign,
+          role: user.role,
+          team: user.team,
+          friendCode: user.friendCode,
+        }
       },
     }),
   ],
@@ -42,6 +48,8 @@ export const authOptions = {
         token.id = user.id
         token.ign = user.ign
         token.role = user.role
+        token.team = user.team
+        token.friendCode = user.friendCode
       }
       return token
     },
@@ -59,6 +67,8 @@ export const authOptions = {
           id: token.id,
           ign: token.ign,
           role: token.role,
+          team: token.team,
+          friendCode: token.friendCode,
         },
       }
     },

@@ -24,7 +24,7 @@ export default async function handler(req, res) {
           ownerId: session.user.id,
         },
         include: {
-          owner: { select: { id: true, ign: true, role: true } },
+          owner: { select: { id: true, ign: true, role: true, team: true, friendCode: true } },
         },
       });
 
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const entries = await prisma.entry.findMany({
-        include: { owner: { select: { id: true, ign: true } } },
+        include: { owner: { select: { id: true, ign: true, team: true, friendCode: true } } },
         orderBy: { createdAt: "desc" },
       });
       return res.status(200).json(entries);

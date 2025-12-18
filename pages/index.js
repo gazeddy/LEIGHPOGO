@@ -1,6 +1,7 @@
 import { useSession } from "next-auth/react"
 import { useState } from "react"
 import prisma from "../lib/prisma"
+import TeamBadge from "../components/TeamBadge"
 
 export default function Home({ entries }) {
   const { data: session } = useSession()
@@ -86,10 +87,14 @@ export default function Home({ entries }) {
         {entryList.length === 0 ? (
           <p>No entries yet.</p>
         ) : (
-          <ul>
+          <ul className="entry-list">
             {entryList.map((entry) => (
-              <li key={entry.id}>
-                <strong>{entry.owner.ign}</strong>: {entry.code}
+              <li key={entry.id} className="entry-row">
+                <div className="entry-meta">
+                  <TeamBadge team={entry.owner.team} />
+                  <strong>{entry.owner.ign}</strong>
+                </div>
+                <div className="entry-code">{entry.code || entry.owner.friendCode || "No code provided"}</div>
               </li>
             ))}
           </ul>
@@ -106,7 +111,9 @@ export async function getServerSideProps() {
     include: {
       owner: {
         select: {
-          ign: true, // Only select the IGN field
+          ign: true,
+          team: true,
+          friendCode: true,
         },
       },
     },
