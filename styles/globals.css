@@ -364,12 +364,18 @@ label {
 .pokedex-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 10px;
   border: 1px solid #30363d;
   border-radius: 8px;
   background: #0d1117;
   transition: border 0.15s ease, background 0.15s ease;
+}
+
+.pokemon-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .pokedex-item.caught {
@@ -385,6 +391,16 @@ label {
 
 .pokemon-name {
   font-weight: 700;
+}
+
+.pokemon-sprite {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: #0a0f14;
+  border: 1px solid #1f2933;
+  border-radius: 8px;
+  padding: 6px;
 }
 
 /* Mobile Nav */
