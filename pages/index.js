@@ -89,7 +89,7 @@ export default function Home({ entries }) {
           <ul>
             {entryList.map((entry) => (
               <li key={entry.id}>
-                <strong>{entry.owner.ign}</strong>: {entry.code}
+                <strong>{entry.trainerName}</strong>: {entry.code}
               </li>
             ))}
           </ul>
@@ -99,17 +99,10 @@ export default function Home({ entries }) {
   )
 }
 
-// Fetch all entries and include the owner's IGN
+// Fetch all entries for server-side rendering
 export async function getServerSideProps() {
   const entries = await prisma.entry.findMany({
     orderBy: { createdAt: "desc" },
-    include: {
-      owner: {
-        select: {
-          ign: true, // Only select the IGN field
-        },
-      },
-    },
   })
 
   // Serialize dates to strings for JSON
