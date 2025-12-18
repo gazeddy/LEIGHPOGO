@@ -4,7 +4,7 @@ import { useState } from "react";
 import prisma from "../lib/prisma";
 import { authOptions } from "./api/auth/[...nextauth]";
 
-export default function Admin({ users, entries, searchStrings }) {
+export default function Admin({ users, entries }) {
   const { data: session } = useSession();
   const [entryList, setEntryList] = useState(entries);
   const [editingEntryId, setEditingEntryId] = useState(null);
@@ -275,11 +275,6 @@ export async function getServerSideProps(context) {
     orderBy: { createdAt: "desc" },
   });
 
-  const rawSearchStrings = await prisma.searchString.findMany({
-    include: { owner: { select: { ign: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
-
   // ✅ Convert Date objects to strings so Next.js can serialize props (both timestamps exist)
   const entries = rawEntries.map((entry) => ({
     ...entry,
@@ -287,11 +282,5 @@ export async function getServerSideProps(context) {
     updatedAt: entry.updatedAt.toISOString(),
   }));
 
-  const searchStrings = rawSearchStrings.map((entry) => ({
-    ...entry,
-    createdAt: entry.createdAt.toISOString(),
-    updatedAt: entry.updatedAt.toISOString(),
-  }));
-
-  return { props: { users, entries, searchStrings } };
+  return { props: { users, entries } };
 }
