@@ -4,14 +4,13 @@ import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
 
-export default function Account({ entry }) {
+export default function Account({ entries }) {
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [status, setStatus] = useState({ type: "", message: "" })
-  const [friendCode, setFriendCode] = useState(entry?.friendCode || "")
-  const [team, setTeam] = useState(entry?.team || "MYSTIC")
-  const [profileStatus, setProfileStatus] = useState({ type: "", message: "" })
+  const [ownedEntries, setOwnedEntries] = useState(entries || [])
+  const [entryStatuses, setEntryStatuses] = useState({})
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault()
@@ -41,30 +40,47 @@ export default function Account({ entry }) {
     setConfirmPassword("")
   }
 
-  const handleProfileSubmit = async (event) => {
-    event.preventDefault()
-    setProfileStatus({ type: "", message: "" })
+  const handleEntryChange = (id, field, value) => {
+    setOwnedEntries((current) =>
+      current.map((entry) => (entry.id === id ? { ...entry, [field]: value } : entry))
+    )
+  }
 
-    const res = await fetch("/api/account", {
-      method: "PUT",
+  const handleEntrySubmit = async (event, entryId) => {
+    event.preventDefault()
+    setEntryStatuses((prev) => ({ ...prev, [entryId]: { type: "", message: "" } }))
+
+    const entry = ownedEntries.find((item) => item.id === entryId)
+    if (!entry) return
+
+    const res = await fetch(`/api/entries/${entryId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ friendCode, team }),
+      body: JSON.stringify({
+        trainerName: entry.trainerName,
+        friendCode: entry.code,
+        team: entry.team,
+      }),
     })
 
     const data = await res.json()
 
     if (!res.ok) {
-      setProfileStatus({
-        type: "error",
-        message: data.error || "Unable to update trainer profile",
-      })
+      setEntryStatuses((prev) => ({
+        ...prev,
+        [entryId]: { type: "error", message: data.error || "Unable to update entry" },
+      }))
       return
     }
 
-    if (data.team) setTeam(data.team)
-    if (typeof data.friendCode === "string") setFriendCode(data.friendCode)
+    setOwnedEntries((current) =>
+      current.map((item) => (item.id === entryId ? { ...item, ...data } : item))
+    )
 
-    setProfileStatus({ type: "success", message: "Trainer profile updated" })
+    setEntryStatuses((prev) => ({
+      ...prev,
+      [entryId]: { type: "success", message: "Trainer entry updated" },
+    }))
   }
 
   return (
@@ -72,36 +88,61 @@ export default function Account({ entry }) {
       <h1>Account settings</h1>
 
       <section>
-        <h2>Trainer profile</h2>
-        <form onSubmit={handleProfileSubmit} className="stack">
-          <label>
-            Team
-            <select value={team} onChange={(e) => setTeam(e.target.value)}>
-              <option value="INSTINCT">Instinct (Yellow)</option>
-              <option value="MYSTIC">Mystic (Blue)</option>
-              <option value="VALOR">Valor (Red)</option>
-            </select>
-          </label>
+        <h2>Your friend codes</h2>
+        {ownedEntries.length === 0 ? (
+          <p className="muted">No friend codes added yet.</p>
+        ) : (
+          <div className="stack">
+            {ownedEntries.map((entry) => (
+              <form key={entry.id} onSubmit={(event) => handleEntrySubmit(event, entry.id)} className="stack">
+                <label>
+                  Trainer name
+                  <input
+                    type="text"
+                    value={entry.trainerName}
+                    onChange={(e) => handleEntryChange(entry.id, "trainerName", e.target.value)}
+                    required
+                  />
+                </label>
 
-          <label>
-            Friend code
-            <input
-              type="text"
-              value={friendCode}
-              onChange={(e) => setFriendCode(e.target.value)}
-              placeholder="0000 0000 0000"
-            />
-          </label>
+                <label>
+                  Team
+                  <select
+                    value={entry.team}
+                    onChange={(e) => handleEntryChange(entry.id, "team", e.target.value)}
+                  >
+                    <option value="INSTINCT">Instinct (Yellow)</option>
+                    <option value="MYSTIC">Mystic (Blue)</option>
+                    <option value="VALOR">Valor (Red)</option>
+                  </select>
+                </label>
 
-          <TeamBadge team={team} />
+                <label>
+                  Friend code
+                  <input
+                    type="text"
+                    value={entry.code}
+                    onChange={(e) => handleEntryChange(entry.id, "code", e.target.value)}
+                    placeholder="0000 0000 0000"
+                  />
+                </label>
 
-          <button type="submit">Save profile</button>
-          {profileStatus.message && (
-            <p style={{ color: profileStatus.type === "error" ? "red" : "green" }}>
-              {profileStatus.message}
-            </p>
-          )}
-        </form>
+                <TeamBadge team={entry.team} />
+
+                <button type="submit">Save entry</button>
+                {entryStatuses[entry.id]?.message && (
+                  <p
+                    style={{
+                      color: entryStatuses[entry.id].type === "error" ? "red" : "green",
+                    }}
+                  >
+                    {entryStatuses[entry.id].message}
+                  </p>
+                )}
+              </form>
+            ))}
+          </div>
+        )}
       </section>
 
       <section>
@@ -158,17 +199,13 @@ export async function getServerSideProps(context) {
     }
   }
 
-  const latestEntry = await prisma.entry.findFirst({
+  const ownedEntries = await prisma.entry.findMany({
     where: { ownerId: session.user.id },
     orderBy: { createdAt: "desc" },
-    select: { trainerName: true, code: true, team: true },
+    select: { id: true, trainerName: true, code: true, team: true },
   })
 
   return {
-    props: {
-      entry: latestEntry
-        ? { friendCode: latestEntry.code, team: latestEntry.team, trainerName: latestEntry.trainerName }
-        : null,
-    },
+    props: { entries: ownedEntries },
   }
 }
