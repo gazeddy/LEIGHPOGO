@@ -225,8 +225,14 @@ label {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  font-size: 14px;
   box-shadow: 0 0 0 2px #0d1117;
+}
+
+.team-icon img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: contain;
 }
 
 .team-label {
