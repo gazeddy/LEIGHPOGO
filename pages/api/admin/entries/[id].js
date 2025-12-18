@@ -15,15 +15,41 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "PUT") {
-    const { trainerName, friendCode } = req.body;
+    const { trainerName, friendCode, team } = req.body;
+    const updates = {};
+    const validTeams = ["INSTINCT", "MYSTIC", "VALOR"];
 
-    if (!trainerName || !friendCode) {
-      return res.status(400).json({ message: "Missing fields" });
+    if (trainerName !== undefined) {
+      if (!trainerName) {
+        return res.status(400).json({ message: "Trainer name is required" });
+      }
+      updates.trainerName = trainerName;
+    }
+
+    if (friendCode !== undefined) {
+      if (!friendCode) {
+        return res.status(400).json({ message: "Friend code is required" });
+      }
+      updates.code = friendCode;
+    }
+
+    if (team !== undefined) {
+      const normalizedTeam = String(team).toUpperCase();
+
+      if (!validTeams.includes(normalizedTeam)) {
+        return res.status(400).json({ message: "Invalid team selection" });
+      }
+
+      updates.team = normalizedTeam;
+    }
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ message: "No fields provided" });
     }
 
     const updated = await prisma.entry.update({
       where: { id: Number(id) },
-      data: { trainerName, code: friendCode },
+      data: updates,
     });
     return res.json(updated);
   }
