@@ -22,12 +22,22 @@ const handler = require("../../pages/api/entries").default;
 const ensureSchema = async () => {
   await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
   await prisma.$executeRawUnsafe(`
+    DROP TABLE IF EXISTS "Entry";
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    DROP TABLE IF EXISTS "User";
+  `);
+
+  await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "User" (
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
       "name" TEXT,
       "ign" TEXT NOT NULL UNIQUE,
       "password" TEXT NOT NULL,
-      "role" TEXT NOT NULL DEFAULT 'user'
+      "role" TEXT NOT NULL DEFAULT 'user',
+      "friendCode" TEXT,
+      "team" TEXT NOT NULL DEFAULT 'MYSTIC'
     )
   `);
 
@@ -36,6 +46,7 @@ const ensureSchema = async () => {
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
       "trainerName" TEXT NOT NULL,
       "code" TEXT NOT NULL,
+      "team" TEXT NOT NULL DEFAULT 'MYSTIC',
       "ownerId" INTEGER NOT NULL,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
