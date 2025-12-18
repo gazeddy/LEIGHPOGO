@@ -26,16 +26,42 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    const { trainerName, friendCode } = req.body;
+    const { trainerName, friendCode, team } = req.body;
+    const updates = {};
 
-    if (!trainerName || !friendCode) {
-      return res.status(400).json({ error: "Missing fields" });
+    if (trainerName !== undefined) {
+      if (!trainerName) {
+        return res.status(400).json({ error: "Trainer name is required" });
+      }
+      updates.trainerName = trainerName;
+    }
+
+    if (friendCode !== undefined) {
+      if (!friendCode) {
+        return res.status(400).json({ error: "Friend code is required" });
+      }
+      updates.code = friendCode;
+    }
+
+    if (team !== undefined) {
+      const normalizedTeam = String(team).toUpperCase();
+      const validTeams = ["INSTINCT", "MYSTIC", "VALOR"];
+
+      if (!validTeams.includes(normalizedTeam)) {
+        return res.status(400).json({ error: "Invalid team selection" });
+      }
+
+      updates.team = normalizedTeam;
+    }
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: "No fields provided for update" });
     }
 
     try {
       const updatedEntry = await prisma.entry.update({
         where: { id: entryId },
-        data: { trainerName, code: friendCode },
+        data: updates,
       });
       res.status(200).json(updatedEntry);
     } catch (err) {
