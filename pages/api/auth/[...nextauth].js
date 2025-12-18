@@ -62,6 +62,9 @@ export const authOptions = {
         },
       }
     },
+    async redirect({ baseUrl }) {
+      return baseUrl
+    },
   },
   pages: {
     signIn: "/login", // your custom login page
