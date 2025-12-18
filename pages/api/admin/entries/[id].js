@@ -1,9 +1,8 @@
-import { getServerSession } from "next-auth";
+import { getSession } from "next-auth/react";
 import prisma from "../../../../lib/prisma";
-import { authOptions } from "../../auth/[...nextauth]";
 
 export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
+  const session = await getSession({ req });
   if (!session || session.user.role !== "admin") {
     return res.status(403).json({ message: "Access denied" });
   }
@@ -16,41 +15,15 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "PUT") {
-    const { trainerName, friendCode, team } = req.body;
-    const updates = {};
-    const validTeams = ["INSTINCT", "MYSTIC", "VALOR"];
+    const { trainerName, friendCode } = req.body;
 
-    if (trainerName !== undefined) {
-      if (!trainerName) {
-        return res.status(400).json({ message: "Trainer name is required" });
-      }
-      updates.trainerName = trainerName;
-    }
-
-    if (friendCode !== undefined) {
-      if (!friendCode) {
-        return res.status(400).json({ message: "Friend code is required" });
-      }
-      updates.code = friendCode;
-    }
-
-    if (team !== undefined) {
-      const normalizedTeam = String(team).toUpperCase();
-
-      if (!validTeams.includes(normalizedTeam)) {
-        return res.status(400).json({ message: "Invalid team selection" });
-      }
-
-      updates.team = normalizedTeam;
-    }
-
-    if (!Object.keys(updates).length) {
-      return res.status(400).json({ message: "No fields provided" });
+    if (!trainerName || !friendCode) {
+      return res.status(400).json({ message: "Missing fields" });
     }
 
     const updated = await prisma.entry.update({
       where: { id: Number(id) },
-      data: updates,
+      data: { trainerName, code: friendCode },
     });
     return res.json(updated);
   }
