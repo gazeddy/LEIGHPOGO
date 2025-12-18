@@ -115,7 +115,7 @@ export default function Home({ entries }) {
   )
 }
 
-// Fetch all entries and include the owner's IGN
+// Fetch all entries for server-side rendering
 export async function getServerSideProps() {
   const entries = await prisma.entry.findMany({
     orderBy: { createdAt: "desc" },
