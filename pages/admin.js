@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth/next";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 import prisma from "../lib/prisma";
 import { authOptions } from "./api/auth/[...nextauth]";
 
-export default function Admin({ users, entries, searchStrings }) {
+export default function Admin({ users, entries }) {
   const { data: session } = useSession();
   const [entryList, setEntryList] = useState(entries);
   const [editingEntryId, setEditingEntryId] = useState(null);
@@ -221,48 +220,6 @@ export default function Admin({ users, entries, searchStrings }) {
         </table>
       </section>
 
-      <section>
-        <h2>Saved search strings</h2>
-
-        <div className="info-callout">
-          <div>
-            <h3>Generate a new search</h3>
-            <p className="muted">
-              Use the Storage Search Builder to assemble a string, copy it, and
-              save it to appear in this admin table. Only the creator and
-              admins can view saved strings.
-            </p>
-          </div>
-          <Link className="nav-item" href="/search-strings">
-            Open Storage Search Builder
-          </Link>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Title</th>
-              <th>Owner</th>
-              <th>Last updated</th>
-              <th>Query</th>
-            </tr>
-          </thead>
-          <tbody>
-            {searchStrings.map((saved) => (
-              <tr key={saved.id}>
-                <td>{saved.id}</td>
-                <td>{saved.title}</td>
-                <td>{saved.owner.ign}</td>
-                <td>{new Date(saved.updatedAt).toLocaleString()}</td>
-                <td>
-                  <code>{saved.query}</code>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
     </div>
   );
 }
@@ -289,11 +246,6 @@ export async function getServerSideProps(context) {
     orderBy: { createdAt: "desc" },
   });
 
-  const rawSearchStrings = await prisma.searchString.findMany({
-    include: { owner: { select: { ign: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
-
   // ✅ Convert Date objects to strings so Next.js can serialize props (both timestamps exist)
   const entries = rawEntries.map((entry) => ({
     ...entry,
@@ -301,11 +253,5 @@ export async function getServerSideProps(context) {
     updatedAt: entry.updatedAt.toISOString(),
   }));
 
-  const searchStrings = rawSearchStrings.map((entry) => ({
-    ...entry,
-    createdAt: entry.createdAt.toISOString(),
-    updatedAt: entry.updatedAt.toISOString(),
-  }));
-
-  return { props: { users, entries, searchStrings } };
+  return { props: { users, entries } };
 }
