@@ -3,9 +3,7 @@ import { useSession } from "next-auth/react"
 import pokedexByRegion, { flatPokemonList } from "../lib/pokedexData"
 
 const buildSpriteUrl = ({ dexNumber }) =>
-  `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber
-    .toString()
-    .padStart(4, "0")}.png`
+  `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber.toString()}.png`
 
 function PokedexRegion({ region, caughtSet, onToggle }) {
   const [isOpen, setIsOpen] = useState(true)
