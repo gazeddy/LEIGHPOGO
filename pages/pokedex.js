@@ -2,20 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import pokedexByRegion, { flatPokemonList } from "../lib/pokedexData"
 
-const buildSpriteUrl = (name) => {
-  const slug = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/♀/g, "-f")
-    .replace(/♂/g, "-m")
-    .replace(/[\u2019']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .replace(/-{2,}/g, "-")
-
-  return `https://img.pokemondb.net/sprites/home/normal/2x/${slug}.jpg`
-}
+const buildSpriteUrl = ({ dexNumber }) =>
+  `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber.toString()}.png`
 
 function PokedexRegion({ region, caughtSet, onToggle }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -59,7 +47,7 @@ function PokedexRegion({ region, caughtSet, onToggle }) {
                   onChange={() => onToggle(pokemon.dexNumber)}
                 />
                 <img
-                  src={buildSpriteUrl(pokemon.name)}
+                  src={buildSpriteUrl(pokemon)}
                   alt={pokemon.name}
                   className="pokemon-sprite"
                   loading="lazy"
