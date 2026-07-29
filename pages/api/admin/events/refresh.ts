@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { forceRefreshEventsCache } from "../../../../lib/events-server";
 import { authOptions } from "../../auth/[...nextauth]";
@@ -22,7 +23,11 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const session = await getServerSession(req, res, authOptions);
+  const session = await getServerSession(
+    req,
+    res,
+    authOptions as NextAuthOptions,
+  );
   const role = (session?.user as { role?: string } | undefined)?.role;
 
   if (role !== "admin") {
