@@ -33,4 +33,6 @@ export interface EventTickerItem {
   end: string;
   guideSlug: string | null;
   guideTitle: string | null;
+  eventUrl: string | null;
+  eventUrlLabel: string | null;
 }
