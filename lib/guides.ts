@@ -39,16 +39,25 @@ function normaliseFrontMatter(
   data: Record<string, unknown>,
   slug: string,
 ): GuideFrontMatter {
-  return {
+  const frontMatter: GuideFrontMatter = {
     title:
       typeof data.title === "string" && data.title.trim()
         ? data.title
         : titleFromSlug(slug),
     description:
       typeof data.description === "string" ? data.description : "",
-    date: normaliseDate(data.date),
-    order: typeof data.order === "number" ? data.order : undefined,
   };
+  const date = normaliseDate(data.date);
+
+  if (date) {
+    frontMatter.date = date;
+  }
+
+  if (typeof data.order === "number") {
+    frontMatter.order = data.order;
+  }
+
+  return frontMatter;
 }
 
 export function getGuideSlugs(): string[] {
