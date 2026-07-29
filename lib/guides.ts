@@ -9,6 +9,7 @@ export interface GuideFrontMatter {
   description: string;
   date?: string;
   order?: number;
+  eventTypes?: string[];
 }
 
 export interface GuideSummary extends GuideFrontMatter {
@@ -35,6 +36,23 @@ function normaliseDate(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
+function normaliseStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const values = Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+
+  return values.length > 0 ? values : undefined;
+}
+
 function normaliseFrontMatter(
   data: Record<string, unknown>,
   slug: string,
@@ -48,6 +66,7 @@ function normaliseFrontMatter(
       typeof data.description === "string" ? data.description : "",
   };
   const date = normaliseDate(data.date);
+  const eventTypes = normaliseStringArray(data.eventTypes);
 
   if (date) {
     frontMatter.date = date;
@@ -55,6 +74,10 @@ function normaliseFrontMatter(
 
   if (typeof data.order === "number") {
     frontMatter.order = data.order;
+  }
+
+  if (eventTypes) {
+    frontMatter.eventTypes = eventTypes;
   }
 
   return frontMatter;
