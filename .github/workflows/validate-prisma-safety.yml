@@ -1,0 +1,55 @@
+name: Validate Prisma safety
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      NEXTAUTH_SECRET: prisma-safety-validation
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install without touching database
+        run: |
+          rm -f prisma/ci.db
+          npm ci
+          test ! -e prisma/ci.db
+
+      - name: Apply migrations to fresh database
+        run: npm run db:deploy
+
+      - name: Verify migrated schema matches intended layout
+        run: |
+          sqlite3 prisma/ci.db 'PRAGMA table_info("User");' | tee /tmp/user-columns
+          sqlite3 prisma/ci.db 'PRAGMA table_info("Entry");' | tee /tmp/entry-columns
+          ! grep -q '|friendCode|' /tmp/user-columns
+          ! grep -q '|team|' /tmp/user-columns
+          grep -q '|team|' /tmp/entry-columns
+          npm run db:status
+
+      - name: Verify existing data and extra columns are untouched
+        run: |
+          cp prisma/ci.db prisma/existing.db
+          sqlite3 prisma/existing.db 'ALTER TABLE "User" ADD COLUMN "friendCode" TEXT;'
+          sqlite3 prisma/existing.db 'ALTER TABLE "User" ADD COLUMN "team" TEXT NOT NULL DEFAULT "MYSTIC";'
+          sqlite3 prisma/existing.db <<'SQL'
+          INSERT INTO "User" ("name", "ign", "password", "role", "friendCode", "team")
+          VALUES ('Gaz', 'SchemaSafetyTest', 'hash', 'admin', '1234 5678 9012', 'VALOR');
+          INSERT INTO "Entry" ("trainerName", "code", "team", "ownerId", "createdAt", "updatedAt")
+          VALUES ('SchemaSafetyTest', '1234 5678 9012', 'VALOR', last_insert_rowid(), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+          SQL
+          DATABASE_URL=file:./existing.db npm run db:deploy
+          test "$(sqlite3 prisma/existing.db 'SELECT ign || "|" || role || "|" || friendCode || "|" || team FROM User WHERE ign="SchemaSafetyTest";')" = 'SchemaSafetyTest|admin|1234 5678 9012|VALOR'
+          test "$(sqlite3 prisma/existing.db 'SELECT trainerName || "|" || code || "|" || team FROM Entry WHERE trainerName="SchemaSafetyTest";')" = 'SchemaSafetyTest|1234 5678 9012|VALOR'
+
+      - name: Build application
+        run: npm run build
