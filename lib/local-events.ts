@@ -18,11 +18,19 @@ export interface LocalEventInput {
   tags?: string[];
 }
 
-export interface LocalEvent extends LocalEventInput {
+export interface LocalEvent {
   id: string;
+  name: string;
+  eventType: string;
+  heading: string;
+  description: string | null;
+  start: string;
+  end: string;
+  campfireUrl: string | null;
+  image: string | null;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
-  tags: string[];
 }
 
 function requiredString(value: unknown, field: string): string {
@@ -33,8 +41,8 @@ function requiredString(value: unknown, field: string): string {
   return value.trim();
 }
 
-function optionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function normaliseTags(value: unknown): string[] {
@@ -46,15 +54,15 @@ function normaliseTags(value: unknown): string[] {
     new Set(
       value
         .filter((tag): tag is string => typeof tag === "string")
-        .map((tag) => tag.trim().toLowerCase())
+        .map((tag) => tag.trim().toLowerCase().replace(/^#+/, "").replace(/\s+/g, "-"))
         .filter(Boolean),
     ),
   ).slice(0, 30);
 }
 
-function validateUrl(value: string | undefined, field: string): string | undefined {
+function validateUrl(value: string | null, field: string): string | null {
   if (!value) {
-    return undefined;
+    return null;
   }
 
   let parsed: URL;
@@ -65,7 +73,7 @@ function validateUrl(value: string | undefined, field: string): string | undefin
     throw new Error(`${field} must be a valid URL`);
   }
 
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
+  if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error(`${field} must use http or https`);
   }
 
@@ -102,7 +110,7 @@ function normaliseEvent(value: unknown): LocalEvent | null {
       id,
       name,
       eventType,
-      heading: optionalString(event.heading),
+      heading: optionalString(event.heading) || eventType,
       description: optionalString(event.description),
       start,
       end,
@@ -157,11 +165,15 @@ export async function readLocalEvents(): Promise<LocalEvent[]> {
 
 export async function createLocalEvent(input: LocalEventInput): Promise<LocalEvent> {
   const name = requiredString(input.name, "Name");
-  const eventType = requiredString(input.eventType, "Event type").toLowerCase();
+  const eventType = slugify(requiredString(input.eventType, "Event type"));
   const start = requiredString(input.start, "Start");
   const end = requiredString(input.end, "End");
   const startTime = Date.parse(start);
   const endTime = Date.parse(end);
+
+  if (!eventType) {
+    throw new Error("Event type must contain letters or numbers");
+  }
 
   if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
     throw new Error("Start and end must be valid dates");
@@ -188,7 +200,9 @@ export async function createLocalEvent(input: LocalEventInput): Promise<LocalEve
   };
   const events = await readLocalEvents();
 
-  await writeLocalEvents([...events, event].sort((left, right) => left.start.localeCompare(right.start)));
+  await writeLocalEvents(
+    [...events, event].sort((left, right) => left.start.localeCompare(right.start)),
+  );
 
   return event;
 }
@@ -210,14 +224,14 @@ export function localEventToSummary(event: LocalEvent): PokemonGoEventSummary {
     eventID: event.id,
     name: event.name,
     eventType: event.eventType,
-    heading: event.heading || event.eventType,
-    link: event.campfireUrl || null,
-    image: event.image || null,
+    heading: event.heading,
+    link: event.campfireUrl,
+    image: event.image,
     start: event.start,
     end: event.end,
     tags: event.tags,
-    description: event.description || null,
-    campfireUrl: event.campfireUrl || null,
+    description: event.description,
+    campfireUrl: event.campfireUrl,
     source: "local",
   };
 }
