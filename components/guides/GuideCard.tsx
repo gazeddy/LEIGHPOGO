@@ -25,6 +25,7 @@ function formatDate(date?: string): string | null {
 
 export default function GuideCard({ guide }: GuideCardProps) {
   const publishedDate = formatDate(guide.date);
+  const tags = guide.tags ?? [];
 
   return (
     <Link href={`/guides/${guide.slug}`} className="guide-card">
@@ -34,6 +35,13 @@ export default function GuideCard({ guide }: GuideCardProps) {
           <span aria-hidden="true">→</span>
         </div>
         {guide.description && <p>{guide.description}</p>}
+        {tags.length > 0 && (
+          <div className="guide-tags" aria-label="Guide tags">
+            {tags.map((tag) => (
+              <small key={tag}>#{tag}</small>
+            ))}
+          </div>
+        )}
         {publishedDate && <time dateTime={guide.date}>{publishedDate}</time>}
       </article>
 
@@ -73,7 +81,7 @@ export default function GuideCard({ guide }: GuideCardProps) {
           font-size: 1.25rem;
         }
 
-        span {
+        .guide-card__heading span {
           color: #58a6ff;
           font-size: 1.4rem;
         }
@@ -82,6 +90,21 @@ export default function GuideCard({ guide }: GuideCardProps) {
           margin: 10px 0 0;
           color: #8b949e;
           line-height: 1.6;
+        }
+
+        .guide-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 14px;
+        }
+
+        .guide-tags small {
+          padding: 4px 7px;
+          border-radius: 999px;
+          background: #21262d;
+          color: #c9d1d9;
+          font-size: 0.72rem;
         }
 
         time {
