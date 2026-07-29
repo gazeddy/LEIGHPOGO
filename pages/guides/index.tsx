@@ -1,5 +1,5 @@
 import Head from "next/head";
-import type { GetStaticProps, InferGetStaticPropsType } from "next";
+import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import GuideCard from "../../components/guides/GuideCard";
 import { getAllGuides, type GuideSummary } from "../../lib/guides";
 
@@ -7,7 +7,7 @@ interface GuidesIndexProps {
   guides: GuideSummary[];
 }
 
-export const getStaticProps: GetStaticProps<GuidesIndexProps> = async () => ({
+export const getServerSideProps: GetServerSideProps<GuidesIndexProps> = async () => ({
   props: {
     guides: getAllGuides(),
   },
@@ -15,7 +15,7 @@ export const getStaticProps: GetStaticProps<GuidesIndexProps> = async () => ({
 
 export default function GuidesIndexPage({
   guides,
-}: InferGetStaticPropsType<typeof getStaticProps>) {
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
   return (
     <>
       <Head>
@@ -45,7 +45,7 @@ export default function GuidesIndexPage({
         ) : (
           <section className="empty-state">
             <h2>No guides yet</h2>
-            <p>Add a Markdown file to content/guides to publish the first one.</p>
+            <p>Create the first guide from the admin content creator.</p>
           </section>
         )}
       </main>

@@ -39,6 +39,7 @@ export default function Navbar() {
             <>
               <Link href="/account" className="nav-item">Account</Link>
               {isAdmin && <Link href="/admin" className="nav-item">Admin Panel</Link>}
+              {isAdmin && <Link href="/admin/content" className="nav-item">Create Content</Link>}
               <button
                 className="nav-btn"
                 onClick={() => signOut({ callbackUrl: "/login" })}

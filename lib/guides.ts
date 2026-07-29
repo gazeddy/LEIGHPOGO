@@ -2,7 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 
-const GUIDES_DIRECTORY = path.join(process.cwd(), "content", "guides");
+const GUIDES_DIRECTORY =
+  process.env.GUIDES_DIRECTORY?.trim() ||
+  path.join(process.cwd(), "content", "guides");
 
 export interface GuideFrontMatter {
   title: string;
@@ -10,6 +12,7 @@ export interface GuideFrontMatter {
   date?: string;
   order?: number;
   eventTypes?: string[];
+  tags?: string[];
 }
 
 export interface GuideSummary extends GuideFrontMatter {
@@ -67,6 +70,7 @@ function normaliseFrontMatter(
   };
   const date = normaliseDate(data.date);
   const eventTypes = normaliseStringArray(data.eventTypes);
+  const tags = normaliseStringArray(data.tags);
 
   if (date) {
     frontMatter.date = date;
@@ -80,7 +84,15 @@ function normaliseFrontMatter(
     frontMatter.eventTypes = eventTypes;
   }
 
+  if (tags) {
+    frontMatter.tags = tags;
+  }
+
   return frontMatter;
+}
+
+export function getGuidesDirectory(): string {
+  return GUIDES_DIRECTORY;
 }
 
 export function getGuideSlugs(): string[] {

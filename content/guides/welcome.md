@@ -5,6 +5,12 @@ order: 1
 eventTypes:
   - max-battles
   - max-mondays
+tags:
+  - max
+  - dmax
+  - gmax
+  - dynamax
+  - gigantamax
 ---
 
 ## So you want to know more about Max Battles!

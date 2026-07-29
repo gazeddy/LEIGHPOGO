@@ -4,3 +4,4 @@ node_modules
 .DS_Store
 .nextauth-secret
 /data/events-cache.json*
+/data/local-events.json*
