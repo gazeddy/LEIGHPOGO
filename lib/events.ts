@@ -12,6 +12,10 @@ export interface PokemonGoEventSummary {
   image: string | null;
   start: string;
   end: string;
+  tags?: string[];
+  description?: string | null;
+  campfireUrl?: string | null;
+  source?: "feed" | "local";
 }
 
 export interface EventsPageData {
