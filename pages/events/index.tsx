@@ -7,6 +7,7 @@ import {
   EVENT_DATA_CREDITS,
   type PokemonGoEventSummary,
 } from "../../lib/events";
+import { shouldShowOnEventsPage } from "../../lib/event-selection";
 import { getEventsPageData } from "../../lib/events-server";
 
 interface EventsPageProps {
@@ -24,6 +25,7 @@ export const getServerSideProps: GetServerSideProps<EventsPageProps> = async () 
     return {
       props: {
         ...data,
+        events: data.events.filter(shouldShowOnEventsPage),
         feedError: null,
       },
     };
@@ -134,8 +136,9 @@ export default function EventsPage({
           <p className="eyebrow">What’s happening in Pokémon Go</p>
           <h1>Events</h1>
           <p>
-            Current and upcoming events, raid rotations, spotlight hours and
-            other scheduled Pokémon Go activity.
+            Current and upcoming special events, spotlight hours, raid hours and
+            other scheduled Pokémon Go activity. Current 5-star, Shadow and Mega
+            raid bosses are shown in the raid bar above.
           </p>
           {formattedFetchedAt && (
             <p className="updated-at">

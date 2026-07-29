@@ -3,6 +3,7 @@ import { useRouter } from "next/router"
 import "../styles/globals.css"
 import Navbar from "../components/Navbar"
 import EventTicker from "../components/events/EventTicker"
+import RaidBossTicker from "../components/events/RaidBossTicker"
 
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
@@ -12,6 +13,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
     <SessionProvider session={session}>
       <Navbar />
       {showEventTicker && <EventTicker />}
+      <RaidBossTicker />
       <Component {...pageProps} />
     </SessionProvider>
   )

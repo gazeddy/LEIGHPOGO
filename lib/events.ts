@@ -36,3 +36,12 @@ export interface EventTickerItem {
   eventUrl: string | null;
   eventUrlLabel: string | null;
 }
+
+export interface RaidBossTickerItem {
+  eventID: string;
+  category: "five-star" | "shadow" | "mega";
+  label: string;
+  boss: string;
+  end: string;
+  link: string | null;
+}

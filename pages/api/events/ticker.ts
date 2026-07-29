@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { EventTickerItem, PokemonGoEventSummary } from "../../../lib/events";
+import { shouldShowInEventTicker } from "../../../lib/event-selection";
 import { getEventsPageData } from "../../../lib/events-server";
 import { getAllGuides, type GuideSummary } from "../../../lib/guides";
 
@@ -60,22 +61,25 @@ export default async function handler(
       Promise.resolve(getAllGuides()),
     ]);
 
-    const items: EventTickerItem[] = eventData.events.slice(0, 12).map((event) => {
-      const guide = findBestGuide(event, guides);
-      const eventUrl = event.campfireUrl || null;
+    const items: EventTickerItem[] = eventData.events
+      .filter(shouldShowInEventTicker)
+      .slice(0, 12)
+      .map((event) => {
+        const guide = findBestGuide(event, guides);
+        const eventUrl = event.campfireUrl || null;
 
-      return {
-        eventID: event.eventID,
-        name: event.name,
-        heading: event.heading,
-        start: event.start,
-        end: event.end,
-        guideSlug: guide?.slug ?? null,
-        guideTitle: guide?.title ?? null,
-        eventUrl,
-        eventUrlLabel: eventUrl ? "Meetup" : null,
-      };
-    });
+        return {
+          eventID: event.eventID,
+          name: event.name,
+          heading: event.heading,
+          start: event.start,
+          end: event.end,
+          guideSlug: guide?.slug ?? null,
+          guideTitle: guide?.title ?? null,
+          eventUrl,
+          eventUrlLabel: eventUrl ? "Meetup" : null,
+        };
+      });
 
     res.setHeader("Cache-Control", "private, no-store");
 
