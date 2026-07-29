@@ -8,15 +8,13 @@ datasource db {
 }
 
 model User {
-  id       Int     @id @default(autoincrement())
-  name     String?
-  ign      String  @unique
-  password String
-  entries  Entry[] // back-relation to Entry
-  role     String  @default("user")
-  friendCode String?
-  team     String  @default("MYSTIC")
-  searchStrings SearchString[]
+  id             Int            @id @default(autoincrement())
+  name           String?
+  ign            String         @unique
+  password       String
+  entries        Entry[]
+  role           String         @default("user")
+  searchStrings  SearchString[]
   pokedexEntries PokedexEntry[]
 }
 
