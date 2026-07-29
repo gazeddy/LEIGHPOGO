@@ -62,6 +62,7 @@ export default async function handler(
 
     const items: EventTickerItem[] = eventData.events.slice(0, 12).map((event) => {
       const guide = findBestGuide(event, guides);
+      const eventUrl = event.campfireUrl || null;
 
       return {
         eventID: event.eventID,
@@ -71,6 +72,8 @@ export default async function handler(
         end: event.end,
         guideSlug: guide?.slug ?? null,
         guideTitle: guide?.title ?? null,
+        eventUrl,
+        eventUrlLabel: eventUrl ? "Meetup" : null,
       };
     });
 
