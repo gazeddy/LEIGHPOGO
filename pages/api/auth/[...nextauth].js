@@ -46,8 +46,6 @@ export const authOptions = {
         token.id = user.id
         token.ign = user.ign
         token.role = user.role
-        token.team = user.team
-        token.friendCode = user.friendCode
       }
       return token
     },
@@ -65,8 +63,6 @@ export const authOptions = {
           id: token.id,
           ign: token.ign,
           role: token.role,
-          team: token.team,
-          friendCode: token.friendCode,
         },
       }
     },
