@@ -1,47 +1,53 @@
 import Head from "next/head";
-import type { GetStaticProps, InferGetStaticPropsType } from "next";
+import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
+import { useSession } from "next-auth/react";
 import { useMemo, useState } from "react";
 import EventCard from "../../components/events/EventCard";
 import {
   EVENT_DATA_CREDITS,
-  getUpcomingEvents,
   type PokemonGoEventSummary,
 } from "../../lib/events";
+import { getEventsPageData } from "../../lib/events-server";
 
 interface EventsPageProps {
   events: PokemonGoEventSummary[];
-  updatedAt: string;
+  fetchedAt: string | null;
+  isStale: boolean;
+  warning: string | null;
   feedError: string | null;
 }
 
-export const getStaticProps: GetStaticProps<EventsPageProps> = async () => {
-  const updatedAt = new Date().toISOString();
-
+export const getServerSideProps: GetServerSideProps<EventsPageProps> = async () => {
   try {
+    const data = await getEventsPageData();
+
     return {
       props: {
-        events: await getUpcomingEvents(),
-        updatedAt,
+        ...data,
         feedError: null,
       },
-      revalidate: 900,
     };
   } catch (error) {
     return {
       props: {
         events: [],
-        updatedAt,
+        fetchedAt: null,
+        isStale: true,
+        warning: null,
         feedError:
           error instanceof Error
             ? error.message
             : "The events feed could not be loaded.",
       },
-      revalidate: 300,
     };
   }
 };
 
-function formatUpdatedAt(value: string): string {
+function formatFetchedAt(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
     dateStyle: "medium",
@@ -51,10 +57,18 @@ function formatUpdatedAt(value: string): string {
 
 export default function EventsPage({
   events,
-  updatedAt,
+  fetchedAt,
+  isStale,
+  warning,
   feedError,
-}: InferGetStaticPropsType<typeof getStaticProps>) {
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const { data: session } = useSession();
   const [selectedType, setSelectedType] = useState("all");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const isAdmin =
+    (session?.user as { role?: string } | undefined)?.role === "admin";
+  const formattedFetchedAt = formatFetchedAt(fetchedAt);
 
   const eventTypes = useMemo(() => {
     const labels = new Map<string, string>();
@@ -78,6 +92,33 @@ export default function EventsPage({
     [events, selectedType],
   );
 
+  async function handleAdminRefresh() {
+    setRefreshing(true);
+    setRefreshMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/events/refresh", {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "The event refresh failed.");
+      }
+
+      setRefreshMessage(payload.message || "Event data refreshed. Reloading…");
+      window.location.reload();
+    } catch (error) {
+      setRefreshMessage(
+        error instanceof Error ? error.message : "The event refresh failed.",
+      );
+      setRefreshing(false);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -96,8 +137,45 @@ export default function EventsPage({
             Current and upcoming events, raid rotations, spotlight hours and
             other scheduled Pokémon Go activity.
           </p>
-          <p className="updated-at">Updated {formatUpdatedAt(updatedAt)}</p>
+          {formattedFetchedAt && (
+            <p className="updated-at">
+              Event data fetched {formattedFetchedAt}
+              {isStale ? " (cached copy)" : ""}.
+            </p>
+          )}
         </section>
+
+        {isAdmin && (
+          <section className="admin-refresh" aria-label="Event administration">
+            <div>
+              <h2>Event data administration</h2>
+              <p>
+                The site refreshes its local event cache automatically when it
+                becomes seven days old. Use this only when an immediate update is
+                needed.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleAdminRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? "Refreshing…" : "Refresh events now"}
+            </button>
+            {refreshMessage && (
+              <p className="refresh-message" role="status">
+                {refreshMessage}
+              </p>
+            )}
+          </section>
+        )}
+
+        {warning && (
+          <section className="events-warning" role="status">
+            <strong>Using the previous cached event list.</strong>
+            <p>{warning}</p>
+          </section>
+        )}
 
         {eventTypes.length > 1 && (
           <section className="events-toolbar" aria-label="Event filters">
@@ -159,8 +237,8 @@ export default function EventsPage({
             .
           </p>
           <p>
-            Data is refreshed automatically. Leigh Pokémon Go Community is not
-            affiliated with Niantic, The Pokémon Company or Nintendo.
+            Leigh Pokémon Go Community is not affiliated with Niantic, The
+            Pokémon Company or Nintendo.
           </p>
         </footer>
       </main>
@@ -204,6 +282,52 @@ export default function EventsPage({
           margin: 14px 0 0;
           color: #8b949e;
           font-size: 0.82rem;
+        }
+
+        .admin-refresh {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: center;
+          gap: 12px 20px;
+          margin-bottom: 20px;
+          padding: 18px;
+          border: 1px solid #2ea043;
+          border-radius: 10px;
+          background: #161b22;
+        }
+
+        .admin-refresh h2 {
+          margin: 0 0 6px;
+          font-size: 1.05rem;
+        }
+
+        .admin-refresh p {
+          margin: 0;
+          color: #8b949e;
+          line-height: 1.5;
+        }
+
+        .admin-refresh button:disabled {
+          cursor: wait;
+          opacity: 0.65;
+        }
+
+        .refresh-message {
+          grid-column: 1 / -1;
+          color: #a5d6ff !important;
+        }
+
+        .events-warning {
+          margin-bottom: 20px;
+          padding: 16px;
+          border: 1px solid #9e6a03;
+          border-radius: 10px;
+          background: #2d2208;
+          color: #f2cc60;
+        }
+
+        .events-warning p {
+          margin: 6px 0 0;
         }
 
         .events-toolbar {
@@ -280,8 +404,13 @@ export default function EventsPage({
             padding: 22px;
           }
 
+          .admin-refresh,
           .events-toolbar {
             grid-template-columns: 1fr;
+          }
+
+          .admin-refresh button {
+            width: 100%;
           }
 
           .events-toolbar label,
