@@ -1,34 +1,20 @@
 ---
-title: Welcome to the Leigh Pokémon Go guides
-description: A quick introduction to the community guides and how new guides are published.
-date: 2026-07-29
+title: "Max Battles Guide: Welcome"
+description: A beginner's introduction to Max Battles and the special Max Pokémon needed to take part.
 order: 1
 ---
 
-## Welcome
+## So you want to know more about Max Battles!
 
-This section is a home for useful Pokémon Go information written for the Leigh community.
+That shundo Charizard is no good here. You need to use special Max Pokémon.
 
-Guides are stored as Markdown files, so they are easy to write, review and keep under version control alongside the website.
+It’s not all bad news, however: a Max Pokémon can also do everything your other Pokémon can.
 
-## What you can expect
+This beginner’s guide will cover the basics of Max Battles, including:
 
-- Local event and meetup information
-- Raid, battle and collection tips
-- Walkthroughs for the tools available on this site
-- Advice contributed by community members
-
-## Adding another guide
-
-Create a new `.md` file in `content/guides` and include front matter at the top:
-
-```yaml
----
-title: Your guide title
-description: A short summary shown on the guides page.
-date: 2026-07-29
-order: 2
----
-```
-
-The filename becomes the URL slug. For example, `raid-guide.md` is published at `/guides/raid-guide`.
+- Getting started
+- Powering up
+- Roles
+- Battling
+- Picking teams
+- Useful links
