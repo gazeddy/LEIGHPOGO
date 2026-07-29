@@ -49,6 +49,11 @@ function formatEventRange(start: string, end: string): string {
 }
 
 export default function EventCard({ event }: EventCardProps) {
+  const tags = event.tags ?? [];
+  const linkLabel = event.campfireUrl
+    ? "View meetup on Campfire"
+    : "View event details";
+
   return (
     <article className="event-card">
       {event.image && (
@@ -67,6 +72,18 @@ export default function EventCard({ event }: EventCardProps) {
         <h2>{event.name}</h2>
         <p className="event-time">{formatEventRange(event.start, event.end)}</p>
 
+        {event.description && (
+          <p className="event-description">{event.description}</p>
+        )}
+
+        {tags.length > 0 && (
+          <div className="event-tags" aria-label="Event tags">
+            {tags.map((tag) => (
+              <span key={tag}>#{tag}</span>
+            ))}
+          </div>
+        )}
+
         {event.link && (
           <a
             href={event.link}
@@ -74,7 +91,7 @@ export default function EventCard({ event }: EventCardProps) {
             rel="noopener noreferrer"
             className="event-link"
           >
-            View event details <span aria-hidden="true">↗</span>
+            {linkLabel} <span aria-hidden="true">↗</span>
           </a>
         )}
       </div>
@@ -140,14 +157,35 @@ export default function EventCard({ event }: EventCardProps) {
         }
 
         .event-time {
-          margin: 12px 0 18px;
+          margin: 12px 0 0;
           color: #c9d1d9;
           font-size: 0.9rem;
           line-height: 1.55;
         }
 
+        .event-description {
+          margin: 12px 0 0;
+          color: #8b949e;
+          line-height: 1.55;
+        }
+
+        .event-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 14px;
+        }
+
+        .event-tags span {
+          padding: 4px 7px;
+          border-radius: 999px;
+          background: #21262d;
+          color: #c9d1d9;
+          font-size: 0.72rem;
+        }
+
         .event-link {
-          margin-top: auto;
+          margin-top: 18px;
           color: #58a6ff;
           font-weight: 700;
           text-decoration: none;
