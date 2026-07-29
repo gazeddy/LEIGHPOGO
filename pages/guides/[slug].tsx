@@ -3,6 +3,7 @@ import type {
   GetStaticProps,
   InferGetStaticPropsType,
 } from "next";
+import type { ParsedUrlQuery } from "querystring";
 import GuideLayout from "../../components/guides/GuideLayout";
 import MarkdownContent from "../../components/guides/MarkdownContent";
 import {
@@ -15,7 +16,7 @@ interface GuidePageProps {
   guide: Guide;
 }
 
-interface GuidePageParams {
+interface GuidePageParams extends ParsedUrlQuery {
   slug: string;
 }
 
