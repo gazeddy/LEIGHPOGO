@@ -21,11 +21,6 @@ async function capture(path, filename) {
   });
 }
 
-await capture("/", "01-home-with-event-ticker.png");
-await capture("/events", "02-events-calendar.png");
-await capture("/guides", "03-guides-index.png");
-await capture("/guides/welcome", "04-max-battles-guide.png");
-
 await page.goto(`${baseURL}/login`, { waitUntil: "networkidle" });
 await page.getByLabel("In-Game Name").fill("Angryspanner");
 await page.getByLabel("Password").fill("test");
@@ -34,6 +29,10 @@ await Promise.all([
   page.getByRole("button", { name: "Login", exact: true }).click(),
 ]);
 
+await capture("/", "01-home-with-event-ticker.png");
+await capture("/events", "02-events-calendar.png");
+await capture("/guides", "03-guides-index.png");
+await capture("/guides/welcome", "04-max-battles-guide.png");
 await capture("/admin/content", "05-content-creator-event-tab.png");
 await page.getByRole("button", { name: "Guide template", exact: true }).click();
 await page.screenshot({
