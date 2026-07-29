@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { GuidedEventTickerItem } from "../../lib/events";
+import type { EventTickerItem } from "../../lib/events";
 
 interface TickerPayload {
-  items?: GuidedEventTickerItem[];
+  items?: EventTickerItem[];
 }
+
+type TickerStatus = "loading" | "ready" | "error";
 
 function dateForDisplay(value: string): {
   date: Date;
@@ -32,11 +34,24 @@ function formatTickerDate(value: string): string {
   }).format(date);
 }
 
+function TickerItemContent({ item }: { item: EventTickerItem }) {
+  return (
+    <>
+      <span className="ticker-heading">{item.heading}</span>
+      <span className="ticker-name">{item.name}</span>
+      <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
+      {item.guideSlug && item.guideTitle && (
+        <span className="ticker-guide">Read guide →</span>
+      )}
+    </>
+  );
+}
+
 function TickerItems({
   items,
   duplicate = false,
 }: {
-  items: GuidedEventTickerItem[];
+  items: EventTickerItem[];
   duplicate?: boolean;
 }) {
   return (
@@ -44,26 +59,36 @@ function TickerItems({
       className={`ticker-group${duplicate ? " ticker-group-duplicate" : ""}`}
       aria-hidden={duplicate || undefined}
     >
-      {items.map((item) => (
-        <Link
-          key={`${duplicate ? "duplicate-" : ""}${item.eventID}`}
-          href={`/guides/${item.guideSlug}`}
-          className="ticker-item"
-          tabIndex={duplicate ? -1 : undefined}
-          title={`Read ${item.guideTitle}`}
-        >
-          <span className="ticker-heading">{item.heading}</span>
-          <span className="ticker-name">{item.name}</span>
-          <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
-          <span className="ticker-guide">Read guide →</span>
-        </Link>
-      ))}
+      {items.map((item) => {
+        const key = `${duplicate ? "duplicate-" : ""}${item.eventID}`;
+
+        if (item.guideSlug && item.guideTitle) {
+          return (
+            <Link
+              key={key}
+              href={`/guides/${item.guideSlug}`}
+              className="ticker-item ticker-item-link"
+              tabIndex={duplicate ? -1 : undefined}
+              title={`Read ${item.guideTitle}`}
+            >
+              <TickerItemContent item={item} />
+            </Link>
+          );
+        }
+
+        return (
+          <span key={key} className="ticker-item ticker-item-static">
+            <TickerItemContent item={item} />
+          </span>
+        );
+      })}
     </div>
   );
 }
 
 export default function EventTicker() {
-  const [items, setItems] = useState<GuidedEventTickerItem[]>([]);
+  const [items, setItems] = useState<EventTickerItem[]>([]);
+  const [status, setStatus] = useState<TickerStatus>("loading");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -76,14 +101,17 @@ export default function EventTicker() {
         });
 
         if (!response.ok) {
+          setStatus("error");
           return;
         }
 
         const payload = (await response.json()) as TickerPayload;
         setItems(Array.isArray(payload.items) ? payload.items : []);
+        setStatus("ready");
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           console.error("Failed to load event ticker", error);
+          setStatus("error");
         }
       }
     }
@@ -98,29 +126,38 @@ export default function EventTicker() {
     [items.length],
   );
 
-  if (items.length === 0) {
-    return null;
-  }
+  const message =
+    status === "loading"
+      ? "Loading upcoming events…"
+      : status === "error"
+        ? "Event ticker temporarily unavailable"
+        : "No upcoming events currently listed";
 
   return (
-    <section className="event-ticker" aria-label="Upcoming guided events">
+    <section className="event-ticker" aria-label="Upcoming events">
       <div className="ticker-label">
         <span aria-hidden="true">●</span>
         Upcoming
       </div>
 
       <div className="ticker-viewport">
-        <div
-          className="ticker-track"
-          style={
-            {
-              "--ticker-duration": animationDuration,
-            } as CSSProperties
-          }
-        >
-          <TickerItems items={items} />
-          <TickerItems items={items} duplicate />
-        </div>
+        {items.length > 0 ? (
+          <div
+            className="ticker-track"
+            style={
+              {
+                "--ticker-duration": animationDuration,
+              } as CSSProperties
+            }
+          >
+            <TickerItems items={items} />
+            <TickerItems items={items} duplicate />
+          </div>
+        ) : (
+          <p className="ticker-message" role="status">
+            {message}
+          </p>
+        )}
       </div>
 
       <style jsx>{`
@@ -175,6 +212,15 @@ export default function EventTicker() {
           min-width: 100%;
           animation: ticker-scroll var(--ticker-duration) linear infinite;
           will-change: transform;
+        }
+
+        .ticker-message {
+          margin: 0;
+          padding: 0 18px;
+          color: #8b949e;
+          font-size: 0.84rem;
+          line-height: 42px;
+          white-space: nowrap;
         }
 
         .event-ticker:hover .ticker-track,
@@ -236,11 +282,15 @@ export default function EventTicker() {
           font-size: 0.55rem;
         }
 
-        .ticker-item:hover,
-        .ticker-item:focus-visible {
+        .ticker-item-link:hover,
+        .ticker-item-link:focus-visible {
           color: #ffffff;
           background: #1f2937;
           outline: none;
+        }
+
+        .ticker-item-static {
+          cursor: default;
         }
 
         .ticker-heading {
