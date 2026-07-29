@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { GuidedEventTickerItem } from "../../../lib/events";
+import type { EventTickerItem } from "../../../lib/events";
 import { getEventsPageData } from "../../../lib/events-server";
 import { getAllGuides } from "../../../lib/guides";
 
 type TickerResponse =
   | {
-      items: GuidedEventTickerItem[];
+      items: EventTickerItem[];
       fetchedAt: string;
     }
   | {
@@ -42,26 +42,19 @@ export default async function handler(
       });
     });
 
-    const items = eventData.events
-      .map((event): GuidedEventTickerItem | null => {
-        const guide = guideByEventType.get(event.eventType.toLowerCase());
+    const items: EventTickerItem[] = eventData.events.slice(0, 12).map((event) => {
+      const guide = guideByEventType.get(event.eventType.toLowerCase());
 
-        if (!guide) {
-          return null;
-        }
-
-        return {
-          eventID: event.eventID,
-          name: event.name,
-          heading: event.heading,
-          start: event.start,
-          end: event.end,
-          guideSlug: guide.slug,
-          guideTitle: guide.title,
-        };
-      })
-      .filter((item): item is GuidedEventTickerItem => item !== null)
-      .slice(0, 12);
+      return {
+        eventID: event.eventID,
+        name: event.name,
+        heading: event.heading,
+        start: event.start,
+        end: event.end,
+        guideSlug: guide?.slug ?? null,
+        guideTitle: guide?.title ?? null,
+      };
+    });
 
     res.setHeader("Cache-Control", "private, no-store");
 
@@ -70,7 +63,7 @@ export default async function handler(
       fetchedAt: eventData.fetchedAt,
     });
   } catch (error) {
-    console.error("Failed to load guided event ticker", error);
+    console.error("Failed to load event ticker", error);
 
     return res.status(502).json({
       error:
