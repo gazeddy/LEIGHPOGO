@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { EventTickerItem } from "../../../lib/events";
+import type { EventTickerItem, PokemonGoEventSummary } from "../../../lib/events";
 import { getEventsPageData } from "../../../lib/events-server";
-import { getAllGuides } from "../../../lib/guides";
+import { getAllGuides, type GuideSummary } from "../../../lib/guides";
 
 type TickerResponse =
   | {
@@ -11,6 +11,39 @@ type TickerResponse =
   | {
       error: string;
     };
+
+function guideScore(event: PokemonGoEventSummary, guide: GuideSummary): number {
+  const eventType = event.eventType.toLowerCase();
+  const eventTags = new Set((event.tags ?? []).map((tag) => tag.toLowerCase()));
+  let score = guide.eventTypes?.includes(eventType) ? 100 : 0;
+
+  guide.tags?.forEach((tag) => {
+    if (eventTags.has(tag.toLowerCase())) {
+      score += 10;
+    }
+  });
+
+  return score;
+}
+
+function findBestGuide(
+  event: PokemonGoEventSummary,
+  guides: GuideSummary[],
+): GuideSummary | null {
+  let bestGuide: GuideSummary | null = null;
+  let bestScore = 0;
+
+  guides.forEach((guide) => {
+    const score = guideScore(event, guide);
+
+    if (score > bestScore) {
+      bestGuide = guide;
+      bestScore = score;
+    }
+  });
+
+  return bestGuide;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -26,24 +59,9 @@ export default async function handler(
       getEventsPageData(),
       Promise.resolve(getAllGuides()),
     ]);
-    const guideByEventType = new Map<
-      string,
-      { slug: string; title: string }
-    >();
-
-    guides.forEach((guide) => {
-      guide.eventTypes?.forEach((eventType) => {
-        if (!guideByEventType.has(eventType)) {
-          guideByEventType.set(eventType, {
-            slug: guide.slug,
-            title: guide.title,
-          });
-        }
-      });
-    });
 
     const items: EventTickerItem[] = eventData.events.slice(0, 12).map((event) => {
-      const guide = guideByEventType.get(event.eventType.toLowerCase());
+      const guide = findBestGuide(event, guides);
 
       return {
         eventID: event.eventID,
