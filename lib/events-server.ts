@@ -4,6 +4,7 @@ import type {
   EventsPageData,
   PokemonGoEventSummary,
 } from "./events";
+import { localEventToSummary, readLocalEvents } from "./local-events";
 
 const EVENTS_FEED_URL =
   "https://raw.githubusercontent.com/Drumstix42/ScrapedDuck/refs/heads/data/events.min.json";
@@ -27,6 +28,21 @@ function asRequiredString(value: unknown): string | null {
 
 function asOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function asTags(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((tag): tag is string => typeof tag === "string")
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
@@ -54,6 +70,10 @@ function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
     image: asOptionalString(event.image),
     start,
     end,
+    tags: asTags(event.tags),
+    description: asOptionalString(event.description),
+    campfireUrl: asOptionalString(event.campfireUrl),
+    source: event.source === "local" ? "local" : "feed",
   };
 }
 
@@ -98,6 +118,23 @@ function selectUpcomingEvents(
         : left.name.localeCompare(right.name);
     })
     .slice(0, Math.max(1, limit));
+}
+
+async function selectWithLocalEvents(
+  feedEvents: PokemonGoEventSummary[],
+  limit: number,
+): Promise<PokemonGoEventSummary[]> {
+  const localEvents = await readLocalEvents();
+  const normalisedFeedEvents = feedEvents.map((event) => ({
+    ...event,
+    tags: event.tags ?? [],
+    source: event.source ?? ("feed" as const),
+  }));
+
+  return selectUpcomingEvents(
+    [...normalisedFeedEvents, ...localEvents.map(localEventToSummary)],
+    limit,
+  );
 }
 
 async function readEventsCache(): Promise<StoredEventsCache | null> {
@@ -216,7 +253,7 @@ export async function getEventsPageData(
   }
 
   return {
-    events: selectUpcomingEvents(cache.events, limit),
+    events: await selectWithLocalEvents(cache.events, limit),
     fetchedAt: cache.fetchedAt,
     isStale: isCacheStale(cache),
     warning,
@@ -229,7 +266,7 @@ export async function forceRefreshEventsCache(
   const cache = await refreshCache();
 
   return {
-    events: selectUpcomingEvents(cache.events, limit),
+    events: await selectWithLocalEvents(cache.events, limit),
     fetchedAt: cache.fetchedAt,
     isStale: false,
     warning: null,
