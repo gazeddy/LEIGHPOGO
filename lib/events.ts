@@ -21,12 +21,12 @@ export interface EventsPageData {
   warning: string | null;
 }
 
-export interface GuidedEventTickerItem {
+export interface EventTickerItem {
   eventID: string;
   name: string;
   heading: string;
   start: string;
   end: string;
-  guideSlug: string;
-  guideTitle: string;
+  guideSlug: string | null;
+  guideTitle: string | null;
 }
