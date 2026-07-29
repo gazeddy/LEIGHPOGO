@@ -2,6 +2,9 @@
 title: "Max Battles Guide: Welcome"
 description: A beginner's introduction to Max Battles and the special Max Pokémon needed to take part.
 order: 1
+eventTypes:
+  - max-battles
+  - max-mondays
 ---
 
 ## So you want to know more about Max Battles!
