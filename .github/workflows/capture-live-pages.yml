@@ -1,0 +1,119 @@
+name: Capture live event pages
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./prisma/live-screenshots.db
+      NEXTAUTH_SECRET: live-screenshot-preview-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma db push
+
+      - name: Create preview admin account
+        run: |
+          node <<'NODE'
+          const { PrismaClient } = require('@prisma/client');
+          const bcrypt = require('bcryptjs');
+          const prisma = new PrismaClient();
+
+          (async () => {
+            const password = await bcrypt.hash('test', 10);
+            await prisma.user.upsert({
+              where: { ign: 'Angryspanner' },
+              update: { password, role: 'admin' },
+              create: {
+                name: 'Angryspanner',
+                ign: 'Angryspanner',
+                password,
+                role: 'admin',
+              },
+            });
+          })().finally(() => prisma.$disconnect());
+          NODE
+
+      - name: Fetch live ScrapedDuck events
+        run: |
+          mkdir -p data screenshots
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/Drumstix42/ScrapedDuck/refs/heads/data/events.min.json \
+            --output /tmp/events.min.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const events = JSON.parse(fs.readFileSync('/tmp/events.min.json', 'utf8'));
+          if (!Array.isArray(events) || events.length === 0) {
+            throw new Error('ScrapedDuck returned no events');
+          }
+
+          const fetchedAt = new Date().toISOString();
+          fs.writeFileSync(
+            'data/events-cache.json',
+            JSON.stringify({ version: 1, fetchedAt, events }, null, 2) + '\n',
+          );
+          fs.rmSync('data/local-events.json', { force: true });
+
+          const today = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Europe/London',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date());
+          const upcoming = events
+            .filter((event) => typeof event.end === 'string' && event.end.slice(0, 10) >= today)
+            .sort((a, b) => String(a.start).localeCompare(String(b.start)))
+            .map(({ eventID, name, eventType, heading, start, end, link }) => ({
+              eventID,
+              name,
+              eventType,
+              heading,
+              start,
+              end,
+              link,
+            }));
+
+          fs.writeFileSync(
+            'screenshots/live-events-used.json',
+            JSON.stringify({ source: 'ScrapedDuck events.min.json', fetchedAt, upcoming }, null, 2) + '\n',
+          );
+          console.log(`Fetched ${events.length} total events; ${upcoming.length} are current or upcoming.`);
+          NODE
+
+      - run: npm run build
+
+      - name: Install Chromium capture tools
+        run: |
+          npm install --no-save @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start application
+        run: |
+          npm run start > /tmp/leighpogo.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/login > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/leighpogo.log
+          exit 1
+
+      - name: Capture pages
+        run: node .github/scripts/capture-live-pages.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leighpogo-live-event-screenshots
+          path: screenshots/*
+          if-no-files-found: error
