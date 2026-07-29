@@ -34,19 +34,6 @@ function formatTickerDate(value: string): string {
   }).format(date);
 }
 
-function TickerItemContent({ item }: { item: EventTickerItem }) {
-  return (
-    <>
-      <span className="ticker-heading">{item.heading}</span>
-      <span className="ticker-name">{item.name}</span>
-      <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
-      {item.guideSlug && item.guideTitle && (
-        <span className="ticker-guide">Read guide →</span>
-      )}
-    </>
-  );
-}
-
 function TickerItems({
   items,
   duplicate = false,
@@ -62,23 +49,34 @@ function TickerItems({
       {items.map((item) => {
         const key = `${duplicate ? "duplicate-" : ""}${item.eventID}`;
 
-        if (item.guideSlug && item.guideTitle) {
-          return (
-            <Link
-              key={key}
-              href={`/guides/${item.guideSlug}`}
-              className="ticker-item ticker-item-link"
-              tabIndex={duplicate ? -1 : undefined}
-              title={`Read ${item.guideTitle}`}
-            >
-              <TickerItemContent item={item} />
-            </Link>
-          );
-        }
-
         return (
-          <span key={key} className="ticker-item ticker-item-static">
-            <TickerItemContent item={item} />
+          <span key={key} className="ticker-item">
+            <span className="ticker-heading">{item.heading}</span>
+            <span className="ticker-name">{item.name}</span>
+            <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
+
+            {item.eventUrl && item.eventUrlLabel && (
+              <a
+                href={item.eventUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ticker-action ticker-meetup"
+                tabIndex={duplicate ? -1 : undefined}
+              >
+                {item.eventUrlLabel} ↗
+              </a>
+            )}
+
+            {item.guideSlug && item.guideTitle && (
+              <Link
+                href={`/guides/${item.guideSlug}`}
+                className="ticker-action ticker-guide"
+                tabIndex={duplicate ? -1 : undefined}
+                title={`Read ${item.guideTitle}`}
+              >
+                Guide →
+              </Link>
+            )}
           </span>
         );
       })}
@@ -271,7 +269,6 @@ export default function EventTicker() {
           color: #c9d1d9;
           font-size: 0.84rem;
           line-height: 42px;
-          text-decoration: none;
           white-space: nowrap;
         }
 
@@ -280,17 +277,6 @@ export default function EventTicker() {
           margin-left: 10px;
           color: #484f58;
           font-size: 0.55rem;
-        }
-
-        .ticker-item-link:hover,
-        .ticker-item-link:focus-visible {
-          color: #ffffff;
-          background: #1f2937;
-          outline: none;
-        }
-
-        .ticker-item-static {
-          cursor: default;
         }
 
         .ticker-heading {
@@ -309,9 +295,27 @@ export default function EventTicker() {
           color: #8b949e;
         }
 
+        .ticker-action {
+          border-radius: 4px;
+          padding: 0 4px;
+          font-weight: 800;
+          line-height: 26px;
+          text-decoration: none;
+        }
+
+        .ticker-action:hover,
+        .ticker-action:focus-visible {
+          background: #1f2937;
+          outline: none;
+          text-decoration: underline;
+        }
+
+        .ticker-meetup {
+          color: #79c0ff;
+        }
+
         .ticker-guide {
           color: #3fb950;
-          font-weight: 700;
         }
 
         @media (prefers-reduced-motion: reduce) {
