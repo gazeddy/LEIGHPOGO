@@ -1,0 +1,68 @@
+name: Fetch SlimWiki guide
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch raw page
+        run: |
+          curl --fail --location --retry 3 \
+            --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36" \
+            "https://slimwiki.com/pokemon-go-leigh/getting-started/welcome" \
+            --output slimwiki-raw.html
+
+      - name: Fetch rendered page
+        run: |
+          mkdir -p /tmp/slimwiki-fetch
+          cd /tmp/slimwiki-fetch
+          npm init -y
+          npm install playwright@1.54.2
+          npx playwright install chromium
+          cat > fetch.cjs <<'EOF'
+          const fs = require("node:fs");
+          const { chromium } = require("playwright");
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+            await page.goto(
+              "https://slimwiki.com/pokemon-go-leigh/getting-started/welcome",
+              { waitUntil: "networkidle", timeout: 120000 },
+            );
+            await page.waitForTimeout(3000);
+            fs.writeFileSync(
+              process.env.GITHUB_WORKSPACE + "/slimwiki-rendered.html",
+              await page.content(),
+            );
+            fs.writeFileSync(
+              process.env.GITHUB_WORKSPACE + "/slimwiki-text.txt",
+              await page.locator("body").innerText(),
+            );
+            await page.screenshot({
+              path: process.env.GITHUB_WORKSPACE + "/slimwiki-page.png",
+              fullPage: true,
+            });
+            await browser.close();
+          })();
+          EOF
+          node fetch.cjs
+
+      - name: Upload fetched page
+        uses: actions/upload-artifact@v4
+        with:
+          name: slimwiki-guide-source
+          path: |
+            slimwiki-raw.html
+            slimwiki-rendered.html
+            slimwiki-text.txt
+            slimwiki-page.png
