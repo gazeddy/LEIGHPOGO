@@ -14,23 +14,32 @@ interface NewGymPayload {
   gyms?: NewGymItem[];
 }
 
+type FetchState = "loading" | "ready" | "error";
+
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export default function NewGymTicker() {
   const { status } = useSession();
   const [gyms, setGyms] = useState<NewGymItem[]>([]);
+  const [fetchState, setFetchState] = useState<FetchState>("loading");
 
   useEffect(() => {
     if (status !== "authenticated") {
       setGyms([]);
+      setFetchState("loading");
       return;
     }
 
     let controller: AbortController | null = null;
+    let hasLoaded = false;
 
     async function loadGyms() {
       controller?.abort();
       controller = new AbortController();
+
+      if (!hasLoaded) {
+        setFetchState("loading");
+      }
 
       try {
         const response = await fetch("/api/gyms/new", {
@@ -41,14 +50,20 @@ export default function NewGymTicker() {
 
         if (!response.ok) {
           setGyms([]);
+          setFetchState("error");
+          hasLoaded = true;
           return;
         }
 
         const payload = (await response.json()) as NewGymPayload;
         setGyms(Array.isArray(payload.gyms) ? payload.gyms : []);
+        setFetchState("ready");
+        hasLoaded = true;
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           setGyms([]);
+          setFetchState("error");
+          hasLoaded = true;
         }
       }
     }
@@ -84,16 +99,25 @@ export default function NewGymTicker() {
     </Link>
   ));
 
+  const statusMessage =
+    fetchState === "loading"
+      ? "Checking for new gyms…"
+      : fetchState === "error"
+        ? "New gym updates are temporarily unavailable."
+        : gyms.length === 0
+          ? "No new gyms in the last 7 days."
+          : null;
+
   return (
     <aside className="new-gym-ticker" aria-label="Newly added gyms">
       <Link href="/gyms" className="new-gym-label">
         <span aria-hidden="true">✨</span>
         <strong>New gyms</strong>
       </Link>
-      <div className="new-gym-viewport">
-        {gyms.length === 0 ? (
-          <p className="new-gym-empty-message">
-            No newly added gyms in the last 7 days.
+      <div className="new-gym-viewport" aria-live="polite">
+        {statusMessage ? (
+          <p className="new-gym-status-message" title={statusMessage}>
+            {statusMessage}
           </p>
         ) : (
           <div className="new-gym-track">
@@ -104,13 +128,22 @@ export default function NewGymTicker() {
       </div>
 
       <style jsx>{`
-        .new-gym-empty-message {
+        .new-gym-status-message {
+          overflow: hidden;
           margin: 0;
           padding: 0 23px;
           color: #8b949e;
           font-size: 1rem;
           line-height: 49px;
+          text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        @media (max-width: 620px) {
+          .new-gym-status-message {
+            padding: 0 10px;
+            font-size: 0.78rem;
+          }
         }
       `}</style>
     </aside>
