@@ -192,7 +192,10 @@ export default function GuideImageUploader({
       {error && <p className="upload-message error">{error}</p>}
 
       <style jsx>{`
-        .guide-image-uploader { gap: 12px; }
+        .guide-image-uploader { display: grid; gap: 12px; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+        .guide-image-uploader label { display: grid; gap: 7px; color: #f0f6fc; font-weight: 700; }
+        .guide-image-uploader input { width: 100%; box-sizing: border-box; border: 1px solid #30363d; border-radius: 7px; padding: 10px; background: #0d1117; color: #f0f6fc; font: inherit; }
+        .field-help { margin: 0 0 4px; color: #8b949e; font-size: .86rem; font-weight: 400; line-height: 1.5; }
         .image-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .image-actions button,
         .cover-preview button { border: 1px solid #30363d; border-radius: 7px; padding: 9px 12px; background: #21262d; color: #f0f6fc; font-weight: 800; cursor: pointer; }

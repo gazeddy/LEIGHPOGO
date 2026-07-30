@@ -66,6 +66,14 @@
         "nxtPid": "nxtPid"
       },
       "namedRegex": "^/entries/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/guides/[slug]",
+      "regex": "^/guides/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/guides/(?<nxtPslug>[^/]+?)(?:/)?$"
     }
   ],
   "staticRoutes": [
@@ -88,6 +96,36 @@
       "namedRegex": "^/admin(?:/)?$"
     },
     {
+      "page": "/admin/content",
+      "regex": "^/admin/content(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/content(?:/)?$"
+    },
+    {
+      "page": "/admin/event-types",
+      "regex": "^/admin/event\\-types(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/event\\-types(?:/)?$"
+    },
+    {
+      "page": "/admin/events",
+      "regex": "^/admin/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/events(?:/)?$"
+    },
+    {
+      "page": "/admin/guide-images",
+      "regex": "^/admin/guide\\-images(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/guide\\-images(?:/)?$"
+    },
+    {
+      "page": "/admin/guide-links",
+      "regex": "^/admin/guide\\-links(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/guide\\-links(?:/)?$"
+    },
+    {
       "page": "/entries",
       "regex": "^/entries(?:/)?$",
       "routeKeys": {},
@@ -98,6 +136,18 @@
       "regex": "^/entries/add(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/entries/add(?:/)?$"
+    },
+    {
+      "page": "/events",
+      "regex": "^/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/events(?:/)?$"
+    },
+    {
+      "page": "/guides",
+      "regex": "^/guides(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/guides(?:/)?$"
     },
     {
       "page": "/login",
@@ -127,31 +177,67 @@
   "dataRoutes": [
     {
       "page": "/",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/index\\.json$"
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/index\\.json$"
     },
     {
       "page": "/account",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/account\\.json$"
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/account\\.json$"
     },
     {
       "page": "/admin",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/admin\\.json$"
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/admin\\.json$"
+    },
+    {
+      "page": "/admin/content",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/admin/content\\.json$"
+    },
+    {
+      "page": "/admin/event-types",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/admin/event-types\\.json$"
+    },
+    {
+      "page": "/admin/events",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/admin/events\\.json$"
+    },
+    {
+      "page": "/admin/guide-images",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/admin/guide-images\\.json$"
+    },
+    {
+      "page": "/admin/guide-links",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/admin/guide-links\\.json$"
     },
     {
       "page": "/entries/[id]",
       "routeKeys": {
         "nxtPid": "nxtPid"
       },
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/entries/([^/]+?)\\.json$",
-      "namedDataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/entries/(?<nxtPid>[^/]+?)\\.json$"
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/entries/([^/]+?)\\.json$",
+      "namedDataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/entries/(?<nxtPid>[^/]+?)\\.json$"
+    },
+    {
+      "page": "/events",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/events\\.json$"
+    },
+    {
+      "page": "/guides",
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/guides\\.json$"
+    },
+    {
+      "page": "/guides/[slug]",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/guides/([^/]+?)\\.json$",
+      "namedDataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/guides/(?<nxtPslug>[^/]+?)\\.json$"
     },
     {
       "page": "/login",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/login\\.json$"
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/login\\.json$"
     },
     {
       "page": "/register",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/register\\.json$"
+      "dataRouteRegex": "^/_next/data/rfnUHD3b71dS0HzgsMTb3/register\\.json$"
     }
   ],
   "rsc": {

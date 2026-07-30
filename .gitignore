@@ -7,3 +7,4 @@ node_modules
 /data/local-events.json*
 /data/event-overrides.json*
 /data/event-type-rules.json*
+/public/uploads/guides/*

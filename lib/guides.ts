@@ -16,6 +16,8 @@ export interface GuideFrontMatter {
   series?: string;
   seriesOrder?: number;
   relatedGuides?: string[];
+  coverImage?: string;
+  coverImageAlt?: string;
 }
 
 export interface GuideSummary extends GuideFrontMatter {
@@ -113,6 +115,14 @@ function normaliseFrontMatter(
   const relatedGuides = normaliseSlugArray(data.relatedGuides)?.filter(
     (relatedSlug) => relatedSlug !== slug,
   );
+  const coverImage =
+    typeof data.coverImage === "string" && data.coverImage.trim()
+      ? data.coverImage.trim()
+      : undefined;
+  const coverImageAlt =
+    typeof data.coverImageAlt === "string" && data.coverImageAlt.trim()
+      ? data.coverImageAlt.trim()
+      : undefined;
 
   if (date) {
     frontMatter.date = date;
@@ -145,6 +155,11 @@ function normaliseFrontMatter(
 
   if (relatedGuides && relatedGuides.length > 0) {
     frontMatter.relatedGuides = relatedGuides;
+  }
+
+  if (coverImage) {
+    frontMatter.coverImage = coverImage;
+    frontMatter.coverImageAlt = coverImageAlt || frontMatter.title;
   }
 
   return frontMatter;

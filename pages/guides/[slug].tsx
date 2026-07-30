@@ -82,6 +82,17 @@ export default function GuidePage({
         </div>
       )}
 
+      {guide.coverImage && (
+        <figure className="guide-cover">
+          <img
+            src={guide.coverImage}
+            alt={guide.coverImageAlt || guide.title}
+            loading="eager"
+            decoding="async"
+          />
+        </figure>
+      )}
+
       <MarkdownContent content={guide.content} />
 
       {hasSequence && (
@@ -121,6 +132,20 @@ export default function GuidePage({
       )}
 
       <style jsx>{`
+        .guide-cover {
+          margin: 0;
+          border-top: 1px solid #30363d;
+          border-bottom: 1px solid #30363d;
+          background: #0d1117;
+        }
+
+        .guide-cover img {
+          display: block;
+          width: 100%;
+          max-height: 540px;
+          object-fit: cover;
+        }
+
         .series-position {
           display: inline-flex;
           margin: 0 0 18px;

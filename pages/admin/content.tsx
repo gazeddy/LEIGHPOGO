@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import GuideImageUploader from "../../components/admin/GuideImageUploader";
 import {
   EVENT_TAG_SUGGESTIONS,
   EVENT_TYPE_OPTIONS,
@@ -171,9 +172,12 @@ export default function ContentCreatorPage({
     eventTypes: [] as string[],
     tags: [] as string[],
     relatedGuides: [] as string[],
+    coverImage: "",
+    coverImageAlt: "",
     body: "## Introduction\n\nWrite the guide here.\n",
   });
   const [slugTouched, setSlugTouched] = useState(false);
+  const guideBodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   const existingSeries = useMemo(
     () =>
@@ -194,6 +198,13 @@ export default function ContentCreatorPage({
       `description: ${yamlString(guideForm.description || "Guide description")}`,
       `date: ${yamlString(guideForm.date)}`,
     ];
+
+    if (guideForm.coverImage) {
+      lines.push(`coverImage: ${yamlString(guideForm.coverImage)}`);
+      lines.push(
+        `coverImageAlt: ${yamlString(guideForm.coverImageAlt || guideForm.title || "Guide cover")}`,
+      );
+    }
 
     if (guideForm.order) {
       lines.push(`order: ${guideForm.order}`);
@@ -328,6 +339,8 @@ export default function ContentCreatorPage({
           eventTypes: guideForm.eventTypes,
           tags: guideForm.tags,
           relatedGuides: guideForm.relatedGuides,
+          coverImage: guideForm.coverImage || undefined,
+          coverImageAlt: guideForm.coverImageAlt || undefined,
         },
       ]);
       setMessage(`${payload.message} It is available at ${payload.url}`);
@@ -733,9 +746,27 @@ export default function ContentCreatorPage({
               )}
             </fieldset>
 
+            <GuideImageUploader
+              body={guideForm.body}
+              onBodyChange={(body) =>
+                setGuideForm((current) => ({ ...current, body }))
+              }
+              coverImage={guideForm.coverImage}
+              coverImageAlt={guideForm.coverImageAlt}
+              onCoverChange={(coverImage, coverImageAlt) =>
+                setGuideForm((current) => ({
+                  ...current,
+                  coverImage,
+                  coverImageAlt,
+                }))
+              }
+              textareaRef={guideBodyRef}
+            />
+
             <label>
               Guide body (Markdown)
               <textarea
+                ref={guideBodyRef}
                 required
                 rows={18}
                 className="code-input"
