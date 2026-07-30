@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
   CircleMarker,
@@ -75,7 +75,7 @@ function MapController({
 }) {
   const map = useMap();
 
-  useMemo(() => {
+  useEffect(() => {
     if (selectedGym) {
       map.flyTo([selectedGym.lat, selectedGym.lon], 17, { duration: 0.7 });
       return;
@@ -253,7 +253,7 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
             const selected = selectedId === gym.id;
 
             return (
-              <span key={gym.id}>
+              <Fragment key={gym.id}>
                 {opacity > 0 && (
                   <CircleMarker
                     center={[gym.lat, gym.lon]}
@@ -296,7 +296,7 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
                     </div>
                   </Popup>
                 </CircleMarker>
-              </span>
+              </Fragment>
             );
           })}
         </MapContainer>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth/next";
 import { useSession } from "next-auth/react";
 import { useMemo, useState } from "react";
@@ -130,6 +131,10 @@ export default function Admin({ users, entries, searchStrings }) {
           <NavButton id="entries">Entries ({counts.entries})</NavButton>
           <NavButton id="users">Users ({counts.users})</NavButton>
           <NavButton id="searches">Saved search strings ({counts.searches})</NavButton>
+          <Link href="/admin/gyms" className="admin-navbtn admin-navlink">
+            <span>Gym data</span>
+            <span className="admin-navbtn-caret">→</span>
+          </Link>
         </aside>
 
         {/* RIGHT: content */}
@@ -328,6 +333,10 @@ export default function Admin({ users, entries, searchStrings }) {
           background: #1f8a3b;
           cursor: pointer;
           box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+        }
+        .admin-navlink {
+          box-sizing: border-box;
+          text-decoration: none;
         }
         .admin-navbtn:hover {
           filter: brightness(1.05);
