@@ -4,6 +4,7 @@ import type {
   EventsPageData,
   PokemonGoEventSummary,
 } from "./events";
+import { applyEventOverrides } from "./event-overrides";
 import { localEventToSummary, readLocalEvents } from "./local-events";
 
 const EVENTS_FEED_URL =
@@ -18,6 +19,13 @@ interface StoredEventsCache {
   version: number;
   fetchedAt: string;
   events: PokemonGoEventSummary[];
+}
+
+export interface ImportedEventsAdminData {
+  events: PokemonGoEventSummary[];
+  fetchedAt: string;
+  isStale: boolean;
+  warning: string | null;
 }
 
 let refreshInFlight: Promise<StoredEventsCache> | null = null;
@@ -130,9 +138,10 @@ async function selectWithLocalEvents(
     tags: event.tags ?? [],
     source: event.source ?? ("feed" as const),
   }));
+  const overriddenFeedEvents = await applyEventOverrides(normalisedFeedEvents);
 
   return selectUpcomingEvents(
-    [...normalisedFeedEvents, ...localEvents.map(localEventToSummary)],
+    [...overriddenFeedEvents, ...localEvents.map(localEventToSummary)],
     limit,
   );
 }
@@ -231,9 +240,10 @@ async function refreshCache(): Promise<StoredEventsCache> {
   return refreshInFlight;
 }
 
-export async function getEventsPageData(
-  limit: number = 80,
-): Promise<EventsPageData> {
+async function loadUsableCache(): Promise<{
+  cache: StoredEventsCache;
+  warning: string | null;
+}> {
   let cache = await readEventsCache();
   let warning: string | null = null;
 
@@ -252,8 +262,29 @@ export async function getEventsPageData(
     }
   }
 
+  return { cache, warning };
+}
+
+export async function getEventsPageData(
+  limit: number = 80,
+): Promise<EventsPageData> {
+  const { cache, warning } = await loadUsableCache();
+
   return {
     events: await selectWithLocalEvents(cache.events, limit),
+    fetchedAt: cache.fetchedAt,
+    isStale: isCacheStale(cache),
+    warning,
+  };
+}
+
+export async function getImportedEventsForAdmin(
+  limit: number = 200,
+): Promise<ImportedEventsAdminData> {
+  const { cache, warning } = await loadUsableCache();
+
+  return {
+    events: selectUpcomingEvents(cache.events, limit),
     fetchedAt: cache.fetchedAt,
     isStale: isCacheStale(cache),
     warning,
