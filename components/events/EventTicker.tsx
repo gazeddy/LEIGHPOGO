@@ -66,9 +66,16 @@ function TickerItems({
 
         return (
           <span key={key} className="ticker-item">
-            <span className="ticker-heading">{item.heading}</span>
-            <span className="ticker-name">{item.name}</span>
-            <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
+            <Link
+              href={{ pathname: "/events", query: { event: item.eventID } }}
+              className="ticker-event-link"
+              tabIndex={duplicate ? -1 : undefined}
+              title={`View ${item.name} on the Events page`}
+            >
+              <span className="ticker-heading">{item.heading}</span>
+              <span className="ticker-name">{item.name}</span>
+              <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
+            </Link>
 
             {item.eventUrl && item.eventUrlLabel && (
               <a
@@ -439,6 +446,28 @@ export default function EventTicker() {
           margin-left: 10px;
           color: #484f58;
           font-size: 0.55rem;
+        }
+
+        .ticker-event-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border-radius: 4px;
+          padding: 0 4px;
+          color: inherit;
+          line-height: 26px;
+          text-decoration: none;
+        }
+
+        .ticker-event-link:hover,
+        .ticker-event-link:focus-visible {
+          background: #1f2937;
+          outline: none;
+        }
+
+        .ticker-event-link:hover .ticker-name,
+        .ticker-event-link:focus-visible .ticker-name {
+          text-decoration: underline;
         }
 
         .ticker-heading {
