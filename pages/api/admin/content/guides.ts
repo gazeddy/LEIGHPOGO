@@ -3,7 +3,11 @@ import path from "node:path";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
-import { getGuideBySlug, getGuidesDirectory } from "../../../../lib/guides";
+import {
+  getAllGuides,
+  getGuideBySlug,
+  getGuidesDirectory,
+} from "../../../../lib/guides";
 import { authOptions } from "../../auth/[...nextauth]";
 
 interface GuideInput {
@@ -14,6 +18,9 @@ interface GuideInput {
   order?: unknown;
   eventTypes?: unknown;
   tags?: unknown;
+  series?: unknown;
+  seriesOrder?: unknown;
+  relatedGuides?: unknown;
   body?: unknown;
 }
 
@@ -48,6 +55,38 @@ function stringArray(value: unknown): string[] {
   ).slice(0, 30);
 }
 
+function slugValue(value: unknown, field: string): string | undefined {
+  const slug = optionalString(value)?.toLowerCase();
+
+  if (!slug) {
+    return undefined;
+  }
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error(`${field} may only contain lowercase letters, numbers and hyphens`);
+  }
+
+  return slug;
+}
+
+function optionalWholeNumber(
+  value: unknown,
+  field: string,
+  minimum: number,
+): number | undefined {
+  if (value === "" || value === undefined || value === null) {
+    return undefined;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number < minimum) {
+    throw new Error(`${field} must be a whole number of ${minimum} or more`);
+  }
+
+  return number;
+}
+
 function yamlString(value: string): string {
   return JSON.stringify(value);
 }
@@ -67,6 +106,9 @@ function renderGuide(input: {
   order?: number;
   eventTypes: string[];
   tags: string[];
+  series?: string;
+  seriesOrder?: number;
+  relatedGuides: string[];
   body: string;
 }): string {
   const frontMatter = [
@@ -80,8 +122,17 @@ function renderGuide(input: {
     frontMatter.push(`order: ${input.order}`);
   }
 
+  if (input.series) {
+    frontMatter.push(`series: ${yamlString(input.series)}`);
+  }
+
+  if (input.seriesOrder !== undefined) {
+    frontMatter.push(`seriesOrder: ${input.seriesOrder}`);
+  }
+
   frontMatter.push(...renderArray("eventTypes", input.eventTypes));
   frontMatter.push(...renderArray("tags", input.tags));
+  frontMatter.push(...renderArray("relatedGuides", input.relatedGuides));
   frontMatter.push("---", "", input.body.trim(), "");
 
   return frontMatter.join("\n");
@@ -121,15 +172,32 @@ export default async function handler(
       return res.status(409).json({ error: "A guide with that slug already exists" });
     }
 
-    const rawOrder = input.order;
-    const order =
-      rawOrder === "" || rawOrder === undefined || rawOrder === null
-        ? undefined
-        : Number(rawOrder);
+    const order = optionalWholeNumber(input.order, "Order", 0);
+    const series = slugValue(input.series, "Series");
+    const seriesOrder = optionalWholeNumber(
+      input.seriesOrder,
+      "Series position",
+      1,
+    );
 
-    if (order !== undefined && (!Number.isInteger(order) || order < 0)) {
-      throw new Error("Order must be a positive whole number");
+    if (seriesOrder !== undefined && !series) {
+      throw new Error("Choose a series before setting a series position");
     }
+
+    const availableGuideSlugs = new Set(getAllGuides().map((guide) => guide.slug));
+    const relatedGuides = stringArray(input.relatedGuides)
+      .filter((relatedSlug) => relatedSlug !== slug)
+      .map((relatedSlug) => {
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(relatedSlug)) {
+          throw new Error(`Related guide slug is invalid: ${relatedSlug}`);
+        }
+
+        if (!availableGuideSlugs.has(relatedSlug)) {
+          throw new Error(`Related guide does not exist: ${relatedSlug}`);
+        }
+
+        return relatedSlug;
+      });
 
     const date = optionalString(input.date) || new Date().toISOString().slice(0, 10);
     const guideSource = renderGuide({
@@ -139,6 +207,9 @@ export default async function handler(
       order,
       eventTypes: stringArray(input.eventTypes),
       tags: stringArray(input.tags),
+      series,
+      seriesOrder,
+      relatedGuides,
       body,
     });
     const directory = getGuidesDirectory();
