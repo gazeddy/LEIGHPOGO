@@ -1,0 +1,104 @@
+/* Prominent ticker sizing: approximately 30% larger than the component defaults. */
+.event-ticker {
+  min-height: 55px !important;
+}
+
+.event-ticker .ticker-label {
+  gap: 9px !important;
+  padding: 0 20px !important;
+  font-size: 1.01rem !important;
+}
+
+.event-ticker .ticker-label span {
+  font-size: 0.85rem !important;
+}
+
+.event-ticker .ticker-viewport {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 23px,
+    black calc(100% - 23px),
+    transparent
+  ) !important;
+}
+
+.event-ticker .ticker-message {
+  padding: 0 23px !important;
+  font-size: 1.09rem !important;
+  line-height: 55px !important;
+}
+
+.ticker-item {
+  gap: 10px !important;
+  padding: 0 23px !important;
+  font-size: 1.09rem !important;
+  line-height: 55px !important;
+}
+
+.ticker-item::after {
+  margin-left: 13px !important;
+  font-size: 0.72rem !important;
+}
+
+.ticker-heading {
+  font-size: 0.94rem !important;
+}
+
+.ticker-action {
+  border-radius: 5px !important;
+  padding: 0 5px !important;
+  line-height: 34px !important;
+}
+
+.raid-ticker {
+  min-height: 49px !important;
+}
+
+.raid-ticker .raid-label {
+  gap: 9px !important;
+  padding: 0 20px !important;
+  font-size: 0.96rem !important;
+}
+
+.raid-ticker .raid-label span {
+  font-size: 0.85rem !important;
+}
+
+.raid-ticker .raid-message {
+  padding: 0 23px !important;
+  font-size: 1.07rem !important;
+  line-height: 49px !important;
+}
+
+.raid-item {
+  gap: 9px !important;
+  padding: 0 21px !important;
+  font-size: 1.07rem !important;
+  line-height: 49px !important;
+}
+
+.raid-item::after {
+  margin-left: 10px !important;
+  font-size: 0.65rem !important;
+}
+
+.raid-category {
+  font-size: 0.94rem !important;
+}
+
+.raid-until {
+  font-size: 0.99rem !important;
+}
+
+@media (max-width: 620px) {
+  .event-ticker .ticker-label {
+    padding: 0 13px !important;
+    font-size: 0.91rem !important;
+  }
+
+  .raid-ticker .raid-label {
+    padding: 0 13px !important;
+    font-size: 0.88rem !important;
+  }
+}
