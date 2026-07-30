@@ -130,6 +130,9 @@ export default function Navbar() {
                     <Link href="/admin/content" className="nav-item nav-subitem">
                       Content Creator
                     </Link>
+                    <Link href="/admin/guide-links" className="nav-item nav-subitem">
+                      Guide Links
+                    </Link>
                   </div>
                 </div>
               )}
