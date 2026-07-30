@@ -1,6 +1,7 @@
 import { SessionProvider } from "next-auth/react"
 import { useRouter } from "next/router"
 import "../styles/globals.css"
+import "../styles/navbar.css"
 import Navbar from "../components/Navbar"
 import EventTicker from "../components/events/EventTicker"
 import RaidBossTicker from "../components/events/RaidBossTicker"
