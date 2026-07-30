@@ -1,7 +1,8 @@
 import Head from "next/head";
+import { useRouter } from "next/router";
 import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import { useSession } from "next-auth/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EventCard from "../../components/events/EventCard";
 import {
   EVENT_DATA_CREDITS,
@@ -45,6 +46,10 @@ export const getServerSideProps: GetServerSideProps<EventsPageProps> = async () 
   }
 };
 
+function eventTargetId(eventID: string): string {
+  return `event-${encodeURIComponent(eventID)}`;
+}
+
 function formatFetchedAt(value: string | null): string | null {
   if (!value) {
     return null;
@@ -64,6 +69,7 @@ export default function EventsPage({
   warning,
   feedError,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const router = useRouter();
   const { data: session } = useSession();
   const [selectedType, setSelectedType] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -71,6 +77,10 @@ export default function EventsPage({
   const isAdmin =
     (session?.user as { role?: string } | undefined)?.role === "admin";
   const formattedFetchedAt = formatFetchedAt(fetchedAt);
+  const selectedEventID =
+    router.isReady && typeof router.query.event === "string"
+      ? router.query.event
+      : null;
 
   const eventTypes = useMemo(() => {
     const labels = new Map<string, string>();
@@ -93,6 +103,32 @@ export default function EventsPage({
         : events.filter((event) => event.eventType === selectedType),
     [events, selectedType],
   );
+
+  useEffect(() => {
+    if (!selectedEventID) {
+      return;
+    }
+
+    setSelectedType("all");
+    const scrollTimer = window.setTimeout(() => {
+      const target = document.getElementById(eventTargetId(selectedEventID));
+
+      if (!target) {
+        return;
+      }
+
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      target.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center",
+      });
+      target.focus({ preventScroll: true });
+    }, 0);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [selectedEventID, visibleEvents]);
 
   async function handleAdminRefresh() {
     setRefreshing(true);
@@ -208,9 +244,20 @@ export default function EventsPage({
           </section>
         ) : visibleEvents.length > 0 ? (
           <section className="events-grid" aria-label="Upcoming events">
-            {visibleEvents.map((event) => (
-              <EventCard key={event.eventID} event={event} />
-            ))}
+            {visibleEvents.map((event) => {
+              const isSelected = event.eventID === selectedEventID;
+
+              return (
+                <div
+                  key={event.eventID}
+                  id={eventTargetId(event.eventID)}
+                  className={`event-target${isSelected ? " selected" : ""}`}
+                  tabIndex={-1}
+                >
+                  <EventCard event={event} />
+                </div>
+              );
+            })}
           </section>
         ) : (
           <section className="events-message">
@@ -369,6 +416,25 @@ export default function EventsPage({
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
           gap: 16px;
+        }
+
+        .event-target {
+          min-width: 0;
+          border-radius: 12px;
+          scroll-margin-top: 160px;
+          outline: 3px solid transparent;
+          transition:
+            outline-color 0.2s ease,
+            box-shadow 0.2s ease;
+        }
+
+        .event-target:focus {
+          outline-color: transparent;
+        }
+
+        .event-target.selected {
+          outline-color: #58a6ff;
+          box-shadow: 0 0 0 5px rgba(88, 166, 255, 0.2);
         }
 
         .events-message {
