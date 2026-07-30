@@ -31,6 +31,8 @@ interface UserLocation {
 }
 
 const NEW_GYM_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const GYM_DISPLAY_LIMIT = 10;
+const LEIGH_CENTRE: UserLocation = { lat: 53.49, lon: -2.52 };
 
 function displayName(gym: MapGym): string {
   return gym.alias || gym.name;
@@ -81,14 +83,17 @@ function MapController({
       return;
     }
 
+    const points = gyms.map((gym) => [gym.lat, gym.lon]) as [number, number][];
+
     if (userLocation) {
-      map.flyTo([userLocation.lat, userLocation.lon], 14, { duration: 0.7 });
-      return;
+      points.push([userLocation.lat, userLocation.lon]);
     }
 
-    if (gyms.length > 0) {
-      const bounds = gyms.map((gym) => [gym.lat, gym.lon]) as LatLngBoundsExpression;
-      map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+    if (points.length > 0) {
+      map.fitBounds(points as LatLngBoundsExpression, {
+        padding: [28, 28],
+        maxZoom: 15,
+      });
     }
   }, [gyms, map, selectedGym, userLocation]);
 
@@ -103,6 +108,7 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
   const [locating, setLocating] = useState(false);
   const selectedId = typeof router.query.gym === "string" ? router.query.gym : null;
   const selectedGym = gyms.find((gym) => gym.id === selectedId) || null;
+  const referenceLocation = userLocation || LEIGH_CENTRE;
 
   const filteredGyms = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -113,13 +119,36 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
       : gyms;
 
     return [...matching].sort((left, right) => {
-      if (userLocation) {
-        return distanceKm(userLocation, left) - distanceKm(userLocation, right);
+      const distanceDifference =
+        distanceKm(referenceLocation, left) - distanceKm(referenceLocation, right);
+
+      if (distanceDifference !== 0) {
+        return distanceDifference;
       }
 
       return displayName(left).localeCompare(displayName(right), "en-GB");
     });
-  }, [gyms, search, userLocation]);
+  }, [gyms, referenceLocation, search]);
+
+  const visibleGyms = useMemo(() => {
+    const nearest = filteredGyms.slice(0, GYM_DISPLAY_LIMIT);
+
+    if (
+      search.trim() ||
+      !selectedGym ||
+      nearest.some((gym) => gym.id === selectedGym.id)
+    ) {
+      return nearest;
+    }
+
+    return [
+      selectedGym,
+      ...nearest.filter((gym) => gym.id !== selectedGym.id).slice(0, GYM_DISPLAY_LIMIT - 1),
+    ];
+  }, [filteredGyms, search, selectedGym]);
+
+  const visibleSelectedGym =
+    visibleGyms.find((gym) => gym.id === selectedGym?.id) || null;
 
   function selectGym(gym: MapGym) {
     void router.replace(
@@ -192,7 +221,14 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
           </div>
           {locationError && <p className="gym-error">{locationError}</p>}
           <p className="gym-count">
-            {filteredGyms.length} of {gyms.length} gyms
+            {search.trim()
+              ? `${visibleGyms.length} closest matches of ${filteredGyms.length}`
+              : `${visibleGyms.length} nearest of ${gyms.length} gyms`}
+            <small>
+              {userLocation
+                ? "Sorted from your current location"
+                : "Sorted from Leigh town centre until you use Gyms near me"}
+            </small>
             {importedAt && (
               <small>Updated {new Date(importedAt).toLocaleString("en-GB")}</small>
             )}
@@ -200,7 +236,7 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
         </div>
 
         <div className="gym-results" aria-label="Gym results">
-          {filteredGyms.slice(0, 100).map((gym) => {
+          {visibleGyms.map((gym) => {
             const opacity = newGymOpacity(gym);
             return (
               <button
@@ -220,21 +256,31 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
               </button>
             );
           })}
-          {filteredGyms.length > 100 && (
-            <p className="result-limit">Refine the search to see results beyond the first 100.</p>
+          {filteredGyms.length === 0 && (
+            <p className="result-limit">No gyms match that search.</p>
+          )}
+          {filteredGyms.length > GYM_DISPLAY_LIMIT && (
+            <p className="result-limit">
+              Showing the closest {GYM_DISPLAY_LIMIT}. Refine the search to find another gym.
+            </p>
           )}
         </div>
       </aside>
 
       <div className="gym-map-panel">
-        <MapContainer center={[53.49, -2.52]} zoom={12} scrollWheelZoom className="gym-leaflet-map">
+        <MapContainer
+          center={[LEIGH_CENTRE.lat, LEIGH_CENTRE.lon]}
+          zoom={12}
+          scrollWheelZoom
+          className="gym-leaflet-map"
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <MapController
-            gyms={filteredGyms}
-            selectedGym={selectedGym}
+            gyms={visibleGyms}
+            selectedGym={visibleSelectedGym}
             userLocation={userLocation}
           />
 
@@ -248,7 +294,7 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
             </CircleMarker>
           )}
 
-          {filteredGyms.map((gym) => {
+          {visibleGyms.map((gym) => {
             const opacity = newGymOpacity(gym);
             const selected = selectedId === gym.id;
 
