@@ -105,11 +105,16 @@ export default function EventsPage({
   );
 
   useEffect(() => {
-    if (!selectedEventID) {
+    if (selectedEventID) {
+      setSelectedType("all");
+    }
+  }, [selectedEventID]);
+
+  useEffect(() => {
+    if (!selectedEventID || selectedType !== "all") {
       return;
     }
 
-    setSelectedType("all");
     const scrollTimer = window.setTimeout(() => {
       const target = document.getElementById(eventTargetId(selectedEventID));
 
@@ -128,7 +133,7 @@ export default function EventsPage({
     }, 0);
 
     return () => window.clearTimeout(scrollTimer);
-  }, [selectedEventID, visibleEvents]);
+  }, [selectedEventID, selectedType]);
 
   async function handleAdminRefresh() {
     setRefreshing(true);
@@ -222,7 +227,16 @@ export default function EventsPage({
             <select
               id="event-type"
               value={selectedType}
-              onChange={(event) => setSelectedType(event.target.value)}
+              onChange={(event) => {
+                setSelectedType(event.target.value);
+
+                if (selectedEventID) {
+                  void router.replace("/events", undefined, {
+                    shallow: true,
+                    scroll: false,
+                  });
+                }
+              }}
             >
               <option value="all">All events</option>
               {eventTypes.map((eventType) => (
