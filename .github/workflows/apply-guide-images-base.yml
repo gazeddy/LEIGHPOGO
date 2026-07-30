@@ -3,7 +3,7 @@ name: Apply guide image feature branch
 on:
   pull_request:
     branches: [develop]
-    types: [synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
   contents: write
