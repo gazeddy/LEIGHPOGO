@@ -165,11 +165,26 @@ export default function ContentCreatorPage({
     description: "",
     date: new Date().toISOString().slice(0, 10),
     order: "",
+    series: "",
+    seriesOrder: "",
     eventTypes: [] as string[],
     tags: [] as string[],
+    relatedGuides: [] as string[],
     body: "## Introduction\n\nWrite the guide here.\n",
   });
   const [slugTouched, setSlugTouched] = useState(false);
+
+  const existingSeries = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          guides
+            .map((guide) => guide.series)
+            .filter((series): series is string => Boolean(series)),
+        ),
+      ).sort(),
+    [guides],
+  );
 
   const guidePreview = useMemo(() => {
     const lines = [
@@ -183,8 +198,17 @@ export default function ContentCreatorPage({
       lines.push(`order: ${guideForm.order}`);
     }
 
+    if (guideForm.series) {
+      lines.push(`series: ${yamlString(guideForm.series)}`);
+    }
+
+    if (guideForm.seriesOrder) {
+      lines.push(`seriesOrder: ${guideForm.seriesOrder}`);
+    }
+
     lines.push(...renderArray("eventTypes", guideForm.eventTypes));
     lines.push(...renderArray("tags", guideForm.tags));
+    lines.push(...renderArray("relatedGuides", guideForm.relatedGuides));
     lines.push("---", "", guideForm.body);
 
     return lines.join("\n");
@@ -240,7 +264,9 @@ export default function ContentCreatorPage({
       });
       setMessage(payload.message);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The event could not be created.");
+      setError(
+        caught instanceof Error ? caught.message : "The event could not be created.",
+      );
     } finally {
       setSaving(false);
     }
@@ -252,9 +278,10 @@ export default function ContentCreatorPage({
     }
 
     resetMessages();
-    const response = await fetch(`/api/admin/content/events?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `/api/admin/content/events?id=${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
     const payload = await response.json();
 
     if (!response.ok) {
@@ -291,13 +318,20 @@ export default function ContentCreatorPage({
           description: guideForm.description,
           date: guideForm.date,
           order: guideForm.order ? Number(guideForm.order) : undefined,
+          series: guideForm.series || undefined,
+          seriesOrder: guideForm.seriesOrder
+            ? Number(guideForm.seriesOrder)
+            : undefined,
           eventTypes: guideForm.eventTypes,
           tags: guideForm.tags,
+          relatedGuides: guideForm.relatedGuides,
         },
       ]);
       setMessage(`${payload.message} It is available at ${payload.url}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The guide could not be created.");
+      setError(
+        caught instanceof Error ? caught.message : "The guide could not be created.",
+      );
     } finally {
       setSaving(false);
     }
@@ -317,6 +351,15 @@ export default function ContentCreatorPage({
       eventTypes: current.eventTypes.includes(value)
         ? current.eventTypes.filter((item) => item !== value)
         : [...current.eventTypes, value],
+    }));
+  }
+
+  function toggleRelatedGuide(slug: string) {
+    setGuideForm((current) => ({
+      ...current,
+      relatedGuides: current.relatedGuides.includes(slug)
+        ? current.relatedGuides.filter((item) => item !== slug)
+        : [...current.relatedGuides, slug],
     }));
   }
 
@@ -355,7 +398,9 @@ export default function ContentCreatorPage({
         <div className="content-grid">
           <form className="creator-card" onSubmit={createEvent}>
             <h2>Create a local event or meetup</h2>
-            <p className="muted">This is merged with the imported Pokémon GO calendar and appears in the ticker.</p>
+            <p className="muted">
+              This is merged with the imported Pokémon GO calendar and appears in the ticker.
+            </p>
 
             <label>
               Event name
@@ -453,7 +498,10 @@ export default function ContentCreatorPage({
                 placeholder="https://campfire.nianticlabs.com/..."
                 value={eventForm.campfireUrl}
                 onChange={(event) =>
-                  setEventForm((current) => ({ ...current, campfireUrl: event.target.value }))
+                  setEventForm((current) => ({
+                    ...current,
+                    campfireUrl: event.target.value,
+                  }))
                 }
               />
             </label>
@@ -475,7 +523,10 @@ export default function ContentCreatorPage({
                 rows={5}
                 value={eventForm.description}
                 onChange={(event) =>
-                  setEventForm((current) => ({ ...current, description: event.target.value }))
+                  setEventForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
               />
             </label>
@@ -495,10 +546,18 @@ export default function ContentCreatorPage({
                   <article key={event.id}>
                     <div>
                       <strong>{event.name}</strong>
-                      <small>{event.eventType} · {new Date(event.start).toLocaleString("en-GB")}</small>
-                      {event.tags.length > 0 && <small>{event.tags.map((tag) => `#${tag}`).join(" ")}</small>}
+                      <small>
+                        {event.eventType} · {new Date(event.start).toLocaleString("en-GB")}
+                      </small>
+                      {event.tags.length > 0 && (
+                        <small>{event.tags.map((tag) => `#${tag}`).join(" ")}</small>
+                      )}
                     </div>
-                    <button type="button" className="danger" onClick={() => removeEvent(event.id)}>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => removeEvent(event.id)}
+                    >
                       Delete
                     </button>
                   </article>
@@ -514,7 +573,11 @@ export default function ContentCreatorPage({
 
             <label>
               Title
-              <input required value={guideForm.title} onChange={(event) => updateGuideTitle(event.target.value)} />
+              <input
+                required
+                value={guideForm.title}
+                onChange={(event) => updateGuideTitle(event.target.value)}
+              />
             </label>
 
             <label>
@@ -525,7 +588,10 @@ export default function ContentCreatorPage({
                 value={guideForm.slug}
                 onChange={(event) => {
                   setSlugTouched(true);
-                  setGuideForm((current) => ({ ...current, slug: slugify(event.target.value) }));
+                  setGuideForm((current) => ({
+                    ...current,
+                    slug: slugify(event.target.value),
+                  }));
                 }}
               />
             </label>
@@ -537,7 +603,10 @@ export default function ContentCreatorPage({
                 rows={3}
                 value={guideForm.description}
                 onChange={(event) =>
-                  setGuideForm((current) => ({ ...current, description: event.target.value }))
+                  setGuideForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
               />
             </label>
@@ -568,6 +637,51 @@ export default function ContentCreatorPage({
             </div>
 
             <fieldset>
+              <legend>Guide sequence</legend>
+              <p className="field-help">
+                Guides with the same series ID receive automatic previous and next links.
+              </p>
+              <div className="two-column">
+                <label>
+                  Series ID
+                  <input
+                    list="guide-series-list"
+                    pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                    placeholder="for example: raid-basics"
+                    value={guideForm.series}
+                    onChange={(event) =>
+                      setGuideForm((current) => ({
+                        ...current,
+                        series: slugify(event.target.value),
+                      }))
+                    }
+                  />
+                  <datalist id="guide-series-list">
+                    {existingSeries.map((series) => (
+                      <option key={series} value={series} />
+                    ))}
+                  </datalist>
+                </label>
+                <label>
+                  Position in series
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    disabled={!guideForm.series}
+                    value={guideForm.seriesOrder}
+                    onChange={(event) =>
+                      setGuideForm((current) => ({
+                        ...current,
+                        seriesOrder: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
               <legend>Matching event types</legend>
               <div className="checkbox-grid">
                 {eventTypes.map((option) => (
@@ -590,6 +704,32 @@ export default function ContentCreatorPage({
               onChange={(tags) => setGuideForm((current) => ({ ...current, tags }))}
             />
 
+            <fieldset>
+              <legend>Related guides</legend>
+              <p className="field-help">
+                Selected guides appear in a separate related-guides section below the article.
+              </p>
+              {guides.length === 0 ? (
+                <p className="muted">Create another guide first to add related links.</p>
+              ) : (
+                <div className="related-guide-grid">
+                  {guides.map((guide) => (
+                    <label key={guide.slug} className="checkbox-label related-guide-option">
+                      <input
+                        type="checkbox"
+                        checked={guideForm.relatedGuides.includes(guide.slug)}
+                        onChange={() => toggleRelatedGuide(guide.slug)}
+                      />
+                      <span>
+                        <strong>{guide.title}</strong>
+                        <small>{guide.slug}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+
             <label>
               Guide body (Markdown)
               <textarea
@@ -610,12 +750,18 @@ export default function ContentCreatorPage({
 
           <section className="creator-card preview-card">
             <h2>Generated Markdown file</h2>
-            <textarea readOnly rows={28} className="code-input" value={guidePreview} />
+            <textarea readOnly rows={32} className="code-input" value={guidePreview} />
             <h3>Existing guides ({guides.length})</h3>
             <div className="guide-links">
               {guides.map((guide) => (
                 <Link key={guide.slug} href={`/guides/${guide.slug}`}>
-                  {guide.title}
+                  <span>{guide.title}</span>
+                  {guide.series && (
+                    <small>
+                      {guide.series}
+                      {guide.seriesOrder ? ` · Part ${guide.seriesOrder}` : ""}
+                    </small>
+                  )}
                 </Link>
               ))}
             </div>
@@ -640,12 +786,18 @@ export default function ContentCreatorPage({
         form { display: grid; gap: 16px; }
         label, fieldset { display: grid; gap: 7px; color: #f0f6fc; font-weight: 700; }
         input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #30363d; border-radius: 7px; padding: 10px; background: #0d1117; color: #f0f6fc; font: inherit; }
+        input:disabled { opacity: .55; cursor: not-allowed; }
         textarea { resize: vertical; }
         .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         fieldset { border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+        .field-help { margin: 0 0 8px; color: #8b949e; font-size: .86rem; font-weight: 400; line-height: 1.5; }
         .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
         .checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: 500; }
         .checkbox-label input { width: auto; }
+        .related-guide-grid { display: grid; max-height: 300px; gap: 7px; overflow-y: auto; }
+        .related-guide-option { align-items: flex-start; padding: 9px; border: 1px solid #30363d; border-radius: 7px; background: #0d1117; }
+        .related-guide-option span { display: grid; gap: 2px; }
+        .related-guide-option small { color: #8b949e; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
         .tag-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 44px; border: 1px solid #30363d; border-radius: 7px; padding: 6px; background: #0d1117; }
         .tag-box input { min-width: 160px; flex: 1; border: 0; padding: 5px; }
         .tag-pill { border: 0; border-radius: 999px; padding: 6px 9px; background: #1f6feb; color: #fff; cursor: pointer; }
@@ -664,7 +816,9 @@ export default function ContentCreatorPage({
         .item-list small { color: #8b949e; }
         .code-input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; line-height: 1.5; }
         .guide-links { display: grid; gap: 7px; }
-        .guide-links a { color: #58a6ff; }
+        .guide-links a { display: grid; gap: 2px; padding: 8px; border-radius: 6px; color: #58a6ff; text-decoration: none; }
+        .guide-links a:hover { background: #21262d; }
+        .guide-links small { color: #8b949e; }
         @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
         @media (max-width: 620px) { .page-header { flex-direction: column; } .two-column { grid-template-columns: 1fr; } }
       `}</style>
