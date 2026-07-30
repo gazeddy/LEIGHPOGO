@@ -8,6 +8,7 @@ import {
   type EventTypeRule,
 } from "../../lib/event-overrides";
 import type { PokemonGoEventSummary } from "../../lib/events";
+import { notifyEventVisibilityChanged } from "../../lib/event-visibility-client";
 import { getImportedEventsForAdmin } from "../../lib/events-server";
 import { authOptions } from "../api/auth/[...nextauth]";
 
@@ -327,6 +328,7 @@ export default function EventTypeAdminPage({
     ]);
     setMessage(nextMessage);
     setError(null);
+    notifyEventVisibilityChanged();
   }
 
   function handleReset(eventType: string, nextMessage: string) {
@@ -335,6 +337,7 @@ export default function EventTypeAdminPage({
     );
     setMessage(nextMessage);
     setError(null);
+    notifyEventVisibilityChanged();
   }
 
   function handleError(nextError: string) {
@@ -350,8 +353,8 @@ export default function EventTypeAdminPage({
           <h1>Event types</h1>
           <p>
             Filter the imported feed by event type and hide whole categories such
-            as Hatch Days. Individual event overrides remain exceptions, so a
-            specific event redirected to Campfire can stay visible.
+            as Hatch Days. A hidden type is removed everywhere, including the events
+            page and both ticker bars, even when an individual event has an override.
           </p>
         </div>
         <div className="header-links">

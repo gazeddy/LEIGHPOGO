@@ -321,33 +321,30 @@ export async function applyEventOverrides(
 
   return events.flatMap((event) => {
     const override = overrideByEventID.get(event.eventID);
-
-    // An individual event override is an explicit exception to its type rule.
-    if (override) {
-      if (hideTimeReached(override.hidden, override.hideAt, now)) {
-        return [];
-      }
-
-      return [
-        {
-          ...event,
-          name: override.name,
-          heading: override.heading,
-          description: override.description,
-          campfireUrl: override.campfireUrl,
-          image: override.image,
-          tags: override.tags,
-          link: override.campfireUrl || event.link,
-        },
-      ];
-    }
-
     const typeRule = ruleByEventType.get(normaliseEventType(event.eventType));
+    const eventIsHidden =
+      (override && hideTimeReached(override.hidden, override.hideAt, now)) ||
+      (typeRule && hideTimeReached(typeRule.hidden, typeRule.hideAt, now));
 
-    if (typeRule && hideTimeReached(typeRule.hidden, typeRule.hideAt, now)) {
+    if (eventIsHidden) {
       return [];
     }
 
-    return [event];
+    if (!override) {
+      return [event];
+    }
+
+    return [
+      {
+        ...event,
+        name: override.name,
+        heading: override.heading,
+        description: override.description,
+        campfireUrl: override.campfireUrl,
+        image: override.image,
+        tags: override.tags,
+        link: override.campfireUrl || event.link,
+      },
+    ];
   });
 }

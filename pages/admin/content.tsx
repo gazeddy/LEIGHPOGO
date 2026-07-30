@@ -9,6 +9,7 @@ import {
   type EventTypeOption,
 } from "../../lib/event-options";
 import { getAllGuides, type GuideSummary } from "../../lib/guides";
+import { notifyEventVisibilityChanged } from "../../lib/event-visibility-client";
 import { readLocalEvents, type LocalEvent } from "../../lib/local-events";
 import { authOptions } from "../api/auth/[...nextauth]";
 
@@ -263,6 +264,7 @@ export default function ContentCreatorPage({
         tags: [],
       });
       setMessage(payload.message);
+      notifyEventVisibilityChanged();
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "The event could not be created.",
@@ -291,6 +293,7 @@ export default function ContentCreatorPage({
 
     setEvents((current) => current.filter((event) => event.id !== id));
     setMessage(payload.message);
+    notifyEventVisibilityChanged();
   }
 
   async function createGuide(event: FormEvent) {

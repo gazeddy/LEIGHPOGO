@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import type { RaidBossTickerItem } from "../../lib/events";
+import {
+  EVENT_VISIBILITY_CHANGED_EVENT,
+  EVENT_VISIBILITY_POLL_INTERVAL_MS,
+} from "../../lib/event-visibility-client";
 
 interface RaidTickerPayload {
   items?: RaidBossTickerItem[];
@@ -64,12 +68,16 @@ export default function RaidBossTicker() {
   const [status, setStatus] = useState<RaidTickerStatus>("loading");
 
   useEffect(() => {
-    const controller = new AbortController();
+    let controller: AbortController | null = null;
 
     async function loadRaidBosses() {
+      controller?.abort();
+      controller = new AbortController();
+
       try {
         const response = await fetch("/api/events/raids", {
           signal: controller.signal,
+          cache: "no-store",
           headers: { Accept: "application/json" },
         });
 
@@ -89,9 +97,31 @@ export default function RaidBossTicker() {
       }
     }
 
-    loadRaidBosses();
+    const reload = () => {
+      void loadRaidBosses();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reload();
+      }
+    };
 
-    return () => controller.abort();
+    reload();
+    const pollTimer = window.setInterval(
+      reload,
+      EVENT_VISIBILITY_POLL_INTERVAL_MS,
+    );
+    window.addEventListener(EVENT_VISIBILITY_CHANGED_EVENT, reload);
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      controller?.abort();
+      window.clearInterval(pollTimer);
+      window.removeEventListener(EVENT_VISIBILITY_CHANGED_EVENT, reload);
+      window.removeEventListener("focus", reload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   const message =
