@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
   CircleMarker,
@@ -6,6 +6,7 @@ import {
   Popup,
   TileLayer,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 import type { LatLngBoundsExpression } from "leaflet";
 
@@ -30,8 +31,15 @@ interface UserLocation {
   lon: number;
 }
 
+interface ViewportBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 const NEW_GYM_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const GYM_DISPLAY_LIMIT = 10;
+const GYM_LIST_LIMIT = 15;
 const LEIGH_CENTRE: UserLocation = { lat: 53.49, lon: -2.52 };
 
 function displayName(gym: MapGym): string {
@@ -66,6 +74,16 @@ function distanceKm(from: UserLocation, gym: MapGym): number {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function isInsideViewport(bounds: ViewportBounds, gym: MapGym): boolean {
+  const insideLatitude = gym.lat >= bounds.south && gym.lat <= bounds.north;
+  const insideLongitude =
+    bounds.east >= bounds.west
+      ? gym.lon >= bounds.west && gym.lon <= bounds.east
+      : gym.lon >= bounds.west || gym.lon <= bounds.east;
+
+  return insideLatitude && insideLongitude;
+}
+
 function MapController({
   gyms,
   selectedGym,
@@ -83,19 +101,44 @@ function MapController({
       return;
     }
 
-    const points = gyms.map((gym) => [gym.lat, gym.lon]) as [number, number][];
-
     if (userLocation) {
-      points.push([userLocation.lat, userLocation.lon]);
+      map.flyTo([userLocation.lat, userLocation.lon], 14, { duration: 0.7 });
+      return;
     }
 
-    if (points.length > 0) {
-      map.fitBounds(points as LatLngBoundsExpression, {
-        padding: [28, 28],
-        maxZoom: 15,
-      });
+    if (gyms.length > 0) {
+      const bounds = gyms.map((gym) => [gym.lat, gym.lon]) as LatLngBoundsExpression;
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
     }
   }, [gyms, map, selectedGym, userLocation]);
+
+  return null;
+}
+
+function MapViewportTracker({
+  onChange,
+}: {
+  onChange: (bounds: ViewportBounds) => void;
+}) {
+  const map = useMap();
+
+  const publishBounds = useCallback(() => {
+    const bounds = map.getBounds();
+    onChange({
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest(),
+    });
+  }, [map, onChange]);
+
+  useMapEvents({
+    moveend: publishBounds,
+  });
+
+  useEffect(() => {
+    publishBounds();
+  }, [publishBounds]);
 
   return null;
 }
@@ -104,51 +147,53 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [viewportBounds, setViewportBounds] = useState<ViewportBounds | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const selectedId = typeof router.query.gym === "string" ? router.query.gym : null;
   const selectedGym = gyms.find((gym) => gym.id === selectedId) || null;
-  const referenceLocation = userLocation || LEIGH_CENTRE;
 
   const filteredGyms = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const matching = term
-      ? gyms.filter((gym) =>
-          [gym.name, gym.alias || ""].some((value) => value.toLowerCase().includes(term)),
-        )
-      : gyms;
 
-    return [...matching].sort((left, right) => {
-      const distanceDifference =
-        distanceKm(referenceLocation, left) - distanceKm(referenceLocation, right);
-
-      if (distanceDifference !== 0) {
-        return distanceDifference;
-      }
-
-      return displayName(left).localeCompare(displayName(right), "en-GB");
-    });
-  }, [gyms, referenceLocation, search]);
-
-  const visibleGyms = useMemo(() => {
-    const nearest = filteredGyms.slice(0, GYM_DISPLAY_LIMIT);
-
-    if (
-      search.trim() ||
-      !selectedGym ||
-      nearest.some((gym) => gym.id === selectedGym.id)
-    ) {
-      return nearest;
+    if (!term) {
+      return gyms;
     }
 
-    return [
-      selectedGym,
-      ...nearest.filter((gym) => gym.id !== selectedGym.id).slice(0, GYM_DISPLAY_LIMIT - 1),
-    ];
-  }, [filteredGyms, search, selectedGym]);
+    return gyms.filter((gym) =>
+      [gym.name, gym.alias || ""].some((value) => value.toLowerCase().includes(term)),
+    );
+  }, [gyms, search]);
 
-  const visibleSelectedGym =
-    visibleGyms.find((gym) => gym.id === selectedGym?.id) || null;
+  const onScreenGyms = useMemo(() => {
+    if (!viewportBounds) {
+      return [];
+    }
+
+    return filteredGyms
+      .filter((gym) => isInsideViewport(viewportBounds, gym))
+      .sort((left, right) => {
+        if (userLocation) {
+          const distanceDifference =
+            distanceKm(userLocation, left) - distanceKm(userLocation, right);
+
+          if (distanceDifference !== 0) {
+            return distanceDifference;
+          }
+        }
+
+        return displayName(left).localeCompare(displayName(right), "en-GB");
+      });
+  }, [filteredGyms, userLocation, viewportBounds]);
+
+  const mapSelectedGym =
+    filteredGyms.find((gym) => gym.id === selectedGym?.id) || null;
+  const showGymList =
+    viewportBounds !== null && onScreenGyms.length <= GYM_LIST_LIMIT;
+
+  const updateViewport = useCallback((bounds: ViewportBounds) => {
+    setViewportBounds(bounds);
+  }, []);
 
   function selectGym(gym: MapGym) {
     void router.replace(
@@ -221,22 +266,35 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
           </div>
           {locationError && <p className="gym-error">{locationError}</p>}
           <p className="gym-count">
-            {search.trim()
-              ? `${visibleGyms.length} closest matches of ${filteredGyms.length}`
-              : `${visibleGyms.length} nearest of ${gyms.length} gyms`}
-            <small>
-              {userLocation
-                ? "Sorted from your current location"
-                : "Sorted from Leigh town centre until you use Gyms near me"}
-            </small>
+            {viewportBounds
+              ? `${onScreenGyms.length} gym${onScreenGyms.length === 1 ? "" : "s"} on screen`
+              : "Checking the visible map area…"}
+            {search.trim() && (
+              <small>{filteredGyms.length} matching {filteredGyms.length === 1 ? "gym" : "gyms"} in the full dataset</small>
+            )}
+            {!search.trim() && <small>All {gyms.length} gyms are shown on the map</small>}
             {importedAt && (
               <small>Updated {new Date(importedAt).toLocaleString("en-GB")}</small>
             )}
           </p>
         </div>
 
-        <div className="gym-results" aria-label="Gym results">
-          {visibleGyms.map((gym) => {
+        <div className="gym-results" aria-label="Gyms visible on the map">
+          {!viewportBounds && (
+            <p className="result-limit">Updating the gym list for the visible map area…</p>
+          )}
+
+          {viewportBounds && onScreenGyms.length > GYM_LIST_LIMIT && (
+            <p className="result-limit">
+              Zoom in until {GYM_LIST_LIMIT} or fewer gyms are visible to show the list.
+            </p>
+          )}
+
+          {showGymList && onScreenGyms.length === 0 && (
+            <p className="result-limit">No gyms are visible in this map area.</p>
+          )}
+
+          {showGymList && onScreenGyms.map((gym) => {
             const opacity = newGymOpacity(gym);
             return (
               <button
@@ -256,14 +314,6 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
               </button>
             );
           })}
-          {filteredGyms.length === 0 && (
-            <p className="result-limit">No gyms match that search.</p>
-          )}
-          {filteredGyms.length > GYM_DISPLAY_LIMIT && (
-            <p className="result-limit">
-              Showing the closest {GYM_DISPLAY_LIMIT}. Refine the search to find another gym.
-            </p>
-          )}
         </div>
       </aside>
 
@@ -279,10 +329,11 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <MapController
-            gyms={visibleGyms}
-            selectedGym={visibleSelectedGym}
+            gyms={filteredGyms}
+            selectedGym={mapSelectedGym}
             userLocation={userLocation}
           />
+          <MapViewportTracker onChange={updateViewport} />
 
           {userLocation && (
             <CircleMarker
@@ -294,7 +345,7 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
             </CircleMarker>
           )}
 
-          {visibleGyms.map((gym) => {
+          {filteredGyms.map((gym) => {
             const opacity = newGymOpacity(gym);
             const selected = selectedId === gym.id;
 
