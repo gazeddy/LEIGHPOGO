@@ -1,0 +1,158 @@
+name: Validate event type rules
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      NEXTAUTH_SECRET: ci-only-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:deploy
+
+      - name: Seed feed, individual override and event type rules
+        run: |
+          mkdir -p data
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const events = [
+            {
+              eventID: 'hatch-hidden',
+              name: 'Hidden Hatch Day',
+              eventType: 'hatch-day',
+              heading: 'Hatch Day',
+              link: 'https://leekduck.com/events/hidden-hatch-day/',
+              image: null,
+              start: '2099-08-01T11:00:00+01:00',
+              end: '2099-08-01T14:00:00+01:00'
+            },
+            {
+              eventID: 'hatch-exception',
+              name: 'Imported Hatch Day Exception',
+              eventType: 'hatch-day',
+              heading: 'Hatch Day',
+              link: 'https://leekduck.com/events/hatch-exception/',
+              image: null,
+              start: '2099-08-02T11:00:00+01:00',
+              end: '2099-08-02T14:00:00+01:00'
+            },
+            {
+              eventID: 'community-visible',
+              name: 'Visible Community Day',
+              eventType: 'community-day',
+              heading: 'Community Day',
+              link: 'https://leekduck.com/events/community-visible/',
+              image: null,
+              start: '2099-08-03T14:00:00+01:00',
+              end: '2099-08-03T17:00:00+01:00'
+            },
+            {
+              eventID: 'raid-past-rule',
+              name: 'Past Scheduled Raid Hour',
+              eventType: 'raid-hour',
+              heading: 'Raid Hour',
+              link: 'https://leekduck.com/events/raid-past-rule/',
+              image: null,
+              start: '2099-08-04T18:00:00+01:00',
+              end: '2099-08-04T19:00:00+01:00'
+            },
+            {
+              eventID: 'research-future-rule',
+              name: 'Future Scheduled Research Day',
+              eventType: 'research-day',
+              heading: 'Research Day',
+              link: 'https://leekduck.com/events/research-future-rule/',
+              image: null,
+              start: '2099-08-05T14:00:00+01:00',
+              end: '2099-08-05T17:00:00+01:00'
+            }
+          ];
+
+          fs.writeFileSync('data/events-cache.json', JSON.stringify({
+            version: 1,
+            fetchedAt: new Date().toISOString(),
+            events
+          }, null, 2));
+
+          fs.writeFileSync('data/event-overrides.json', JSON.stringify([
+            {
+              eventID: 'hatch-exception',
+              name: 'Leigh Hatch Day Meetup',
+              heading: 'Leigh Hatch Day',
+              description: 'This individual override remains visible.',
+              campfireUrl: 'https://campfire.nianticlabs.com/discover/hatch-exception',
+              image: null,
+              tags: ['hatch-day', 'meetup'],
+              hidden: false,
+              hideAt: null,
+              updatedAt: new Date().toISOString()
+            }
+          ], null, 2));
+
+          fs.writeFileSync('data/event-type-rules.json', JSON.stringify([
+            {
+              eventType: 'hatch-day',
+              hidden: true,
+              hideAt: null,
+              updatedAt: new Date().toISOString()
+            },
+            {
+              eventType: 'raid-hour',
+              hidden: false,
+              hideAt: '2020-01-01T00:00:00.000Z',
+              updatedAt: new Date().toISOString()
+            },
+            {
+              eventType: 'research-day',
+              hidden: false,
+              hideAt: '2099-01-01T00:00:00.000Z',
+              updatedAt: new Date().toISOString()
+            }
+          ], null, 2));
+
+          fs.writeFileSync('data/local-events.json', '[]\n');
+          NODE
+
+      - run: npm run build
+
+      - name: Start application
+        run: |
+          npm run start > /tmp/leighpogo.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/events > /tmp/events.html; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/leighpogo.log
+          exit 1
+
+      - name: Verify event type rules and individual exception
+        run: |
+          set -euo pipefail
+          grep -F 'Leigh Hatch Day Meetup' /tmp/events.html
+          grep -F 'https://campfire.nianticlabs.com/discover/hatch-exception' /tmp/events.html
+          grep -F 'Visible Community Day' /tmp/events.html
+          grep -F 'Future Scheduled Research Day' /tmp/events.html
+          ! grep -F 'Hidden Hatch Day' /tmp/events.html
+          ! grep -F 'Past Scheduled Raid Hour' /tmp/events.html
+          ! grep -F 'Imported Hatch Day Exception' /tmp/events.html
+
+      - name: Verify admin controls build
+        run: |
+          test -f .next/server/pages/admin/event-types.html || test -f .next/server/pages/admin/event-types.js
+          grep -F 'Filter by event type' pages/admin/event-types.tsx
+          grep -F 'Event Types' components/Navbar.js
