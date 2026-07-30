@@ -1,0 +1,64 @@
+name: Apply guide image feature branch
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.event.pull_request.head.ref == 'feature/guide-images-service-rename'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/guide-images-service-rename
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply integration patch
+        shell: bash
+        run: |
+          if [[ -f scripts/apply-guide-images.py ]]; then
+            python3 scripts/apply-guide-images.py
+          else
+            echo "Patch already applied."
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Validate guide image and service wiring
+        shell: bash
+        run: |
+          grep -q 'coverImage?: string' lib/guides.ts
+          grep -q 'GuideImageUploader' pages/admin/content.tsx
+          grep -q 'Guide Pictures' components/Navbar.js
+          grep -q 'public/uploads/guides' .gitignore
+          grep -q 'leighpogo-test' deploy/rename-systemd-services.sh
+          test ! -e scripts/apply-guide-images.py
+          test ! -e .github/workflows/apply-guide-images.yml
+          test ! -e .guide-images-trigger
+
+      - name: Commit validated feature
+        shell: bash
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Add guide picture management and service rename"
+          git push origin HEAD:feature/guide-images-service-rename
