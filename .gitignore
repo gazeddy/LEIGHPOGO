@@ -5,3 +5,4 @@ node_modules
 .nextauth-secret
 /data/events-cache.json*
 /data/local-events.json*
+/data/event-overrides.json*
