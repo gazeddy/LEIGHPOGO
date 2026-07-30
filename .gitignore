@@ -7,4 +7,5 @@ node_modules
 /data/local-events.json*
 /data/event-overrides.json*
 /data/event-type-rules.json*
+/data/gym-imports/*.csv
 /public/uploads/guides/*
