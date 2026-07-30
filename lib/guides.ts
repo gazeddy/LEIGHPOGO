@@ -87,7 +87,7 @@ function normaliseSlugArray(value: unknown): string[] | undefined {
     new Set(
       value
         .map(normaliseSlug)
-        .filter((slug): slug is string => Boolean(slug)),
+        .filter((slug): slug is string => slug !== undefined),
     ),
   );
 
@@ -229,7 +229,10 @@ export function getGuideRelationships(
   const guideBySlug = new Map(guides.map((item) => [item.slug, item]));
   const relatedGuides = (guide.relatedGuides ?? [])
     .map((slug) => guideBySlug.get(slug))
-    .filter((item): item is GuideSummary => Boolean(item) && item.slug !== guide.slug);
+    .filter(
+      (item): item is GuideSummary =>
+        item !== undefined && item.slug !== guide.slug,
+    );
 
   if (!guide.series) {
     return {
