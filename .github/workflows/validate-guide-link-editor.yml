@@ -1,0 +1,50 @@
+name: Validate guide link editor
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      NEXTAUTH_SECRET: ci-only-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run build
+
+      - name: Verify guide body survives frontmatter rewrite
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const matter = require('gray-matter');
+          const source = `---\ntitle: Existing\ndescription: Test\ntags:\n  - raid\n---\n\n## Body\n\nKeep this text.\n`;
+          const parsed = matter(source);
+          const data = { ...parsed.data, series: 'raid-basics', seriesOrder: 2, relatedGuides: ['other'] };
+          const output = matter.stringify(parsed.content, data);
+          const reparsed = matter(output);
+
+          if (!reparsed.content.includes('Keep this text.')) throw new Error('Guide body was lost');
+          if (reparsed.data.title !== 'Existing') throw new Error('Existing metadata was lost');
+          if (reparsed.data.series !== 'raid-basics') throw new Error('Series was not written');
+          if (reparsed.data.seriesOrder !== 2) throw new Error('Series position was not written');
+          if (reparsed.data.relatedGuides[0] !== 'other') throw new Error('Related guide was not written');
+          console.log('Frontmatter rewrite validated');
+          NODE
+
+      - name: Verify editor wiring
+        run: |
+          set -euo pipefail
+          grep -F 'method: "PATCH"' pages/admin/guide-links.tsx
+          grep -F 'Guide relationships updated successfully.' pages/api/admin/content/guides.ts
+          grep -F 'href="/admin/guide-links"' components/Navbar.js
