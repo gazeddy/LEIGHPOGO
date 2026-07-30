@@ -98,6 +98,11 @@ export default function Navbar() {
               <Link href="/pokedex" className="nav-item nav-subitem">
                 Pokédex
               </Link>
+              {session && (
+                <Link href="/gyms" className="nav-item nav-subitem">
+                  Gym Map
+                </Link>
+              )}
             </div>
           </div>
 
@@ -135,6 +140,9 @@ export default function Navbar() {
                     </Link>
                     <Link href="/admin/guide-images" className="nav-item nav-subitem">
                       Guide Pictures
+                    </Link>
+                    <Link href="/admin/gyms" className="nav-item nav-subitem">
+                      Gym Data
                     </Link>
                   </div>
                 </div>
