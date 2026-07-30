@@ -1,0 +1,122 @@
+name: Validate guide navigation
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      NEXTAUTH_SECRET: ci-only-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run build
+
+      - name: Validate guide relationship logic
+        run: |
+          set -euo pipefail
+          export GUIDES_DIRECTORY="$RUNNER_TEMP/guides"
+          mkdir -p "$GUIDES_DIRECTORY"
+
+          cat > "$GUIDES_DIRECTORY/one.md" <<'EOF'
+          ---
+          title: "First"
+          description: "First guide"
+          series: "raid-basics"
+          seriesOrder: 1
+          relatedGuides:
+            - "other"
+          ---
+          First body.
+          EOF
+
+          cat > "$GUIDES_DIRECTORY/two.md" <<'EOF'
+          ---
+          title: "Second"
+          description: "Second guide"
+          series: "raid-basics"
+          seriesOrder: 2
+          ---
+          Second body.
+          EOF
+
+          cat > "$GUIDES_DIRECTORY/three.md" <<'EOF'
+          ---
+          title: "Third"
+          description: "Third guide"
+          series: "raid-basics"
+          seriesOrder: 3
+          ---
+          Third body.
+          EOF
+
+          cat > "$GUIDES_DIRECTORY/other.md" <<'EOF'
+          ---
+          title: "Other"
+          description: "Related guide"
+          ---
+          Other body.
+          EOF
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const ts = require('typescript');
+
+          require.extensions['.ts'] = (module, filename) => {
+            const source = fs.readFileSync(filename, 'utf8');
+            const output = ts.transpileModule(source, {
+              compilerOptions: {
+                module: ts.ModuleKind.CommonJS,
+                target: ts.ScriptTarget.ES2020,
+                esModuleInterop: true,
+              },
+              fileName: filename,
+            }).outputText;
+            module._compile(output, filename);
+          };
+
+          const {
+            getAllGuides,
+            getGuideBySlug,
+            getGuideRelationships,
+          } = require('./lib/guides.ts');
+
+          const guides = getAllGuides();
+          const second = getGuideBySlug('two');
+          const first = getGuideBySlug('one');
+
+          if (!second || !first) throw new Error('Synthetic guides were not loaded');
+
+          const secondLinks = getGuideRelationships(second, guides);
+          if (secondLinks.previousGuide?.slug !== 'one') throw new Error('Previous guide incorrect');
+          if (secondLinks.nextGuide?.slug !== 'three') throw new Error('Next guide incorrect');
+          if (secondLinks.seriesPosition !== 2 || secondLinks.seriesLength !== 3) {
+            throw new Error('Series position incorrect');
+          }
+
+          const firstLinks = getGuideRelationships(first, guides);
+          if (firstLinks.relatedGuides[0]?.slug !== 'other') {
+            throw new Error('Related guide incorrect');
+          }
+
+          console.log('Guide relationships validated');
+          NODE
+
+      - name: Verify creator fields and page navigation
+        run: |
+          set -euo pipefail
+          grep -F 'seriesOrder' pages/admin/content.tsx
+          grep -F 'relatedGuides' pages/admin/content.tsx
+          grep -F 'Previous guide' 'pages/guides/[slug].tsx'
+          grep -F 'Related guides' 'pages/guides/[slug].tsx'
