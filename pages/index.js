@@ -3,6 +3,30 @@ import { useState } from "react"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
 
+async function copyTextToClipboard(value) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textArea = document.createElement("textarea")
+  textArea.value = value
+  textArea.setAttribute("readonly", "")
+  textArea.style.position = "fixed"
+  textArea.style.left = "-9999px"
+  textArea.style.opacity = "0"
+  document.body.appendChild(textArea)
+  textArea.select()
+  textArea.setSelectionRange(0, value.length)
+
+  const copied = document.execCommand("copy")
+  document.body.removeChild(textArea)
+
+  if (!copied) {
+    throw new Error("Clipboard copy failed")
+  }
+}
+
 export default function Home({ entries }) {
   const { data: session } = useSession()
   const [trainerName, setTrainerName] = useState("")
@@ -10,6 +34,8 @@ export default function Home({ entries }) {
   const [team, setTeam] = useState("MYSTIC")
   const [message, setMessage] = useState("")
   const [entryList, setEntryList] = useState(entries)
+  const [copiedEntryId, setCopiedEntryId] = useState(null)
+  const [copyError, setCopyError] = useState("")
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -38,6 +64,24 @@ export default function Home({ entries }) {
     } else {
       const err = await res.json()
       setMessage(err.error || "Failed to add entry.")
+    }
+  }
+
+  const handleCopyFriendCode = async (entry) => {
+    const code = String(entry.code || "").replace(/\D/g, "")
+
+    if (!code) {
+      setCopyError("This entry does not have a valid friend code to copy.")
+      return
+    }
+
+    try {
+      await copyTextToClipboard(code)
+      setCopiedEntryId(entry.id)
+      setCopyError("")
+    } catch (error) {
+      console.error("Failed to copy friend code", error)
+      setCopyError("The friend code could not be copied. Please copy it manually.")
     }
   }
 
@@ -99,18 +143,92 @@ export default function Home({ entries }) {
           <p>No entries yet.</p>
         ) : (
           <ul className="entry-list">
-            {entryList.map((entry) => (
-              <li key={entry.id} className="entry-row">
-                <div className="entry-meta">
-                  <TeamBadge team={entry.team} />
-                  <strong>{entry.trainerName || entry.owner.ign}</strong>
-                </div>
-                <div className="entry-code">{entry.code || "No code provided"}</div>
-              </li>
-            ))}
+            {entryList.map((entry) => {
+              const hasCode = /\d/.test(String(entry.code || ""))
+              const copied = copiedEntryId === entry.id
+
+              return (
+                <li key={entry.id} className="entry-row">
+                  <div className="entry-meta">
+                    <TeamBadge team={entry.team} />
+                    <strong>{entry.trainerName || entry.owner.ign}</strong>
+                  </div>
+                  <div className="entry-code-actions">
+                    <div className="entry-code">{entry.code || "No code provided"}</div>
+                    {hasCode && (
+                      <button
+                        type="button"
+                        className={`copy-code-button${copied ? " copied" : ""}`}
+                        onClick={() => handleCopyFriendCode(entry)}
+                        aria-label={`${copied ? "Copied" : "Copy"} ${entry.trainerName || entry.owner.ign}'s friend code`}
+                      >
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
+        {copyError && (
+          <p className="copy-error" role="alert">
+            {copyError}
+          </p>
+        )}
       </div>
+
+      <style jsx>{`
+        .entry-code-actions {
+          display: flex;
+          min-width: 0;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+
+        .copy-code-button {
+          width: auto;
+          min-width: 74px;
+          flex: 0 0 auto;
+          padding: 7px 10px;
+          border: 1px solid #30363d;
+          background: #21262d;
+        }
+
+        .copy-code-button:hover {
+          border-color: #58a6ff;
+          background: #30363d;
+        }
+
+        .copy-code-button.copied,
+        .copy-code-button.copied:hover {
+          border-color: #2ea043;
+          background: #238636;
+        }
+
+        .copy-error {
+          margin-top: 12px;
+          color: #ff7b72;
+        }
+
+        @media (max-width: 600px) {
+          .entry-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+
+          .entry-code-actions {
+            width: 100%;
+            justify-content: space-between;
+          }
+
+          .copy-code-button {
+            width: auto;
+          }
+        }
+      `}</style>
     </div>
   )
 }
