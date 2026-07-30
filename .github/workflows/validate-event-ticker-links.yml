@@ -1,0 +1,51 @@
+name: Validate event ticker links
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/event-ticker-links
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply event ticker links
+        run: python scripts/apply-event-ticker-links.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Validate event selection links
+        run: |
+          grep -q 'pathname: "/events", query: { event: item.eventID }' components/events/EventTicker.tsx
+          grep -q 'className="ticker-event-link"' components/events/EventTicker.tsx
+          grep -q 'function eventTargetId' pages/events/index.tsx
+          grep -q 'target.scrollIntoView' pages/events/index.tsx
+          grep -q 'setSelectedType("all")' pages/events/index.tsx
+          grep -q 'className={`event-target${isSelected ? " selected" : ""}`}' pages/events/index.tsx
+
+      - name: Commit feature changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/events/EventTicker.tsx pages/events/index.tsx
+          if git diff --cached --quiet; then
+            echo "Feature changes are already committed."
+          else
+            git commit -m "Link event ticker to selected event"
+            git push origin HEAD:feature/event-ticker-links
+          fi
