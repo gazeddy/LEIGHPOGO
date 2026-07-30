@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type PointerEvent,
+} from "react";
 import type { EventTickerItem } from "../../lib/events";
 
 interface TickerPayload {
@@ -7,6 +15,9 @@ interface TickerPayload {
 }
 
 type TickerStatus = "loading" | "ready" | "error";
+
+const AUTO_RESUME_DELAY_MS = 3000;
+const TAP_MAX_DURATION_MS = 450;
 
 function dateForDisplay(value: string): {
   date: Date;
@@ -87,6 +98,11 @@ function TickerItems({
 export default function EventTicker() {
   const [items, setItems] = useState<EventTickerItem[]>([]);
   const [status, setStatus] = useState<TickerStatus>("loading");
+  const [paused, setPaused] = useState(false);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerStartedAtRef = useRef<number | null>(null);
+  const pointerWasPausedRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -119,10 +135,117 @@ export default function EventTicker() {
     return () => controller.abort();
   }, []);
 
+  useEffect(
+    () => () => {
+      if (resumeTimerRef.current !== null) {
+        clearTimeout(resumeTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const animationDuration = useMemo(
     () => `${Math.max(32, items.length * 10)}s`,
     [items.length],
   );
+
+  function clearResumeTimer() {
+    if (resumeTimerRef.current !== null) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+  }
+
+  function pauseTicker() {
+    clearResumeTimer();
+    setPaused(true);
+  }
+
+  function resumeTicker() {
+    clearResumeTimer();
+    setPaused(false);
+  }
+
+  function scheduleResume() {
+    clearResumeTimer();
+    resumeTimerRef.current = setTimeout(() => {
+      resumeTimerRef.current = null;
+      setPaused(false);
+    }, AUTO_RESUME_DELAY_MS);
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    clearResumeTimer();
+    pointerStartedAtRef.current = performance.now();
+    pointerWasPausedRef.current = paused;
+    activePointerIdRef.current = event.pointerId;
+    setPaused(true);
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLElement>) {
+    if (activePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    const startedAt = pointerStartedAtRef.current;
+    const wasPaused = pointerWasPausedRef.current;
+    const pressDuration =
+      startedAt === null ? TAP_MAX_DURATION_MS + 1 : performance.now() - startedAt;
+    const target = event.target as HTMLElement;
+    const usedActionLink = target.closest("a") !== null;
+
+    activePointerIdRef.current = null;
+    pointerStartedAtRef.current = null;
+
+    if (!usedActionLink && wasPaused && pressDuration <= TAP_MAX_DURATION_MS) {
+      resumeTicker();
+      return;
+    }
+
+    scheduleResume();
+  }
+
+  function handlePointerCancel(event: PointerEvent<HTMLElement>) {
+    if (activePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    activePointerIdRef.current = null;
+    pointerStartedAtRef.current = null;
+    scheduleResume();
+  }
+
+  function handlePointerEnter(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse") {
+      pauseTicker();
+    }
+  }
+
+  function handlePointerLeave(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && activePointerIdRef.current === null) {
+      scheduleResume();
+    }
+  }
+
+  function handleFocus(event: FocusEvent<HTMLElement>) {
+    const target = event.target as HTMLElement;
+
+    if (target.matches(":focus-visible")) {
+      pauseTicker();
+    }
+  }
+
+  function handleBlur(event: FocusEvent<HTMLElement>) {
+    const nextTarget = event.relatedTarget as Node | null;
+
+    if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+      scheduleResume();
+    }
+  }
 
   const message =
     status === "loading"
@@ -132,7 +255,17 @@ export default function EventTicker() {
         : "No upcoming events currently listed";
 
   return (
-    <section className="event-ticker" aria-label="Upcoming events">
+    <section
+      className={`event-ticker${paused ? " paused" : ""}`}
+      aria-label="Upcoming events"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onFocusCapture={handleFocus}
+      onBlurCapture={handleBlur}
+    >
       <div className="ticker-label">
         <span aria-hidden="true">●</span>
         Upcoming
@@ -212,6 +345,10 @@ export default function EventTicker() {
           will-change: transform;
         }
 
+        .event-ticker.paused .ticker-track {
+          animation-play-state: paused;
+        }
+
         .ticker-message {
           margin: 0;
           padding: 0 18px;
@@ -219,11 +356,6 @@ export default function EventTicker() {
           font-size: 0.84rem;
           line-height: 42px;
           white-space: nowrap;
-        }
-
-        .event-ticker:hover .ticker-track,
-        .event-ticker:focus-within .ticker-track {
-          animation-play-state: paused;
         }
 
         @keyframes ticker-scroll {
