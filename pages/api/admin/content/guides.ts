@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import matter from "gray-matter";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
@@ -87,6 +88,44 @@ function optionalWholeNumber(
   return number;
 }
 
+function validateRelationships(
+  input: GuideInput,
+  slug: string,
+  guides = getAllGuides(),
+): {
+  series?: string;
+  seriesOrder?: number;
+  relatedGuides: string[];
+} {
+  const series = slugValue(input.series, "Series");
+  const seriesOrder = optionalWholeNumber(
+    input.seriesOrder,
+    "Series position",
+    1,
+  );
+
+  if (seriesOrder !== undefined && !series) {
+    throw new Error("Choose a series before setting a series position");
+  }
+
+  const availableGuideSlugs = new Set(guides.map((guide) => guide.slug));
+  const relatedGuides = stringArray(input.relatedGuides)
+    .filter((relatedSlug) => relatedSlug !== slug)
+    .map((relatedSlug) => {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(relatedSlug)) {
+        throw new Error(`Related guide slug is invalid: ${relatedSlug}`);
+      }
+
+      if (!availableGuideSlugs.has(relatedSlug)) {
+        throw new Error(`Related guide does not exist: ${relatedSlug}`);
+      }
+
+      return relatedSlug;
+    });
+
+  return { series, seriesOrder, relatedGuides };
+}
+
 function yamlString(value: string): string {
   return JSON.stringify(value);
 }
@@ -138,12 +177,106 @@ function renderGuide(input: {
   return frontMatter.join("\n");
 }
 
+async function createGuide(
+  input: GuideInput,
+  res: NextApiResponse<GuideResponse>,
+) {
+  const title = requiredString(input.title, "Title");
+  const slug = requiredString(input.slug, "Slug").toLowerCase();
+  const description = requiredString(input.description, "Description");
+  const body = requiredString(input.body, "Guide body");
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error("Slug may only contain lowercase letters, numbers and hyphens");
+  }
+
+  if (getGuideBySlug(slug)) {
+    return res.status(409).json({ error: "A guide with that slug already exists" });
+  }
+
+  const order = optionalWholeNumber(input.order, "Order", 0);
+  const relationships = validateRelationships(input, slug);
+  const date = optionalString(input.date) || new Date().toISOString().slice(0, 10);
+  const guideSource = renderGuide({
+    title,
+    description,
+    date,
+    order,
+    eventTypes: stringArray(input.eventTypes),
+    tags: stringArray(input.tags),
+    ...relationships,
+    body,
+  });
+  const directory = getGuidesDirectory();
+  const guidePath = path.join(directory, `${slug}.md`);
+
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(guidePath, guideSource, { encoding: "utf8", flag: "wx" });
+
+  return res.status(201).json({
+    message: "Guide created successfully.",
+    slug,
+    url: `/guides/${slug}`,
+  });
+}
+
+async function updateGuideRelationships(
+  input: GuideInput,
+  res: NextApiResponse<GuideResponse>,
+) {
+  const slug = requiredString(input.slug, "Slug").toLowerCase();
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error("Slug may only contain lowercase letters, numbers and hyphens");
+  }
+
+  if (!getGuideBySlug(slug)) {
+    return res.status(404).json({ error: "Guide not found" });
+  }
+
+  const relationships = validateRelationships(input, slug);
+  const guidePath = path.join(getGuidesDirectory(), `${slug}.md`);
+  const source = await fs.readFile(guidePath, "utf8");
+  const parsed = matter(source);
+  const data = { ...parsed.data };
+
+  if (relationships.series) {
+    data.series = relationships.series;
+  } else {
+    delete data.series;
+  }
+
+  if (relationships.seriesOrder !== undefined) {
+    data.seriesOrder = relationships.seriesOrder;
+  } else {
+    delete data.seriesOrder;
+  }
+
+  if (relationships.relatedGuides.length > 0) {
+    data.relatedGuides = relationships.relatedGuides;
+  } else {
+    delete data.relatedGuides;
+  }
+
+  const temporaryPath = `${guidePath}.tmp-${process.pid}-${Date.now()}`;
+  const updatedSource = matter.stringify(parsed.content, data);
+
+  await fs.writeFile(temporaryPath, updatedSource, "utf8");
+  await fs.rename(temporaryPath, guidePath);
+
+  return res.status(200).json({
+    message: "Guide relationships updated successfully.",
+    slug,
+    url: `/guides/${slug}`,
+  });
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<GuideResponse>,
 ) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
+  if (req.method !== "POST" && req.method !== "PATCH") {
+    res.setHeader("Allow", "POST, PATCH");
     return res.status(405).json({ error: "Method not allowed" });
   }
 
@@ -159,70 +292,10 @@ export default async function handler(
 
   try {
     const input = req.body as GuideInput;
-    const title = requiredString(input.title, "Title");
-    const slug = requiredString(input.slug, "Slug").toLowerCase();
-    const description = requiredString(input.description, "Description");
-    const body = requiredString(input.body, "Guide body");
 
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-      throw new Error("Slug may only contain lowercase letters, numbers and hyphens");
-    }
-
-    if (getGuideBySlug(slug)) {
-      return res.status(409).json({ error: "A guide with that slug already exists" });
-    }
-
-    const order = optionalWholeNumber(input.order, "Order", 0);
-    const series = slugValue(input.series, "Series");
-    const seriesOrder = optionalWholeNumber(
-      input.seriesOrder,
-      "Series position",
-      1,
-    );
-
-    if (seriesOrder !== undefined && !series) {
-      throw new Error("Choose a series before setting a series position");
-    }
-
-    const availableGuideSlugs = new Set(getAllGuides().map((guide) => guide.slug));
-    const relatedGuides = stringArray(input.relatedGuides)
-      .filter((relatedSlug) => relatedSlug !== slug)
-      .map((relatedSlug) => {
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(relatedSlug)) {
-          throw new Error(`Related guide slug is invalid: ${relatedSlug}`);
-        }
-
-        if (!availableGuideSlugs.has(relatedSlug)) {
-          throw new Error(`Related guide does not exist: ${relatedSlug}`);
-        }
-
-        return relatedSlug;
-      });
-
-    const date = optionalString(input.date) || new Date().toISOString().slice(0, 10);
-    const guideSource = renderGuide({
-      title,
-      description,
-      date,
-      order,
-      eventTypes: stringArray(input.eventTypes),
-      tags: stringArray(input.tags),
-      series,
-      seriesOrder,
-      relatedGuides,
-      body,
-    });
-    const directory = getGuidesDirectory();
-    const guidePath = path.join(directory, `${slug}.md`);
-
-    await fs.mkdir(directory, { recursive: true });
-    await fs.writeFile(guidePath, guideSource, { encoding: "utf8", flag: "wx" });
-
-    return res.status(201).json({
-      message: "Guide created successfully.",
-      slug,
-      url: `/guides/${slug}`,
-    });
+    return req.method === "PATCH"
+      ? await updateGuideRelationships(input, res)
+      : await createGuide(input, res);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
 
@@ -230,10 +303,10 @@ export default async function handler(
       return res.status(409).json({ error: "A guide with that slug already exists" });
     }
 
-    console.error("Guide creation failed", error);
+    console.error("Guide content operation failed", error);
 
     return res.status(400).json({
-      error: error instanceof Error ? error.message : "The guide could not be created.",
+      error: error instanceof Error ? error.message : "The guide could not be saved.",
     });
   }
 }
