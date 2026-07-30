@@ -1,0 +1,33 @@
+name: Validate ticker size
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      NEXTAUTH_SECRET: ci-only-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run build
+
+      - name: Verify enlarged ticker rules
+        run: |
+          set -euo pipefail
+          grep -F 'min-height: 55px !important' styles/tickers.css
+          grep -F 'font-size: 1.09rem !important' styles/tickers.css
+          grep -F 'min-height: 49px !important' styles/tickers.css
+          grep -F 'font-size: 1.07rem !important' styles/tickers.css
+          grep -F 'import "../styles/tickers.css"' pages/_app.js
