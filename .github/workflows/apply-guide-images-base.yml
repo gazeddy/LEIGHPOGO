@@ -38,6 +38,12 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Remove generated build changes
+        shell: bash
+        run: |
+          git checkout origin/develop -- .next next-env.d.ts || true
+          rm -f .guide-images-cleanup-trigger
+
       - name: Validate guide image and service wiring
         shell: bash
         run: |
@@ -60,5 +66,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
-          git commit -m "Add guide picture management and service rename"
+          git commit -m "Clean guide image feature build artifacts"
           git push origin HEAD:feature/guide-images-service-rename
