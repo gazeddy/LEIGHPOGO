@@ -2,7 +2,7 @@
   Warnings:
 
   - You are about to drop the column `friendCode` on the `User` table. All the data in the column will be lost.
-  - You are about to drop the column `team` on the `User` table. All the data in the column will be lost.
+  - You are about to drop the column `team` on the `User` table after copying it to each existing entry.
 
 */
 -- RedefineTables
@@ -18,7 +18,22 @@ CREATE TABLE "new_Entry" (
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Entry_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-INSERT INTO "new_Entry" ("code", "createdAt", "id", "ownerId", "trainerName", "updatedAt") SELECT "code", "createdAt", "id", "ownerId", "trainerName", "updatedAt" FROM "Entry";
+INSERT INTO "new_Entry" ("code", "createdAt", "id", "ownerId", "team", "trainerName", "updatedAt")
+SELECT
+    "Entry"."code",
+    "Entry"."createdAt",
+    "Entry"."id",
+    "Entry"."ownerId",
+    CASE UPPER(TRIM("User"."team"))
+        WHEN 'INSTINCT' THEN 'INSTINCT'
+        WHEN 'VALOR' THEN 'VALOR'
+        WHEN 'MYSTIC' THEN 'MYSTIC'
+        ELSE 'MYSTIC'
+    END,
+    "Entry"."trainerName",
+    "Entry"."updatedAt"
+FROM "Entry"
+JOIN "User" ON "User"."id" = "Entry"."ownerId";
 DROP TABLE "Entry";
 ALTER TABLE "new_Entry" RENAME TO "Entry";
 CREATE TABLE "new_User" (
