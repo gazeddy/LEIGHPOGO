@@ -13,6 +13,9 @@ export interface GuideFrontMatter {
   order?: number;
   eventTypes?: string[];
   tags?: string[];
+  series?: string;
+  seriesOrder?: number;
+  relatedGuides?: string[];
 }
 
 export interface GuideSummary extends GuideFrontMatter {
@@ -21,6 +24,15 @@ export interface GuideSummary extends GuideFrontMatter {
 
 export interface Guide extends GuideSummary {
   content: string;
+}
+
+export interface GuideRelationships {
+  previousGuide: GuideSummary | null;
+  nextGuide: GuideSummary | null;
+  relatedGuides: GuideSummary[];
+  seriesTitle: string | null;
+  seriesPosition: number | null;
+  seriesLength: number;
 }
 
 function titleFromSlug(slug: string): string {
@@ -56,6 +68,32 @@ function normaliseStringArray(value: unknown): string[] | undefined {
   return values.length > 0 ? values : undefined;
 }
 
+function normaliseSlug(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const slug = value.trim().toLowerCase();
+
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : undefined;
+}
+
+function normaliseSlugArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const slugs = Array.from(
+    new Set(
+      value
+        .map(normaliseSlug)
+        .filter((slug): slug is string => slug !== undefined),
+    ),
+  );
+
+  return slugs.length > 0 ? slugs : undefined;
+}
+
 function normaliseFrontMatter(
   data: Record<string, unknown>,
   slug: string,
@@ -71,6 +109,10 @@ function normaliseFrontMatter(
   const date = normaliseDate(data.date);
   const eventTypes = normaliseStringArray(data.eventTypes);
   const tags = normaliseStringArray(data.tags);
+  const series = normaliseSlug(data.series);
+  const relatedGuides = normaliseSlugArray(data.relatedGuides)?.filter(
+    (relatedSlug) => relatedSlug !== slug,
+  );
 
   if (date) {
     frontMatter.date = date;
@@ -88,7 +130,50 @@ function normaliseFrontMatter(
     frontMatter.tags = tags;
   }
 
+  if (series) {
+    frontMatter.series = series;
+  }
+
+  if (
+    series &&
+    typeof data.seriesOrder === "number" &&
+    Number.isInteger(data.seriesOrder) &&
+    data.seriesOrder > 0
+  ) {
+    frontMatter.seriesOrder = data.seriesOrder;
+  }
+
+  if (relatedGuides && relatedGuides.length > 0) {
+    frontMatter.relatedGuides = relatedGuides;
+  }
+
   return frontMatter;
+}
+
+function compareGuides(left: GuideSummary, right: GuideSummary): number {
+  const orderDifference =
+    (left.order ?? Number.MAX_SAFE_INTEGER) -
+    (right.order ?? Number.MAX_SAFE_INTEGER);
+
+  if (orderDifference !== 0) {
+    return orderDifference;
+  }
+
+  if (left.date && right.date && left.date !== right.date) {
+    return right.date.localeCompare(left.date);
+  }
+
+  return left.title.localeCompare(right.title);
+}
+
+function compareSeriesGuides(left: GuideSummary, right: GuideSummary): number {
+  const seriesOrderDifference =
+    (left.seriesOrder ?? Number.MAX_SAFE_INTEGER) -
+    (right.seriesOrder ?? Number.MAX_SAFE_INTEGER);
+
+  return seriesOrderDifference !== 0
+    ? seriesOrderDifference
+    : compareGuides(left, right);
 }
 
 export function getGuidesDirectory(): string {
@@ -133,20 +218,47 @@ export function getAllGuides(): GuideSummary[] {
   return getGuideSlugs()
     .map(getGuideBySlug)
     .filter((guide): guide is Guide => guide !== null)
-    .sort((left, right) => {
-      const orderDifference =
-        (left.order ?? Number.MAX_SAFE_INTEGER) -
-        (right.order ?? Number.MAX_SAFE_INTEGER);
-
-      if (orderDifference !== 0) {
-        return orderDifference;
-      }
-
-      if (left.date && right.date && left.date !== right.date) {
-        return right.date.localeCompare(left.date);
-      }
-
-      return left.title.localeCompare(right.title);
-    })
+    .sort(compareGuides)
     .map(({ content: _content, ...guide }) => guide);
+}
+
+export function getGuideRelationships(
+  guide: GuideSummary,
+  guides: GuideSummary[] = getAllGuides(),
+): GuideRelationships {
+  const guideBySlug = new Map(guides.map((item) => [item.slug, item]));
+  const relatedGuides = (guide.relatedGuides ?? [])
+    .map((slug) => guideBySlug.get(slug))
+    .filter(
+      (item): item is GuideSummary =>
+        item !== undefined && item.slug !== guide.slug,
+    );
+
+  if (!guide.series) {
+    return {
+      previousGuide: null,
+      nextGuide: null,
+      relatedGuides,
+      seriesTitle: null,
+      seriesPosition: null,
+      seriesLength: 0,
+    };
+  }
+
+  const seriesGuides = guides
+    .filter((item) => item.series === guide.series)
+    .sort(compareSeriesGuides);
+  const currentIndex = seriesGuides.findIndex((item) => item.slug === guide.slug);
+
+  return {
+    previousGuide: currentIndex > 0 ? seriesGuides[currentIndex - 1] : null,
+    nextGuide:
+      currentIndex >= 0 && currentIndex < seriesGuides.length - 1
+        ? seriesGuides[currentIndex + 1]
+        : null,
+    relatedGuides,
+    seriesTitle: titleFromSlug(guide.series),
+    seriesPosition: currentIndex >= 0 ? currentIndex + 1 : null,
+    seriesLength: seriesGuides.length,
+  };
 }
