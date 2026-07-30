@@ -22,6 +22,8 @@ interface GuideInput {
   series?: unknown;
   seriesOrder?: unknown;
   relatedGuides?: unknown;
+  coverImage?: unknown;
+  coverImageAlt?: unknown;
   body?: unknown;
 }
 
@@ -39,6 +41,32 @@ function requiredString(value: unknown, field: string): string {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function validateImageUrl(value: unknown): string | undefined {
+  const image = optionalString(value);
+
+  if (!image) {
+    return undefined;
+  }
+
+  if (image.startsWith("/uploads/guides/")) {
+    return image;
+  }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(image);
+  } catch {
+    throw new Error("Cover image must be a valid local or web URL");
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Cover image must use HTTP or HTTPS");
+  }
+
+  return parsed.toString();
 }
 
 function stringArray(value: unknown): string[] {
@@ -148,6 +176,8 @@ function renderGuide(input: {
   series?: string;
   seriesOrder?: number;
   relatedGuides: string[];
+  coverImage?: string;
+  coverImageAlt?: string;
   body: string;
 }): string {
   const frontMatter = [
@@ -156,6 +186,11 @@ function renderGuide(input: {
     `description: ${yamlString(input.description)}`,
     `date: ${yamlString(input.date)}`,
   ];
+
+  if (input.coverImage) {
+    frontMatter.push(`coverImage: ${yamlString(input.coverImage)}`);
+    frontMatter.push(`coverImageAlt: ${yamlString(input.coverImageAlt || input.title)}`);
+  }
 
   if (input.order !== undefined) {
     frontMatter.push(`order: ${input.order}`);
@@ -195,6 +230,13 @@ async function createGuide(
   }
 
   const order = optionalWholeNumber(input.order, "Order", 0);
+  const coverImage = validateImageUrl(input.coverImage);
+  const coverImageAlt = optionalString(input.coverImageAlt);
+
+  if (coverImage && !coverImageAlt) {
+    throw new Error("Cover image alternative text is required");
+  }
+
   const relationships = validateRelationships(input, slug);
   const date = optionalString(input.date) || new Date().toISOString().slice(0, 10);
   const guideSource = renderGuide({
@@ -204,6 +246,8 @@ async function createGuide(
     order,
     eventTypes: stringArray(input.eventTypes),
     tags: stringArray(input.tags),
+    coverImage,
+    coverImageAlt,
     ...relationships,
     body,
   });

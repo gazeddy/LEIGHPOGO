@@ -49,3 +49,18 @@ npx prisma migrate dev
 ```
 
 Do not use `prisma migrate reset` against the production database.
+
+
+## Guide image storage
+
+Admin guide images are stored under `public/uploads/guides` by default. The folder contents are ignored by Git so `git pull`, `npm ci` and application builds do not remove uploaded pictures. Back this directory up alongside the guide Markdown files. Set `GUIDE_UPLOADS_DIRECTORY` and `GUIDE_UPLOADS_URL_PREFIX` only when using a different persistent storage location.
+
+## Renaming the systemd services
+
+After deploying this update, rename and verify both application services with:
+
+```bash
+sudo bash deploy/rename-systemd-services.sh
+```
+
+The script starts and verifies `leighpogo.service` and `leighpogo-test.service` before disabling and deleting `pokego-backend.service` and `pokego-test.service`. If a replacement fails to start, the old service is left in place.

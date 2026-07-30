@@ -133,6 +133,9 @@ export default function Navbar() {
                     <Link href="/admin/guide-links" className="nav-item nav-subitem">
                       Guide Links
                     </Link>
+                    <Link href="/admin/guide-images" className="nav-item nav-subitem">
+                      Guide Pictures
+                    </Link>
                   </div>
                 </div>
               )}
