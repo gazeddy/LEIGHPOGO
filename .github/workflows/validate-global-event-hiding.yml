@@ -1,0 +1,144 @@
+name: Validate global event hiding
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      NEXTAUTH_SECRET: ci-only-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run build
+
+      - name: Validate global hide precedence
+        run: |
+          set -euo pipefail
+          export EVENT_OVERRIDES_PATH="$RUNNER_TEMP/event-overrides.json"
+          export EVENT_TYPE_RULES_PATH="$RUNNER_TEMP/event-type-rules.json"
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const ts = require('typescript');
+
+          require.extensions['.ts'] = (module, filename) => {
+            const source = fs.readFileSync(filename, 'utf8');
+            const output = ts.transpileModule(source, {
+              compilerOptions: {
+                module: ts.ModuleKind.CommonJS,
+                target: ts.ScriptTarget.ES2020,
+                esModuleInterop: true,
+              },
+              fileName: filename,
+            }).outputText;
+            module._compile(output, filename);
+          };
+
+          const overridesPath = process.env.EVENT_OVERRIDES_PATH;
+          const typeRulesPath = process.env.EVENT_TYPE_RULES_PATH;
+          const now = new Date('2026-07-30T15:00:00.000Z');
+          const event = {
+            eventID: 'raid-hour-one',
+            name: 'Original raid hour',
+            eventType: 'raid-hour',
+            heading: 'Raid Hour',
+            link: 'https://example.com/original',
+            image: null,
+            start: '2026-07-30T17:00:00.000Z',
+            end: '2026-07-30T18:00:00.000Z',
+            tags: [],
+            description: null,
+            campfireUrl: null,
+            source: 'feed',
+          };
+          const visibleOverride = {
+            eventID: event.eventID,
+            name: 'Community raid hour',
+            heading: 'Local Raid Hour',
+            description: 'Meet locally',
+            campfireUrl: 'https://campfire.nianticlabs.com/test',
+            image: null,
+            tags: ['local'],
+            hidden: false,
+            hideAt: null,
+            updatedAt: now.toISOString(),
+          };
+
+          async function run() {
+            const { applyEventOverrides } = require('./lib/event-overrides.ts');
+
+            fs.writeFileSync(overridesPath, JSON.stringify([visibleOverride]));
+            fs.writeFileSync(typeRulesPath, JSON.stringify([{
+              eventType: 'raid-hour',
+              hidden: true,
+              hideAt: null,
+              updatedAt: now.toISOString(),
+            }]));
+
+            const hiddenByType = await applyEventOverrides([event], now);
+            if (hiddenByType.length !== 0) {
+              throw new Error('A hidden event type was bypassed by an individual override');
+            }
+
+            fs.writeFileSync(typeRulesPath, '[]');
+            fs.writeFileSync(overridesPath, JSON.stringify([{
+              ...visibleOverride,
+              hidden: true,
+            }]));
+
+            const hiddenIndividually = await applyEventOverrides([event], now);
+            if (hiddenIndividually.length !== 0) {
+              throw new Error('An individually hidden event remained visible');
+            }
+
+            fs.writeFileSync(overridesPath, JSON.stringify([visibleOverride]));
+            const visible = await applyEventOverrides([event], now);
+            if (visible.length !== 1 || visible[0].name !== visibleOverride.name) {
+              throw new Error('A visible event override was not applied');
+            }
+            if (visible[0].link !== visibleOverride.campfireUrl) {
+              throw new Error('The visible Campfire override was not applied');
+            }
+
+            fs.writeFileSync(typeRulesPath, JSON.stringify([{
+              eventType: 'raid-hour',
+              hidden: false,
+              hideAt: '2026-07-30T14:59:00.000Z',
+              updatedAt: now.toISOString(),
+            }]));
+            const scheduledHidden = await applyEventOverrides([event], now);
+            if (scheduledHidden.length !== 0) {
+              throw new Error('A scheduled type hide did not remove the event');
+            }
+
+            console.log('Global event visibility rules validated');
+          }
+
+          run().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Verify live ticker refresh wiring
+        run: |
+          set -euo pipefail
+          grep -F 'EVENT_VISIBILITY_CHANGED_EVENT' components/events/EventTicker.tsx
+          grep -F 'EVENT_VISIBILITY_POLL_INTERVAL_MS' components/events/EventTicker.tsx
+          grep -F 'EVENT_VISIBILITY_CHANGED_EVENT' components/events/RaidBossTicker.tsx
+          grep -F 'EVENT_VISIBILITY_POLL_INTERVAL_MS' components/events/RaidBossTicker.tsx
+          grep -F 'notifyEventVisibilityChanged()' pages/admin/events.tsx
+          grep -F 'notifyEventVisibilityChanged()' pages/admin/event-types.tsx
+          grep -F 'notifyEventVisibilityChanged()' pages/admin/content.tsx
