@@ -73,7 +73,7 @@ export default function NewGymTicker() {
     };
   }, [status]);
 
-  if (status !== "authenticated" || gyms.length === 0) {
+  if (status !== "authenticated") {
     return null;
   }
 
@@ -91,11 +91,28 @@ export default function NewGymTicker() {
         <strong>New gyms</strong>
       </Link>
       <div className="new-gym-viewport">
-        <div className="new-gym-track">
-          <div className="new-gym-copy">{items}</div>
-          <div className="new-gym-copy" aria-hidden="true">{items}</div>
-        </div>
+        {gyms.length === 0 ? (
+          <p className="new-gym-empty-message">
+            No newly added gyms in the last 7 days.
+          </p>
+        ) : (
+          <div className="new-gym-track">
+            <div className="new-gym-copy">{items}</div>
+            <div className="new-gym-copy" aria-hidden="true">{items}</div>
+          </div>
+        )}
       </div>
+
+      <style jsx>{`
+        .new-gym-empty-message {
+          margin: 0;
+          padding: 0 23px;
+          color: #8b949e;
+          font-size: 1rem;
+          line-height: 49px;
+          white-space: nowrap;
+        }
+      `}</style>
     </aside>
   );
 }
