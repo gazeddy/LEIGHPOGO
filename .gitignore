@@ -6,3 +6,4 @@ node_modules
 /data/events-cache.json*
 /data/local-events.json*
 /data/event-overrides.json*
+/data/event-type-rules.json*
