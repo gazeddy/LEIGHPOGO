@@ -28,23 +28,30 @@ rename_service() {
   install -m 0644 "$old_path" "$new_path"
   systemctl daemon-reload
 
-  if ! systemctl enable --now "${new_name}.service"; then
-    echo "Failed to start ${new_name}.service; rolling back the new unit." >&2
+  echo "Stopping ${old_name}.service before transferring its port..."
+  systemctl stop "${old_name}.service"
+
+  if ! systemctl start "${new_name}.service"; then
+    echo "Failed to start ${new_name}.service; restoring ${old_name}.service." >&2
+    systemctl stop "${new_name}.service" || true
     rm -f "$new_path"
     systemctl daemon-reload
+    systemctl start "${old_name}.service"
     exit 1
   fi
 
   if ! systemctl is-active --quiet "${new_name}.service"; then
-    echo "${new_name}.service did not become active; keeping the old service." >&2
-    systemctl disable --now "${new_name}.service" || true
+    echo "${new_name}.service did not become active; restoring ${old_name}.service." >&2
+    systemctl stop "${new_name}.service" || true
     rm -f "$new_path"
     systemctl daemon-reload
+    systemctl start "${old_name}.service"
     exit 1
   fi
 
+  systemctl enable "${new_name}.service"
   echo "${new_name}.service is active. Removing ${old_name}.service..."
-  systemctl disable --now "${old_name}.service" || true
+  systemctl disable "${old_name}.service" || true
   rm -f "$old_path"
   systemctl daemon-reload
   systemctl reset-failed
