@@ -8,6 +8,7 @@ import {
   type EventOverride,
 } from "../../lib/event-overrides";
 import type { PokemonGoEventSummary } from "../../lib/events";
+import { notifyEventVisibilityChanged } from "../../lib/event-visibility-client";
 import { getImportedEventsForAdmin } from "../../lib/events-server";
 import { authOptions } from "../api/auth/[...nextauth]";
 
@@ -195,6 +196,7 @@ export default function EventFeedAdminPage({
         saved,
       ]);
       setMessage(payload.message);
+      notifyEventVisibilityChanged();
       cancelEdit();
     } catch (caught) {
       setError(
@@ -230,6 +232,7 @@ export default function EventFeedAdminPage({
       current.filter((override) => override.eventID !== eventID),
     );
     setMessage(payload.message);
+    notifyEventVisibilityChanged();
 
     if (editingEventID === eventID) {
       cancelEdit();
@@ -397,7 +400,7 @@ export default function EventFeedAdminPage({
                           setDraft({ ...draft, hidden: changeEvent.target.checked })
                         }
                       />
-                      Hide this event immediately
+                      Hide this event immediately everywhere
                     </label>
                     <label>
                       Automatically hide from

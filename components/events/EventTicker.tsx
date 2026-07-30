@@ -9,6 +9,10 @@ import {
   type PointerEvent,
 } from "react";
 import type { EventTickerItem } from "../../lib/events";
+import {
+  EVENT_VISIBILITY_CHANGED_EVENT,
+  EVENT_VISIBILITY_POLL_INTERVAL_MS,
+} from "../../lib/event-visibility-client";
 
 interface TickerPayload {
   items?: EventTickerItem[];
@@ -105,12 +109,16 @@ export default function EventTicker() {
   const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let controller: AbortController | null = null;
 
     async function loadTicker() {
+      controller?.abort();
+      controller = new AbortController();
+
       try {
         const response = await fetch("/api/events/ticker", {
           signal: controller.signal,
+          cache: "no-store",
           headers: { Accept: "application/json" },
         });
 
@@ -130,9 +138,31 @@ export default function EventTicker() {
       }
     }
 
-    loadTicker();
+    const reload = () => {
+      void loadTicker();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reload();
+      }
+    };
 
-    return () => controller.abort();
+    reload();
+    const pollTimer = window.setInterval(
+      reload,
+      EVENT_VISIBILITY_POLL_INTERVAL_MS,
+    );
+    window.addEventListener(EVENT_VISIBILITY_CHANGED_EVENT, reload);
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      controller?.abort();
+      window.clearInterval(pollTimer);
+      window.removeEventListener(EVENT_VISIBILITY_CHANGED_EVENT, reload);
+      window.removeEventListener("focus", reload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   useEffect(
