@@ -2,6 +2,11 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "./auth/[...nextauth]"
 import prisma from "../../lib/prisma"
 
+const {
+  filterReleasedDexNumbers,
+  getReleasedPokemonData,
+} = require("../../lib/releasedPokemonCache")
+
 async function ensureSession(req, res) {
   const session = await getServerSession(req, res, authOptions)
   if (!session) {
@@ -11,9 +16,22 @@ async function ensureSession(req, res) {
   return session
 }
 
+async function loadReleasedPokemon(res) {
+  try {
+    return await getReleasedPokemonData()
+  } catch (error) {
+    console.error("Failed to load released Pokémon data", error)
+    res.status(503).json({ error: "The released Pokémon list is temporarily unavailable." })
+    return null
+  }
+}
+
 export default async function handler(req, res) {
   const session = await ensureSession(req, res)
   if (!session) return
+
+  const releasedPokemonData = await loadReleasedPokemon(res)
+  if (!releasedPokemonData) return
 
   if (req.method === "GET") {
     try {
@@ -22,7 +40,12 @@ export default async function handler(req, res) {
         select: { dexNumber: true },
       })
 
-      res.status(200).json({ dexNumbers: entries.map((entry) => entry.dexNumber) })
+      res.status(200).json({
+        dexNumbers: filterReleasedDexNumbers(
+          entries.map((entry) => entry.dexNumber),
+          releasedPokemonData.dexNumbers
+        ),
+      })
     } catch (error) {
       console.error("Failed to fetch Pokédex entries", error)
       res.status(500).json({ error: "Unable to load your Pokédex right now." })
@@ -38,23 +61,22 @@ export default async function handler(req, res) {
       return
     }
 
-    const uniqueDexNumbers = Array.from(
-      new Set(
-        dexNumbers
-          .map((value) => Number(value))
-          .filter((value) => Number.isInteger(value) && value > 0)
-      )
+    const releasedDexNumbers = filterReleasedDexNumbers(
+      dexNumbers,
+      releasedPokemonData.dexNumbers
     )
 
     try {
       await prisma.$transaction([
         prisma.pokedexEntry.deleteMany({
-          where: {
-            ownerId: session.user.id,
-            dexNumber: { notIn: uniqueDexNumbers },
-          },
+          where: releasedDexNumbers.length
+            ? {
+                ownerId: session.user.id,
+                dexNumber: { notIn: releasedDexNumbers },
+              }
+            : { ownerId: session.user.id },
         }),
-        ...uniqueDexNumbers.map((dexNumber) =>
+        ...releasedDexNumbers.map((dexNumber) =>
           prisma.pokedexEntry.upsert({
             where: {
               ownerId_dexNumber: { ownerId: session.user.id, dexNumber },
@@ -65,7 +87,7 @@ export default async function handler(req, res) {
         ),
       ])
 
-      res.status(200).json({ dexNumbers: uniqueDexNumbers })
+      res.status(200).json({ dexNumbers: releasedDexNumbers })
     } catch (error) {
       console.error("Failed to save Pokédex entries", error)
       res.status(500).json({ error: "Unable to save your Pokédex right now." })
