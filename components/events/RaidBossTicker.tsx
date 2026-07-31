@@ -1,4 +1,12 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type PointerEvent,
+} from "react";
 import type { RaidBossTickerItem } from "../../lib/events";
 import {
   EVENT_VISIBILITY_CHANGED_EVENT,
@@ -10,6 +18,9 @@ interface RaidTickerPayload {
 }
 
 type RaidTickerStatus = "loading" | "ready" | "error";
+
+const AUTO_RESUME_DELAY_MS = 3000;
+const TAP_MAX_DURATION_MS = 450;
 
 function dateForDisplay(value: string): {
   date: Date;
@@ -34,7 +45,13 @@ function formatEndDate(value: string): string {
   }).format(date);
 }
 
-function RaidItem({ item }: { item: RaidBossTickerItem }) {
+function RaidItem({
+  item,
+  duplicate = false,
+}: {
+  item: RaidBossTickerItem;
+  duplicate?: boolean;
+}) {
   const content = (
     <>
       <span className={`raid-category raid-category-${item.category}`}>
@@ -55,6 +72,7 @@ function RaidItem({ item }: { item: RaidBossTickerItem }) {
       target="_blank"
       rel="noopener noreferrer"
       className="raid-item raid-item-link"
+      tabIndex={duplicate ? -1 : undefined}
       title={`View ${item.label} ${item.boss} raid details`}
     >
       {content}
@@ -63,9 +81,37 @@ function RaidItem({ item }: { item: RaidBossTickerItem }) {
   );
 }
 
+function RaidItems({
+  items,
+  duplicate = false,
+}: {
+  items: RaidBossTickerItem[];
+  duplicate?: boolean;
+}) {
+  return (
+    <div
+      className={`raid-group${duplicate ? " raid-group-duplicate" : ""}`}
+      aria-hidden={duplicate || undefined}
+    >
+      {items.map((item) => (
+        <RaidItem
+          key={`${duplicate ? "duplicate-" : ""}${item.eventID}`}
+          item={item}
+          duplicate={duplicate}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function RaidBossTicker() {
   const [items, setItems] = useState<RaidBossTickerItem[]>([]);
   const [status, setStatus] = useState<RaidTickerStatus>("loading");
+  const [paused, setPaused] = useState(false);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerStartedAtRef = useRef<number | null>(null);
+  const pointerWasPausedRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let controller: AbortController | null = null;
@@ -124,6 +170,118 @@ export default function RaidBossTicker() {
     };
   }, []);
 
+  useEffect(
+    () => () => {
+      if (resumeTimerRef.current !== null) {
+        clearTimeout(resumeTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const animationDuration = useMemo(
+    () => `${Math.max(32, items.length * 10)}s`,
+    [items.length],
+  );
+
+  function clearResumeTimer() {
+    if (resumeTimerRef.current !== null) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+  }
+
+  function pauseTicker() {
+    clearResumeTimer();
+    setPaused(true);
+  }
+
+  function resumeTicker() {
+    clearResumeTimer();
+    setPaused(false);
+  }
+
+  function scheduleResume() {
+    clearResumeTimer();
+    resumeTimerRef.current = setTimeout(() => {
+      resumeTimerRef.current = null;
+      setPaused(false);
+    }, AUTO_RESUME_DELAY_MS);
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    clearResumeTimer();
+    pointerStartedAtRef.current = performance.now();
+    pointerWasPausedRef.current = paused;
+    activePointerIdRef.current = event.pointerId;
+    setPaused(true);
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLElement>) {
+    if (activePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    const startedAt = pointerStartedAtRef.current;
+    const wasPaused = pointerWasPausedRef.current;
+    const pressDuration =
+      startedAt === null ? TAP_MAX_DURATION_MS + 1 : performance.now() - startedAt;
+    const target = event.target as HTMLElement;
+    const usedActionLink = target.closest("a") !== null;
+
+    activePointerIdRef.current = null;
+    pointerStartedAtRef.current = null;
+
+    if (!usedActionLink && wasPaused && pressDuration <= TAP_MAX_DURATION_MS) {
+      resumeTicker();
+      return;
+    }
+
+    scheduleResume();
+  }
+
+  function handlePointerCancel(event: PointerEvent<HTMLElement>) {
+    if (activePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    activePointerIdRef.current = null;
+    pointerStartedAtRef.current = null;
+    scheduleResume();
+  }
+
+  function handlePointerEnter(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse") {
+      pauseTicker();
+    }
+  }
+
+  function handlePointerLeave(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && activePointerIdRef.current === null) {
+      scheduleResume();
+    }
+  }
+
+  function handleFocus(event: FocusEvent<HTMLElement>) {
+    const target = event.target as HTMLElement;
+
+    if (target.matches(":focus-visible")) {
+      pauseTicker();
+    }
+  }
+
+  function handleBlur(event: FocusEvent<HTMLElement>) {
+    const nextTarget = event.relatedTarget as Node | null;
+
+    if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+      scheduleResume();
+    }
+  }
+
   const message =
     status === "loading"
       ? "Loading current raid bosses…"
@@ -132,7 +290,17 @@ export default function RaidBossTicker() {
         : "No current raid bosses listed";
 
   return (
-    <section className="raid-ticker" aria-label="Current raid bosses">
+    <section
+      className={`raid-ticker${paused ? " paused" : ""}`}
+      aria-label="Current raid bosses"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onFocusCapture={handleFocus}
+      onBlurCapture={handleBlur}
+    >
       <div className="raid-label">
         <span aria-hidden="true">●</span>
         Current raids
@@ -140,10 +308,16 @@ export default function RaidBossTicker() {
 
       <div className="raid-viewport">
         {items.length > 0 ? (
-          <div className="raid-list">
-            {items.map((item) => (
-              <RaidItem key={item.eventID} item={item} />
-            ))}
+          <div
+            className="raid-track"
+            style={
+              {
+                "--raid-ticker-duration": animationDuration,
+              } as CSSProperties
+            }
+          >
+            <RaidItems items={items} />
+            <RaidItems items={items} duplicate />
           </div>
         ) : (
           <p className="raid-message" role="status">
@@ -188,14 +362,26 @@ export default function RaidBossTicker() {
         .raid-viewport {
           min-width: 0;
           flex: 1;
-          overflow-x: auto;
+          overflow: hidden;
+          mask-image: linear-gradient(
+            to right,
+            transparent,
+            black 18px,
+            black calc(100% - 18px),
+            transparent
+          );
         }
 
-        .raid-list {
+        .raid-track {
           display: flex;
           width: max-content;
           min-width: 100%;
-          align-items: stretch;
+          animation: raid-ticker-scroll var(--raid-ticker-duration) linear infinite;
+          will-change: transform;
+        }
+
+        .raid-ticker.paused .raid-track {
+          animation-play-state: paused;
         }
 
         .raid-message {
@@ -207,15 +393,41 @@ export default function RaidBossTicker() {
           white-space: nowrap;
         }
 
+        @keyframes raid-ticker-scroll {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(-50%);
+          }
+        }
+
         @media (max-width: 620px) {
           .raid-label {
             padding: 0 10px;
             font-size: 0.68rem;
           }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .raid-viewport {
+            overflow-x: auto;
+            mask-image: none;
+          }
+
+          .raid-track {
+            animation: none;
+          }
+        }
       `}</style>
 
       <style jsx global>{`
+        .raid-group {
+          display: flex;
+          flex: 0 0 auto;
+          align-items: stretch;
+        }
+
         .raid-item {
           display: inline-flex;
           align-items: center;
@@ -268,6 +480,12 @@ export default function RaidBossTicker() {
         .raid-until {
           color: #8b949e;
           font-size: 0.76rem;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .raid-group-duplicate {
+            display: none;
+          }
         }
       `}</style>
     </section>
