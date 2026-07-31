@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import type {
   GetServerSideProps,
   InferGetServerSidePropsType,
@@ -57,6 +58,9 @@ export default function GuidePage({
   seriesPosition,
   seriesLength,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const { data: session } = useSession();
+  const isAdmin =
+    (session?.user as { role?: string } | undefined)?.role === "admin";
   const hasSequence = previousGuide || nextGuide;
 
   return (
@@ -65,6 +69,16 @@ export default function GuidePage({
       description={guide.description}
       date={guide.date}
     >
+      {isAdmin && (
+        <div className="guide-admin-actions">
+<Link
+  href={{ pathname: "/admin/content", query: { guide: guide.slug } }}
+>
+  Edit this guide
+</Link>
+        </div>
+      )}
+
       {seriesTitle && (
         <p className="series-position">
           {seriesTitle}
@@ -132,6 +146,28 @@ export default function GuidePage({
       )}
 
       <style jsx>{`
+        .guide-admin-actions {
+display: flex;
+justify-content: flex-end;
+margin: 0 0 18px;
+        }
+
+        .guide-admin-actions a {
+border: 1px solid #238636;
+border-radius: 8px;
+padding: 8px 12px;
+background: rgba(35, 134, 54, 0.15);
+color: #7ee787;
+font-weight: 800;
+text-decoration: none;
+        }
+
+        .guide-admin-actions a:hover,
+        .guide-admin-actions a:focus-visible {
+background: rgba(35, 134, 54, 0.3);
+outline: none;
+        }
+
         .guide-cover {
           margin: 0;
           border-top: 1px solid #30363d;
