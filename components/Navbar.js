@@ -138,6 +138,9 @@ export default function Navbar() {
                     <Link href="/admin/gyms" className="nav-item nav-subitem">
                       Gym Data
                     </Link>
+                    <Link href="/admin/gym-removals" className="nav-item nav-subitem">
+                      Gym Removals
+                    </Link>
                   </div>
                 </div>
               )}
