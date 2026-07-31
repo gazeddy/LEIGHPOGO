@@ -30,7 +30,10 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("display: none;");
   });
 
-  it("retains matching pointer, hover and keyboard pause controls", () => {
+  it("retains matching speed and interaction behaviour", () => {
+    expect(eventTicker).toContain("Math.max(32, items.length * 10)");
+    expect(raidTicker).toContain("Math.max(32, items.length * 10)");
+
     for (const handler of [
       "onPointerDown={handlePointerDown}",
       "onPointerUp={handlePointerUp}",
