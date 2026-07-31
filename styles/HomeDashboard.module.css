@@ -138,6 +138,57 @@
   color: #f2cc60;
 }
 
+.tradeSection {
+  margin-top: 38px;
+}
+
+.tradeHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.tradeHeader h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.tradeIntro {
+  margin: 8px 0 0;
+  color: #8b949e;
+  line-height: 1.5;
+}
+
+.tradeList {
+  display: grid;
+  gap: 16px;
+}
+
+.tradeListing {
+  margin-bottom: 0;
+}
+
+.tradeTitle {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.tradeTitle a {
+  color: #9ecbff;
+  text-decoration: none;
+}
+
+.tradeTitle a:hover,
+.tradeTitle a:focus-visible {
+  text-decoration: underline;
+}
+
+.emptyTrades {
+  margin-bottom: 0;
+}
+
 .loginNote {
   margin: 20px 0 0;
   color: #8b949e;
@@ -164,6 +215,19 @@
 
   .card {
     min-height: 185px;
+  }
+
+  .tradeHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tradeHeader :global(.trade-card-actions) {
+    width: 100%;
+  }
+
+  .tradeHeader :global(.trade-card-actions) > * {
+    width: 100%;
   }
 }
 
