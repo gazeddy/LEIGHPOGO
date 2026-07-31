@@ -1,0 +1,19 @@
+name: Import SlimWiki Dynamax text
+
+on:
+  push:
+    branches: [content/dynamax-guide-from-slimwiki]
+    paths:
+      - .github/workflows/import-slimwiki-dynamax.yml
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch source page
+        run: bash scripts/import-slimwiki-dynamax.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slimwiki-dynamax-source
+          path: tmp/slimwiki-dynamax
