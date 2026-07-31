@@ -1,10 +1,8 @@
 name: Import SlimWiki Dynamax text
 
 on:
-  push:
-    branches: [content/dynamax-guide-from-slimwiki]
-    paths:
-      - .github/workflows/import-slimwiki-dynamax.yml
+  pull_request:
+    branches: [develop]
 
 jobs:
   import:
