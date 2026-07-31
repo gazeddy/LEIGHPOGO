@@ -1,3 +1,5 @@
+const fs = require("fs")
+const path = require("path")
 const {
   isDittoCacheForSeason,
   normaliseDittoDisguises,
@@ -93,5 +95,19 @@ describe("Ditto disguise helpers", () => {
         new Date("2026-09-08T09:00:00.000Z"),
       ),
     ).toBeNull()
+  })
+
+  it("stores a successful PoGoAPI response in memory before writing the file cache", () => {
+    const serverSource = fs.readFileSync(
+      path.join(process.cwd(), "lib/ditto-disguises-server.ts"),
+      "utf8",
+    )
+    const memoryAssignment = serverSource.indexOf("memoryCache = cache")
+    const diskWrite = serverSource.indexOf("await writeDittoCache(cache)")
+
+    expect(serverSource).toContain("if (memoryCache)")
+    expect(memoryAssignment).toBeGreaterThan(-1)
+    expect(diskWrite).toBeGreaterThan(memoryAssignment)
+    expect(serverSource).toContain("Failed to persist Ditto disguise cache")
   })
 })
