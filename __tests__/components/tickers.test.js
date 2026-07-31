@@ -33,11 +33,12 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("display: none;");
   });
 
-  it("keeps the Ditto ticker public, cached and between raids and new gyms", () => {
+  it("keeps the Ditto ticker public, daily cached and between raids and new gyms", () => {
     expect(dittoTicker).toContain('fetch("/api/ditto-disguises"');
     expect(dittoTicker).not.toContain("useSession");
     expect(dittoTicker).not.toContain('cache: "no-store"');
-    expect(dittoApi).toContain("max-age=3600");
+    expect(dittoTicker).toContain("const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;");
+    expect(dittoApi).toContain("max-age=86400");
     expect(dittoApi).toContain("s-maxage=86400");
     expect(dittoTicker).toContain("<DittoItems disguises={disguises} />");
     expect(dittoTicker).toContain("<DittoItems disguises={disguises} duplicate />");
