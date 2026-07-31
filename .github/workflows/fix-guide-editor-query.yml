@@ -1,77 +1,20 @@
-name: Validate guide editor query handling
+name: Validate published guide editor
 
 on:
   pull_request:
     branches: [develop]
 
-permissions:
-  contents: write
-
 jobs:
-  patch-build-and-check:
-    if: github.head_ref == 'fix/published-guide-editor'
+  build-and-check:
+    if: startsWith(github.head_ref, 'fix/published-guide-editor')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: fix/published-guide-editor
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Fix one-time query loading
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('pages/admin/guide-editor.tsx')
-          content = path.read_text()
-
-          old_ref = '  const textareaRef = useRef<HTMLTextAreaElement | null>(null);\n'
-          new_ref = old_ref + '  const loadedQuerySlugRef = useRef<string | null>(null);\n'
-          if 'loadedQuerySlugRef' not in content:
-              if old_ref not in content:
-                  raise SystemExit('Textarea ref insertion point not found')
-              content = content.replace(old_ref, new_ref, 1)
-
-          old_effect = '''  useEffect(() => {
-    if (!router.isReady) {
-      return;
-    }
-
-    const requestedSlug =
-      typeof router.query.slug === "string" ? router.query.slug : "";
-
-    if (!requestedSlug || requestedSlug === selectedSlug) {
-      return;
-    }
-
-    void loadGuide(requestedSlug);
-  }, [router.isReady, router.query.slug, selectedSlug]);
-'''
-          new_effect = '''  useEffect(() => {
-    if (!router.isReady) {
-      return;
-    }
-
-    const requestedSlug =
-      typeof router.query.slug === "string" ? router.query.slug : "";
-
-    if (!requestedSlug || loadedQuerySlugRef.current === requestedSlug) {
-      return;
-    }
-
-    loadedQuerySlugRef.current = requestedSlug;
-    void loadGuide(requestedSlug);
-  }, [router.isReady, router.query.slug]);
-'''
-          if old_effect not in content:
-              raise SystemExit('Original query-loading effect not found')
-          content = content.replace(old_effect, new_effect, 1)
-          path.write_text(content)
-          PY
 
       - name: Install dependencies
         run: npm ci
@@ -79,16 +22,15 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Validate query handling
+      - name: Validate published guide editing
         run: |
+          test -f pages/admin/guide-editor.tsx
           grep -q 'loadedQuerySlugRef.current === requestedSlug' pages/admin/guide-editor.tsx
           grep -q '\[router.isReady, router.query.slug\]' pages/admin/guide-editor.tsx
           ! grep -q '\[router.isReady, router.query.slug, selectedSlug\]' pages/admin/guide-editor.tsx
-
-      - name: Commit correction
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/admin/guide-editor.tsx
-          git commit -m "Keep manual guide selection after direct edit links"
-          git push origin HEAD:fix/published-guide-editor
+          grep -q 'pathname: "/admin/guide-editor"' 'pages/guides/[slug].tsx'
+          grep -q 'Edit this guide' 'pages/guides/[slug].tsx'
+          grep -q 'destination: `/admin/guide-editor' pages/admin/guide-images.tsx
+          grep -q 'href="/admin/guide-editor"' components/Navbar.js
+          grep -q 'method: "PATCH"' pages/admin/guide-editor.tsx
+          grep -q 'Save published guide' pages/admin/guide-editor.tsx
