@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
-import pokedexByRegion, { flatPokemonList } from "../lib/pokedexData"
+import pokedexByRegion from "../lib/pokedexData"
 
 const buildSpriteUrl = ({ dexNumber }) =>
   `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber.toString()}.png`
@@ -65,13 +65,38 @@ function PokedexRegion({ region, caughtSet, onToggle }) {
   )
 }
 
-export default function PokedexPage() {
+export default function PokedexPage({
+  releasedDexNumbers = [],
+  releaseDataStale = false,
+  releaseDataError = "",
+}) {
   const { data: session, status } = useSession()
   const [caughtSet, setCaughtSet] = useState(new Set())
   const [statusMessage, setStatusMessage] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
+
+  const releasedSet = useMemo(
+    () => new Set(releasedDexNumbers.map((dexNumber) => Number(dexNumber))),
+    [releasedDexNumbers]
+  )
+
+  const availablePokedex = useMemo(
+    () =>
+      pokedexByRegion
+        .map((region) => ({
+          ...region,
+          pokemon: region.pokemon.filter((pokemon) => releasedSet.has(pokemon.dexNumber)),
+        }))
+        .filter((region) => region.pokemon.length > 0),
+    [releasedSet]
+  )
+
+  const availablePokemonList = useMemo(
+    () => availablePokedex.flatMap((region) => region.pokemon),
+    [availablePokedex]
+  )
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -82,7 +107,9 @@ export default function PokedexPage() {
         const response = await fetch("/api/pokedex")
         if (!response.ok) throw new Error("Unable to load your Pokédex")
         const data = await response.json()
-        setCaughtSet(new Set(data.dexNumbers))
+        setCaughtSet(
+          new Set(data.dexNumbers.filter((dexNumber) => releasedSet.has(Number(dexNumber))))
+        )
       } catch (error) {
         setStatusMessage(error.message)
       } finally {
@@ -91,9 +118,11 @@ export default function PokedexPage() {
     }
 
     fetchData()
-  }, [status])
+  }, [releasedSet, status])
 
   const toggleCaught = (dexNumber) => {
+    if (!releasedSet.has(dexNumber)) return
+
     setCaughtSet((prev) => {
       const next = new Set(prev)
       if (next.has(dexNumber)) {
@@ -105,17 +134,25 @@ export default function PokedexPage() {
     })
   }
 
-  const caughtCount = caughtSet.size
-  const caughtPercentage = Math.round((caughtCount / flatPokemonList.length) * 100)
+  const caughtCount = useMemo(
+    () => Array.from(caughtSet).filter((dexNumber) => releasedSet.has(dexNumber)).length,
+    [caughtSet, releasedSet]
+  )
+  const caughtPercentage = availablePokemonList.length
+    ? Math.round((caughtCount / availablePokemonList.length) * 100)
+    : 0
 
   const handleSave = async () => {
     setIsSaving(true)
     setStatusMessage("")
     try {
+      const releasedCaughtDexNumbers = Array.from(caughtSet).filter((dexNumber) =>
+        releasedSet.has(dexNumber)
+      )
       const response = await fetch("/api/pokedex", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dexNumbers: Array.from(caughtSet) }),
+        body: JSON.stringify({ dexNumbers: releasedCaughtDexNumbers }),
       })
 
       if (!response.ok) throw new Error("Failed to save your Pokédex.")
@@ -145,6 +182,19 @@ export default function PokedexPage() {
     )
   }
 
+  if (!availablePokemonList.length) {
+    return (
+      <div className="container">
+        <div className="card">
+          <h1>Pokédex Tracker</h1>
+          <p className="status-text">
+            {releaseDataError || "The released Pokémon list is temporarily unavailable."}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="container">
       <div className="card pokedex-hero">
@@ -152,8 +202,11 @@ export default function PokedexPage() {
           <h1>Pokédex Tracker</h1>
           <p className="muted">Mark Pokémon you’ve obtained by National Dex order, grouped by region.</p>
           <p className="muted">
-            Progress: {caughtCount} / {flatPokemonList.length} ({caughtPercentage}%)
+            Progress: {caughtCount} / {availablePokemonList.length} ({caughtPercentage}%)
           </p>
+          {releaseDataStale && (
+            <p className="muted">Using the last cached release list while PogoAPI is unavailable.</p>
+          )}
           {lastSaved && (
             <p className="muted">Last saved: {lastSaved.toLocaleString()}</p>
           )}
@@ -168,7 +221,7 @@ export default function PokedexPage() {
 
       {isLoading && <p className="muted">Loading your saved Pokédex…</p>}
 
-      {pokedexByRegion.map((region) => (
+      {availablePokedex.map((region) => (
         <PokedexRegion
           key={region.region}
           region={region}
@@ -178,4 +231,29 @@ export default function PokedexPage() {
       ))}
     </div>
   )
+}
+
+export async function getServerSideProps() {
+  try {
+    const { getReleasedPokemonData } = require("../lib/releasedPokemonCache")
+    const releasedPokemonData = await getReleasedPokemonData()
+
+    return {
+      props: {
+        releasedDexNumbers: releasedPokemonData.dexNumbers,
+        releaseDataStale: releasedPokemonData.stale,
+        releaseDataError: "",
+      },
+    }
+  } catch (error) {
+    console.error("Unable to load the released Pokémon list", error)
+
+    return {
+      props: {
+        releasedDexNumbers: [],
+        releaseDataStale: false,
+        releaseDataError: "The released Pokémon list could not be loaded. Please try again shortly.",
+      },
+    }
+  }
 }
