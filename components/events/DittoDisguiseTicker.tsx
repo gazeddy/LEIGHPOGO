@@ -49,7 +49,6 @@ export default function DittoDisguiseTicker() {
       try {
         const response = await fetch("/api/ditto-disguises", {
           signal: controller.signal,
-          cache: "no-store",
           headers: { Accept: "application/json" },
         });
 
