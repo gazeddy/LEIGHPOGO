@@ -39,6 +39,8 @@ jobs:
             eslint-config-next@15.5.22 \
             jest@30 \
             @types/node@24
+          npm pkg set 'overrides.brace-expansion=5.0.8'
+          npm install --package-lock-only --ignore-scripts
           npm audit fix --package-lock-only --ignore-scripts || true
 
       - name: Install refreshed dependency tree
