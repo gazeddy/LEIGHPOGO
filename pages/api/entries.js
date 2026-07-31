@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
-import prisma from "../../lib/prisma"; // adjust path if needed
+import prisma from "../../lib/prisma";
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
           ownerId: session.user.id,
         },
         include: {
-          owner: { select: { id: true, ign: true, role: true, team: true, friendCode: true } },
+          owner: { select: { id: true, ign: true, role: true } },
         },
       });
 
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const entries = await prisma.entry.findMany({
-        include: { owner: { select: { id: true, ign: true, team: true, friendCode: true } } },
+        include: { owner: { select: { id: true, ign: true } } },
         orderBy: { createdAt: "desc" },
       });
       return res.status(200).json(entries);
