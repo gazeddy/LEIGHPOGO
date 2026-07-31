@@ -29,7 +29,8 @@
 }
 
 .primary,
-.secondary {
+.secondary,
+.methodButton {
   border-radius: 7px;
   padding: 10px 14px;
   font: inherit;
@@ -43,14 +44,16 @@
   color: #fff;
 }
 
-.secondary {
+.secondary,
+.methodButton {
   border: 1px solid #30363d;
   background: #21262d;
   color: #f0f6fc;
 }
 
 .primary:disabled,
-.secondary:disabled {
+.secondary:disabled,
+.methodButton:disabled {
   opacity: 0.6;
   cursor: wait;
 }
@@ -104,14 +107,37 @@
   font: inherit;
 }
 
-.locationStatus {
+.locationMethods {
   display: grid;
-  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.methodButton {
+  text-align: center;
+}
+
+.methodActive {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.14);
+  color: #79c0ff;
+}
+
+.locationStatus,
+.manualLocation {
+  display: grid;
+  gap: 8px;
   padding: 12px;
   border: 1px solid #30363d;
   border-radius: 8px;
   background: #0d1117;
   color: #f0f6fc;
+}
+
+.coordinateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .error {
@@ -126,11 +152,15 @@
 
 @media (max-width: 700px) {
   .launch,
-  .formHeader {
+  .formHeader,
+  .locationMethods,
+  .coordinateGrid {
     display: grid;
+    grid-template-columns: 1fr;
   }
 
-  .launch .primary {
+  .launch .primary,
+  .methodButton {
     width: 100%;
   }
 }
