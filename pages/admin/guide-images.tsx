@@ -65,6 +65,8 @@ export default function GuideEditorPage({
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
   const [selectedSlug, setSelectedSlug] = useState("");
   const [guide, setGuide] = useState<EditableGuide | null>(null);
+  const [eventTypesText, setEventTypesText] = useState("");
+  const [tagsText, setTagsText] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -101,7 +103,10 @@ export default function GuideEditorPage({
         throw new Error(payload.error || "The guide could not be loaded.");
       }
 
-      setGuide(payload.guide as EditableGuide);
+      const loadedGuide = payload.guide as EditableGuide;
+      setGuide(loadedGuide);
+      setEventTypesText(loadedGuide.eventTypes.join(", "));
+      setTagsText(loadedGuide.tags.join(", "));
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "The guide could not be loaded.",
@@ -124,7 +129,11 @@ export default function GuideEditorPage({
       const response = await fetch("/api/admin/content/guide-editor", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(guide),
+        body: JSON.stringify({
+          ...guide,
+          eventTypes: commaSeparatedValues(eventTypesText),
+          tags: commaSeparatedValues(tagsText),
+        }),
       });
       const payload = await response.json();
 
@@ -132,7 +141,10 @@ export default function GuideEditorPage({
         throw new Error(payload.error || "The guide could not be saved.");
       }
 
-      setGuide(payload.guide as EditableGuide);
+      const savedGuide = payload.guide as EditableGuide;
+      setGuide(savedGuide);
+      setEventTypesText(savedGuide.eventTypes.join(", "));
+      setTagsText(savedGuide.tags.join(", "));
       setMessage(payload.message || "Published guide saved.");
     } catch (caught) {
       setError(
@@ -267,33 +279,19 @@ export default function GuideEditorPage({
               <label>
                 Event types
                 <input
-                  value={guide.eventTypes.join(", ")}
-                  placeholder="max-battles, max-mondays"
-                  onChange={(event) =>
-                    setGuide((current) =>
-                      current && {
-                        ...current,
-                        eventTypes: commaSeparatedValues(event.target.value),
-                      },
-                    )
-                  }
-                />
+        value={eventTypesText}
+        placeholder="max-battles, max-mondays"
+        onChange={(event) => setEventTypesText(event.target.value)}
+      />
               </label>
 
               <label>
                 Tags
                 <input
-                  value={guide.tags.join(", ")}
-                  placeholder="max, dynamax, gigantamax"
-                  onChange={(event) =>
-                    setGuide((current) =>
-                      current && {
-                        ...current,
-                        tags: commaSeparatedValues(event.target.value),
-                      },
-                    )
-                  }
-                />
+        value={tagsText}
+        placeholder="max, dynamax, gigantamax"
+        onChange={(event) => setTagsText(event.target.value)}
+      />
               </label>
 
               <label>
