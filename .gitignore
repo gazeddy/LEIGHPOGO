@@ -5,6 +5,7 @@ node_modules
 .nextauth-secret
 /data/.cache/
 /data/events-cache.json*
+/data/ditto-disguises-cache.json*
 /data/local-events.json*
 /data/event-overrides.json*
 /data/event-type-rules.json*

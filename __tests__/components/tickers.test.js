@@ -6,8 +6,10 @@ function readSource(relativePath) {
 }
 
 describe("ticker regression wiring", () => {
+  const app = readSource("pages/_app.js");
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
+  const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
 
   it("uses a Campfire URL as the primary event link with an Events-page fallback", () => {
     expect(eventTicker).toMatch(
@@ -28,6 +30,21 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("animation-play-state: paused;");
     expect(raidTicker).toContain(".raid-group-duplicate");
     expect(raidTicker).toContain("display: none;");
+  });
+
+  it("keeps the Ditto ticker public and between raids and new gyms", () => {
+    expect(dittoTicker).toContain('fetch("/api/ditto-disguises"');
+    expect(dittoTicker).not.toContain("useSession");
+    expect(dittoTicker).toContain("<DittoItems disguises={disguises} />");
+    expect(dittoTicker).toContain("<DittoItems disguises={disguises} duplicate />");
+
+    const raidPosition = app.indexOf("<RaidBossTicker />");
+    const dittoPosition = app.indexOf("<DittoDisguiseTicker />");
+    const gymPosition = app.indexOf("<NewGymTicker />");
+
+    expect(raidPosition).toBeGreaterThan(-1);
+    expect(dittoPosition).toBeGreaterThan(raidPosition);
+    expect(gymPosition).toBeGreaterThan(dittoPosition);
   });
 
   it("retains matching speed and interaction behaviour", () => {
