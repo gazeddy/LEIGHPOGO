@@ -24,75 +24,72 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('pages/admin/guide-images.tsx')
           source = path.read_text()
 
-          source = source.replace(
+          def replace_once(old, new, label):
+              global source
+              if old not in source:
+                  raise SystemExit(f'{label} not found')
+              source = source.replace(old, new, 1)
+
+          replace_once(
               '  const [guide, setGuide] = useState<EditableGuide | null>(null);\n  const [loading, setLoading] = useState(false);',
               '  const [guide, setGuide] = useState<EditableGuide | null>(null);\n  const [eventTypesText, setEventTypesText] = useState("");\n  const [tagsText, setTagsText] = useState("");\n  const [loading, setLoading] = useState(false);',
-              1,
+              'Guide state block',
           )
 
-          source = source.replace(
+          replace_once(
               '      setGuide(payload.guide as EditableGuide);',
               '      const loadedGuide = payload.guide as EditableGuide;\n      setGuide(loadedGuide);\n      setEventTypesText(loadedGuide.eventTypes.join(", "));\n      setTagsText(loadedGuide.tags.join(", "));',
-              1,
+              'Guide load block',
           )
 
-          source = source.replace(
+          replace_once(
               '        body: JSON.stringify(guide),',
               '        body: JSON.stringify({\n          ...guide,\n          eventTypes: commaSeparatedValues(eventTypesText),\n          tags: commaSeparatedValues(tagsText),\n        }),',
-              1,
+              'Guide save payload',
           )
 
-          source = source.replace(
+          replace_once(
               '      setGuide(payload.guide as EditableGuide);\n      setMessage(payload.message || "Published guide saved.");',
               '      const savedGuide = payload.guide as EditableGuide;\n      setGuide(savedGuide);\n      setEventTypesText(savedGuide.eventTypes.join(", "));\n      setTagsText(savedGuide.tags.join(", "));\n      setMessage(payload.message || "Published guide saved.");',
-              1,
+              'Guide save response',
           )
 
-          old_event_types = '''                <input
-                  value={guide.eventTypes.join(", ")}
-                  placeholder="max-battles, max-mondays"
-                  onChange={(event) =>
-                    setGuide((current) =>
-                      current && {
-                        ...current,
-                        eventTypes: commaSeparatedValues(event.target.value),
-                      },
-                    )
-                  }
-                />'''
-          new_event_types = '''                <input
+          event_pattern = re.compile(
+              r'<input\s+value=\{guide\.eventTypes\.join\(", "\)\}\s+placeholder="max-battles, max-mondays"\s+onChange=\{\(event\) =>.*?\n\s*/>',
+              re.S,
+          )
+          source, count = event_pattern.subn(
+              '''<input
                   value={eventTypesText}
                   placeholder="max-battles, max-mondays"
                   onChange={(event) => setEventTypesText(event.target.value)}
-                />'''
-          if old_event_types not in source:
+                />''',
+              source,
+              count=1,
+          )
+          if count != 1:
               raise SystemExit('Event types input block not found')
-          source = source.replace(old_event_types, new_event_types, 1)
 
-          old_tags = '''                <input
-                  value={guide.tags.join(", ")}
-                  placeholder="max, dynamax, gigantamax"
-                  onChange={(event) =>
-                    setGuide((current) =>
-                      current && {
-                        ...current,
-                        tags: commaSeparatedValues(event.target.value),
-                      },
-                    )
-                  }
-                />'''
-          new_tags = '''                <input
+          tags_pattern = re.compile(
+              r'<input\s+value=\{guide\.tags\.join\(", "\)\}\s+placeholder="max, dynamax, gigantamax"\s+onChange=\{\(event\) =>.*?\n\s*/>',
+              re.S,
+          )
+          source, count = tags_pattern.subn(
+              '''<input
                   value={tagsText}
                   placeholder="max, dynamax, gigantamax"
                   onChange={(event) => setTagsText(event.target.value)}
-                />'''
-          if old_tags not in source:
+                />''',
+              source,
+              count=1,
+          )
+          if count != 1:
               raise SystemExit('Tags input block not found')
-          source = source.replace(old_tags, new_tags, 1)
 
           path.write_text(source)
           PY
