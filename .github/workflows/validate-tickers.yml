@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - test/ticker-regression-validation
+  pull_request:
+    branches:
+      - develop
 
 permissions:
   contents: read
