@@ -4,6 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { parse } from "csv-parse/sync";
+import { isCommunityGym } from "../../../../lib/communityGyms";
 import {
   readGymState,
   writeGymState,
@@ -244,15 +245,17 @@ export default async function handler(
     const buffer = decodeCsv(req.body as UploadBody);
     const importedGyms = parseGyms(buffer);
     const previous = await readGymState();
-    const previousById = new Map(previous.gyms.map((gym) => [gym.id, gym]));
+    const previousImportedGyms = previous.gyms.filter((gym) => !isCommunityGym(gym));
+    const communityGyms = previous.gyms.filter(isCommunityGym);
+    const previousById = new Map(previousImportedGyms.map((gym) => [gym.id, gym]));
     const importedAtDate = new Date();
     const importedAt = importedAtDate.toISOString();
-    const initialImport = previous.gyms.length === 0;
+    const initialImport = previousImportedGyms.length === 0;
     let added = 0;
     let updated = 0;
     let unchanged = 0;
 
-    const gyms: GymRecord[] = importedGyms.map((gym) => {
+    const importedGymRecords: GymRecord[] = importedGyms.map((gym) => {
       const existing = previousById.get(gym.id);
 
       if (!existing) {
@@ -277,8 +280,14 @@ export default async function handler(
       };
     });
 
-    const importedIds = new Set(gyms.map((gym) => gym.id));
-    const removed = previous.gyms.filter((gym) => !importedIds.has(gym.id)).length;
+    const importedIds = new Set(importedGymRecords.map((gym) => gym.id));
+    const preservedCommunityGyms = communityGyms.filter(
+      (gym) => !importedIds.has(gym.id),
+    );
+    const gyms = [...importedGymRecords, ...preservedCommunityGyms];
+    const removed = previousImportedGyms.filter(
+      (gym) => !importedIds.has(gym.id),
+    ).length;
     const sourceFile = await archiveCsv(buffer, importedAtDate);
 
     await writeGymState({
