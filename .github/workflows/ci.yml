@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+        env:
+          DATABASE_URL: file:./ci-validate.db
+
+      - name: Apply migrations to clean database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: file:./ci-migrate.db
+
+      - name: Run tests
+        run: npm test -- --runInBand
+        env:
+          DATABASE_URL: file:trade-ci?mode=memory&cache=shared
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: ci-only-nextauth-secret
+
+      - name: Build production application
+        run: npm run build
+        env:
+          DATABASE_URL: file:./ci-build.db
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: ci-only-nextauth-secret
