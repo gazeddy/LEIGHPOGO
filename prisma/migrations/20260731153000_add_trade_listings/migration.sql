@@ -13,7 +13,7 @@ CREATE TABLE "TradeListing" (
 
 -- CreateTable
 CREATE TABLE "TradeListingItem" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT(),
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "listingId" INTEGER NOT NULL,
     "direction" TEXT NOT NULL,
     "pokemonName" TEXT NOT NULL,
