@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const {
   CACHE_TTL_MS,
   extractReleasedDexNumbers,
@@ -50,5 +52,15 @@ describe("released Pokémon cache helpers", () => {
         now
       )
     ).toBe(false);
+  });
+
+  it("uses the shared PoGoAPI hash manifest", () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "lib/releasedPokemonCache.js"),
+      "utf8",
+    );
+
+    expect(source).toContain("getPogoApiFileHash(RELEASED_POKEMON_FILENAME)");
+    expect(source).not.toContain('const API_HASHES_URL =');
   });
 });
