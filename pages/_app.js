@@ -7,6 +7,7 @@ import "../styles/tickers.css"
 import "../styles/gyms.css"
 import "../styles/trades.css"
 import Navbar from "../components/Navbar"
+import DittoDisguiseTicker from "../components/events/DittoDisguiseTicker"
 import EventTicker from "../components/events/EventTicker"
 import RaidBossTicker from "../components/events/RaidBossTicker"
 import NewGymTicker from "../components/gyms/NewGymTicker"
@@ -20,6 +21,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       <Navbar />
       {showEventTicker && <EventTicker />}
       <RaidBossTicker />
+      <DittoDisguiseTicker />
       <NewGymTicker />
       <Component {...pageProps} />
     </SessionProvider>
