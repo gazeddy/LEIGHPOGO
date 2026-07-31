@@ -133,13 +133,7 @@ export default function Navbar() {
                       Event Types
                     </Link>
                     <Link href="/admin/content" className="nav-item nav-subitem">
-                      Content Creator
-                    </Link>
-                    <Link href="/admin/guide-images" className="nav-item nav-subitem">
-                      Guide Editor
-                    </Link>
-                    <Link href="/admin/guide-links" className="nav-item nav-subitem">
-                      Guide Links
+                      Guide Creator / Editor
                     </Link>
                     <Link href="/admin/gyms" className="nav-item nav-subitem">
                       Gym Data
