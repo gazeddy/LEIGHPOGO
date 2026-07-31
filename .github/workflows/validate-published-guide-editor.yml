@@ -1,0 +1,65 @@
+name: Validate published guide editor
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Validate editor and guide series
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const matter = require('gray-matter');
+
+          const expected = [
+            ['welcome', 1, 'Max Battles Guide: Getting Started'],
+            ['particles', 2, 'Max Battles Guide: Max Particles'],
+            ['powering-up', 3, 'Max Battles Guide: Powering Up'],
+            ['roles', 4, 'Max Battles Guide: Team Roles'],
+            ['battling', 5, 'Max Battles Guide: Battling'],
+            ['picking-teams', 6, 'Max Battles Guide: Picking Teams'],
+            ['links', 7, 'Max Battles Guide: Useful Links'],
+          ];
+
+          for (const [slug, position, title] of expected) {
+            const source = fs.readFileSync(`content/guides/${slug}.md`, 'utf8');
+            const parsed = matter(source);
+            if (parsed.data.title !== title) throw new Error(`${slug}: title mismatch`);
+            if (parsed.data.series !== 'max-battles') throw new Error(`${slug}: series mismatch`);
+            if (parsed.data.seriesOrder !== position) throw new Error(`${slug}: series order mismatch`);
+            if (!parsed.content.trim()) throw new Error(`${slug}: empty body`);
+          }
+
+          const welcome = matter(fs.readFileSync('content/guides/welcome.md', 'utf8'));
+          if (!welcome.data.eventTypes.includes('max-battles')) throw new Error('Welcome event matching missing');
+          if (welcome.content.includes('## Max Particles')) throw new Error('Welcome guide was not split');
+
+          const api = fs.readFileSync('pages/api/admin/content/guide-editor.ts', 'utf8');
+          for (const field of ['title', 'description', 'date', 'order', 'eventTypes', 'tags', 'series', 'seriesOrder', 'relatedGuides', 'body']) {
+            if (!api.includes(field)) throw new Error(`Editor API missing ${field}`);
+          }
+          if (!api.includes('Published guide updated successfully.')) throw new Error('Editor save response missing');
+
+          const page = fs.readFileSync('pages/admin/guide-images.tsx', 'utf8');
+          if (!page.includes('Published guide editor')) throw new Error('Published editor heading missing');
+          if (!page.includes('Save published guide')) throw new Error('Published editor save control missing');
+
+          const navbar = fs.readFileSync('components/Navbar.js', 'utf8');
+          if (!navbar.includes('Guide Editor')) throw new Error('Guide Editor navigation missing');
+          NODE
