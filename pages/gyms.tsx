@@ -3,6 +3,7 @@ import Head from "next/head";
 import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
+import AddGymForm from "../components/gyms/AddGymForm";
 import { readGymState, sortGyms } from "../lib/gyms";
 import { authOptions } from "./api/auth/[...nextauth]";
 
@@ -65,7 +66,8 @@ export default function GymsPage({
             <h1>Community gym map</h1>
             <p>
               Search official names and community aliases, find the nearest gyms,
-              and open turn-by-turn directions in Google Maps.
+              add missing gyms from your current GPS location, and open turn-by-turn
+              directions in Google Maps.
             </p>
           </div>
           <div className="gym-legend" aria-label="Map legend">
@@ -74,6 +76,7 @@ export default function GymsPage({
             <span><i className="new" /> Added in the last week</span>
           </div>
         </header>
+        <AddGymForm />
         <GymMap gyms={gyms} importedAt={importedAt} />
       </main>
     </>
