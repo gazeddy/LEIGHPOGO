@@ -1,0 +1,36 @@
+name: Validate ticker regression
+
+on:
+  push:
+    branches:
+      - test/ticker-regression-validation
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: file:./prisma/ci.db
+      NEXTAUTH_SECRET: ticker-validation-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ticker regression tests
+        run: npm test -- --runInBand __tests__/components/tickers.test.js
+
+      - name: Build production application
+        run: npm run build
