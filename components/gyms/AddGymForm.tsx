@@ -11,30 +11,52 @@ interface CreatedGym {
   id: string;
 }
 
+type LocationMode = "gps" | "manual";
+
 type CreateGymResponse =
   | { message: string; gym: CreatedGym }
   | { error: string };
 
 function geolocationErrorMessage(error: GeolocationPositionError): string {
   if (error.code === error.PERMISSION_DENIED) {
-    return "Location access is blocked for this site. Open your browser's site permissions, change Location to Allow, then press Try location again.";
+    return "Location access is blocked for this site. Open your browser's site permissions, change Location to Allow, then press Try location again. You can also set the location manually.";
   }
 
   if (error.code === error.POSITION_UNAVAILABLE) {
-    return "Your device could not provide a GPS position. Make sure device Location is switched on, then try again.";
+    return "Your device could not provide a GPS position. Make sure device Location is switched on, then try again, or set the location manually.";
   }
 
   if (error.code === error.TIMEOUT) {
-    return "The GPS request timed out before your device found a position. Move somewhere with a clearer signal and try again.";
+    return "The GPS request timed out before your device found a position. Move somewhere with a clearer signal and try again, or set the location manually.";
   }
 
-  return "Your current GPS location could not be determined. Please try again.";
+  return "Your current GPS location could not be determined. Try again or set the location manually.";
+}
+
+function manualCoordinate(
+  value: string,
+  field: "latitude" | "longitude",
+): number {
+  const coordinate = Number(value.trim());
+  const minimum = field === "latitude" ? -90 : -180;
+  const maximum = field === "latitude" ? 90 : 180;
+
+  if (!Number.isFinite(coordinate) || coordinate < minimum || coordinate > maximum) {
+    throw new Error(
+      `Enter a valid ${field} between ${minimum} and ${maximum}.`,
+    );
+  }
+
+  return coordinate;
 }
 
 export default function AddGymForm() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [location, setLocation] = useState<CapturedLocation | null>(null);
+  const [locationMode, setLocationMode] = useState<LocationMode>("gps");
+  const [gpsLocation, setGpsLocation] = useState<CapturedLocation | null>(null);
+  const [manualLatitude, setManualLatitude] = useState("");
+  const [manualLongitude, setManualLongitude] = useState("");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
@@ -46,20 +68,22 @@ export default function AddGymForm() {
 
     if (!window.isSecureContext) {
       setLocationError(
-        "Your browser blocks GPS on non-secure pages. Open the HTTPS version of this site, then try again.",
+        "Your browser blocks GPS on non-secure pages. Open the HTTPS version of this site and try again, or set the location manually.",
       );
       return;
     }
 
     if (!navigator.geolocation) {
-      setLocationError("Location is not supported by this browser or device.");
+      setLocationError(
+        "Location is not supported by this browser or device. Set the location manually instead.",
+      );
       return;
     }
 
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        setGpsLocation({
           lat: position.coords.latitude,
           lon: position.coords.longitude,
           accuracy: position.coords.accuracy,
@@ -67,7 +91,7 @@ export default function AddGymForm() {
         setLocating(false);
       },
       (error) => {
-        setLocation(null);
+        setGpsLocation(null);
         setLocationError(geolocationErrorMessage(error));
         setLocating(false);
       },
@@ -81,18 +105,38 @@ export default function AddGymForm() {
 
   function startAdding() {
     setOpen(true);
-    setLocation(null);
+    setLocationMode("gps");
+    setGpsLocation(null);
+    setManualLatitude("");
+    setManualLongitude("");
     setLocationError(null);
     setSubmitError(null);
     requestLocation();
   }
 
+  function chooseGps() {
+    setLocationMode("gps");
+    setSubmitError(null);
+    requestLocation();
+  }
+
+  function chooseManual() {
+    setLocationMode("manual");
+    setLocationError(null);
+    setSubmitError(null);
+  }
+
   function cancel() {
     setOpen(false);
     setTitle("");
-    setLocation(null);
+    setLocationMode("gps");
+    setGpsLocation(null);
+    setManualLatitude("");
+    setManualLongitude("");
     setLocationError(null);
     setSubmitError(null);
+    setLocating(false);
+    setSaving(false);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -106,8 +150,26 @@ export default function AddGymForm() {
       return;
     }
 
-    if (!location) {
-      setSubmitError("A current GPS location is required before the gym can be added.");
+    let lat: number;
+    let lon: number;
+
+    try {
+      if (locationMode === "manual") {
+        lat = manualCoordinate(manualLatitude, "latitude");
+        lon = manualCoordinate(manualLongitude, "longitude");
+      } else if (gpsLocation) {
+        lat = gpsLocation.lat;
+        lon = gpsLocation.lon;
+      } else {
+        setSubmitError(
+          "Capture a GPS location or choose Set location manually.",
+        );
+        return;
+      }
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Enter valid coordinates.",
+      );
       return;
     }
 
@@ -119,8 +181,8 @@ export default function AddGymForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: cleanedTitle,
-          lat: location.lat,
-          lon: location.lon,
+          lat,
+          lon,
         }),
       });
       const data = (await response.json()) as CreateGymResponse;
@@ -144,10 +206,10 @@ export default function AddGymForm() {
         <div className={styles.launch}>
           <div className={styles.launchCopy}>
             <strong>Missing a gym?</strong>
-            <span>Add it using your device's current GPS position.</span>
+            <span>Use your device GPS or enter its coordinates manually.</span>
           </div>
           <button type="button" className={styles.primary} onClick={startAdding}>
-            Add a gym at my location
+            Add a gym
           </button>
         </div>
       ) : (
@@ -155,7 +217,7 @@ export default function AddGymForm() {
           <div className={styles.formHeader}>
             <div>
               <h2>Add a gym</h2>
-              <p>The saved marker will use the GPS position reported by this device.</p>
+              <p>Choose device GPS or enter the marker coordinates manually.</p>
             </div>
             <button
               type="button"
@@ -180,42 +242,108 @@ export default function AddGymForm() {
             />
           </label>
 
-          {location ? (
-            <div className={styles.locationStatus}>
-              <strong>GPS location captured</strong>
-              <span>
-                {location.lat.toFixed(6)}, {location.lon.toFixed(6)}
-              </span>
-              <small>Reported accuracy: about {Math.round(location.accuracy)} metres</small>
-            </div>
+          <div className={styles.locationMethods} role="group" aria-label="Location method">
+            <button
+              type="button"
+              className={`${styles.methodButton} ${locationMode === "gps" ? styles.methodActive : ""}`}
+              onClick={chooseGps}
+              disabled={saving || (locationMode === "gps" && locating)}
+            >
+              Use device GPS
+            </button>
+            <button
+              type="button"
+              className={`${styles.methodButton} ${locationMode === "manual" ? styles.methodActive : ""}`}
+              onClick={chooseManual}
+              disabled={saving}
+            >
+              Set location manually
+            </button>
+          </div>
+
+          {locationMode === "gps" ? (
+            <>
+              {gpsLocation ? (
+                <div className={styles.locationStatus}>
+                  <strong>GPS location captured</strong>
+                  <span>
+                    {gpsLocation.lat.toFixed(6)}, {gpsLocation.lon.toFixed(6)}
+                  </span>
+                  <small>
+                    Reported accuracy: about {Math.round(gpsLocation.accuracy)} metres
+                  </small>
+                </div>
+              ) : (
+                <p className={styles.help}>
+                  {locating
+                    ? "Requesting your current GPS location…"
+                    : "A GPS location has not been captured."}
+                </p>
+              )}
+
+              {locationError && <p className={styles.error}>{locationError}</p>}
+
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={requestLocation}
+                disabled={locating || saving}
+              >
+                {locating
+                  ? "Finding location…"
+                  : gpsLocation
+                    ? "Refresh GPS location"
+                    : "Try location again"}
+              </button>
+            </>
           ) : (
-            <p className={styles.help}>
-              {locating
-                ? "Requesting your current GPS location…"
-                : "A current GPS location is required."}
-            </p>
+            <div className={styles.manualLocation}>
+              <p className={styles.help}>
+                Enter decimal coordinates. In Google Maps, press and hold the gym location to drop a pin and copy its latitude and longitude.
+              </p>
+              <div className={styles.coordinateGrid}>
+                <label className={styles.field}>
+                  Latitude
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="-90"
+                    max="90"
+                    value={manualLatitude}
+                    placeholder="53.496000"
+                    required={locationMode === "manual"}
+                    onChange={(event) => setManualLatitude(event.target.value)}
+                  />
+                </label>
+                <label className={styles.field}>
+                  Longitude
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="-180"
+                    max="180"
+                    value={manualLongitude}
+                    placeholder="-2.519000"
+                    required={locationMode === "manual"}
+                    onChange={(event) => setManualLongitude(event.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
           )}
 
-          {locationError && <p className={styles.error}>{locationError}</p>}
           {submitError && <p className={styles.error}>{submitError}</p>}
 
           <div className={styles.actions}>
             <button
-              type="button"
-              className={styles.secondary}
-              onClick={requestLocation}
-              disabled={locating || saving}
-            >
-              {locating
-                ? "Finding location…"
-                : location
-                  ? "Refresh GPS location"
-                  : "Try location again"}
-            </button>
-            <button
               type="submit"
               className={styles.primary}
-              disabled={locating || saving || !location}
+              disabled={
+                saving ||
+                (locationMode === "gps" && (locating || !gpsLocation))
+              }
             >
               {saving ? "Adding gym…" : "Add gym"}
             </button>
