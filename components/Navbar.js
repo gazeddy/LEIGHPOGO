@@ -99,9 +99,14 @@ export default function Navbar() {
                 Pokédex
               </Link>
               {session && (
-                <Link href="/gyms" className="nav-item nav-subitem">
-                  Gym Map
-                </Link>
+                <>
+                  <Link href="/gyms" className="nav-item nav-subitem">
+                    Gym Map
+                  </Link>
+                  <Link href="/trades" className="nav-item nav-subitem">
+                    Trades
+                  </Link>
+                </>
               )}
             </div>
           </div>
