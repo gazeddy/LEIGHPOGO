@@ -66,7 +66,7 @@ function ListingCard({ listing, mine = false, onClose }) {
   )
 }
 
-export default function TradesPage({ requiresFriendCode, listings, myListings }) {
+export default function TradesPage({ listings, myListings }) {
   const router = useRouter()
 
   const closeListing = async (listingId) => {
@@ -87,25 +87,6 @@ export default function TradesPage({ requiresFriendCode, listings, myListings })
     }
 
     router.replace(router.asPath)
-  }
-
-  if (requiresFriendCode) {
-    return (
-      <div className="container">
-        <div className="card">
-          <h1>Trade listings</h1>
-          <p>
-            You need a valid 12-digit Pokémon GO friend code saved to your account
-            before you can view or create trade listings.
-          </p>
-          <div className="trade-card-actions">
-            <Link className="button-link" href="/account">
-              Add friend code
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -169,11 +150,7 @@ export async function getServerSideProps(context) {
 
   if (!tradeUser) {
     return {
-      props: {
-        requiresFriendCode: true,
-        listings: [],
-        myListings: [],
-      },
+      redirect: { destination: "/friend-codes", permanent: false },
     }
   }
 
@@ -201,7 +178,6 @@ export async function getServerSideProps(context) {
 
   return {
     props: {
-      requiresFriendCode: false,
       listings: listings.map(serializeTradeListing),
       myListings: myListings.map(serializeTradeListing),
     },

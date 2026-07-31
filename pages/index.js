@@ -2,11 +2,12 @@ import Head from "next/head"
 import Link from "next/link"
 import { getServerSession } from "next-auth/next"
 import { getHomeCards } from "../lib/homeCards"
+import { getEligibleTradeUser } from "../lib/tradeServer"
 import styles from "../styles/HomeDashboard.module.css"
 import { authOptions } from "./api/auth/[...nextauth]"
 
-export default function Home({ isLoggedIn, isAdmin }) {
-  const cards = getHomeCards({ isLoggedIn, isAdmin })
+export default function Home({ isLoggedIn, isAdmin, hasFriendCode }) {
+  const cards = getHomeCards({ isLoggedIn, isAdmin, hasFriendCode })
 
   return (
     <>
@@ -30,7 +31,7 @@ export default function Home({ isLoggedIn, isAdmin }) {
         <section className={styles.grid} aria-label="Community sections">
           {cards.map((card) => (
             <Link
-              key={card.href}
+              key={card.title}
               href={card.href}
               className={`${styles.card} ${styles[card.tone]}`}
             >
@@ -59,11 +60,13 @@ export default function Home({ isLoggedIn, isAdmin }) {
 export async function getServerSideProps(context) {
   const session = await getServerSession(context.req, context.res, authOptions)
   const role = session?.user?.role
+  const tradeUser = session ? await getEligibleTradeUser(session) : null
 
   return {
     props: {
       isLoggedIn: Boolean(session),
       isAdmin: role === "admin",
+      hasFriendCode: Boolean(tradeUser),
     },
   }
 }

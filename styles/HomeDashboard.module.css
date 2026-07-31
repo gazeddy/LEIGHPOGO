@@ -124,6 +124,12 @@
     #161b22;
 }
 
+.trades {
+  background:
+    radial-gradient(circle at top right, rgba(248, 81, 73, 0.2), transparent 42%),
+    #161b22;
+}
+
 .admin {
   grid-column: 1 / -1;
   min-height: 180px;

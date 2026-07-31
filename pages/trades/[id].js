@@ -171,7 +171,7 @@ export async function getServerSideProps(context) {
 
   if (!tradeUser) {
     return {
-      redirect: { destination: "/trades", permanent: false },
+      redirect: { destination: "/friend-codes", permanent: false },
     }
   }
 
