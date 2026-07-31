@@ -36,6 +36,8 @@ jobs:
         run: |
           npm pkg set 'dependencies.next=^15.5.22'
           npm pkg set 'dependencies.next-auth=^4.24.15'
+          npm pkg set 'overrides.postcss=8.5.23'
+          npm pkg set 'overrides.sharp=0.35.3'
           npm install --package-lock-only --ignore-scripts
 
       - name: Apply remaining non-breaking npm fixes
