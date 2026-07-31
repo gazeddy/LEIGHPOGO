@@ -1,0 +1,202 @@
+name: Fix published guide editor
+
+on:
+  push:
+    branches: [fix/published-guide-editor]
+    paths:
+      - .github/workflows/fix-published-guide-editor.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/published-guide-editor
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Fix published guide editor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old_page = Path("pages/admin/guide-images.tsx")
+          editor_page = Path("pages/admin/guide-editor.tsx")
+
+          if old_page.exists() and not editor_page.exists():
+              old_page.rename(editor_page)
+
+          editor = editor_page.read_text()
+          editor = editor.replace(
+              'import Link from "next/link";\n',
+              'import Link from "next/link";\nimport { useRouter } from "next/router";\n',
+              1,
+          )
+          editor = editor.replace(
+              'import { useMemo, useRef, useState } from "react";',
+              'import { useEffect, useMemo, useRef, useState } from "react";',
+              1,
+          )
+          editor = editor.replace(
+              '  const [selectedSlug, setSelectedSlug] = useState("");\n',
+              '  const router = useRouter();\n  const [selectedSlug, setSelectedSlug] = useState("");\n',
+              1,
+          )
+          load_anchor = '  async function loadGuide(slug: string) {\n'
+          auto_load = '''  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const requestedSlug =
+      typeof router.query.slug === "string" ? router.query.slug : "";
+
+    if (!requestedSlug || requestedSlug === selectedSlug) {
+      return;
+    }
+
+    void loadGuide(requestedSlug);
+  }, [router.isReady, router.query.slug, selectedSlug]);
+
+'''
+          if auto_load not in editor:
+              if load_anchor not in editor:
+                  raise SystemExit("Guide load function was not found")
+              editor = editor.replace(load_anchor, auto_load + load_anchor, 1)
+
+          editor_page.write_text(editor)
+
+          old_page.write_text('''import type { GetServerSideProps } from "next";
+
+export const getServerSideProps: GetServerSideProps = async ({ query }) => {
+  const slug = typeof query.slug === "string" ? query.slug : "";
+  const suffix = slug ? `?slug=${encodeURIComponent(slug)}` : "";
+
+  return {
+    redirect: {
+      destination: `/admin/guide-editor${suffix}`,
+      permanent: false,
+    },
+  };
+};
+
+export default function LegacyGuideImagesPage() {
+  return null;
+}
+''')
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or ".git" in path.parts:
+                  continue
+              if path.suffix not in {".js", ".ts", ".tsx", ".md"}:
+                  continue
+              content = path.read_text()
+              updated = content.replace('/admin/guide-images', '/admin/guide-editor')
+              if updated != content:
+                  path.write_text(updated)
+
+          guide_page = Path("pages/guides/[slug].tsx")
+          guide = guide_page.read_text()
+          guide = guide.replace(
+              'import Link from "next/link";\n',
+              'import Link from "next/link";\nimport { useSession } from "next-auth/react";\n',
+              1,
+          )
+          guide = guide.replace(
+              '  const hasSequence = previousGuide || nextGuide;\n',
+              '''  const { data: session } = useSession();
+  const isAdmin =
+    (session?.user as { role?: string } | undefined)?.role === "admin";
+  const hasSequence = previousGuide || nextGuide;
+''',
+              1,
+          )
+          layout_anchor = '''    <GuideLayout
+      title={guide.title}
+      description={guide.description}
+      date={guide.date}
+    >
+'''
+          admin_action = layout_anchor + '''      {isAdmin && (
+        <div className="guide-admin-actions">
+          <Link
+            href={{ pathname: "/admin/guide-editor", query: { slug: guide.slug } }}
+          >
+            Edit this guide
+          </Link>
+        </div>
+      )}
+
+'''
+          if 'className="guide-admin-actions"' not in guide:
+              if layout_anchor not in guide:
+                  raise SystemExit("Guide layout insertion point was not found")
+              guide = guide.replace(layout_anchor, admin_action, 1)
+
+          css_anchor = '''      <style jsx>{`
+        .guide-cover {
+'''
+          css_replacement = '''      <style jsx>{`
+        .guide-admin-actions {
+          display: flex;
+          justify-content: flex-end;
+          margin: 0 0 18px;
+        }
+
+        .guide-admin-actions a {
+          border: 1px solid #238636;
+          border-radius: 8px;
+          padding: 8px 12px;
+          background: rgba(35, 134, 54, 0.15);
+          color: #7ee787;
+          font-weight: 800;
+          text-decoration: none;
+        }
+
+        .guide-admin-actions a:hover,
+        .guide-admin-actions a:focus-visible {
+          background: rgba(35, 134, 54, 0.3);
+          outline: none;
+        }
+
+        .guide-cover {
+'''
+          if '.guide-admin-actions {' not in guide:
+              if css_anchor not in guide:
+                  raise SystemExit("Guide CSS insertion point was not found")
+              guide = guide.replace(css_anchor, css_replacement, 1)
+
+          guide_page.write_text(guide)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Validate published guide editing
+        run: |
+          test -f pages/admin/guide-editor.tsx
+          grep -q 'pathname: "/admin/guide-editor"' 'pages/guides/[slug].tsx'
+          grep -q 'Edit this guide' 'pages/guides/[slug].tsx'
+          grep -q 'router.query.slug' pages/admin/guide-editor.tsx
+          grep -q 'destination: `/admin/guide-editor' pages/admin/guide-images.tsx
+          grep -q 'href="/admin/guide-editor"' components/Navbar.js
+          grep -q 'method: "PATCH"' pages/admin/guide-editor.tsx
+          grep -q 'Save published guide' pages/admin/guide-editor.tsx
+
+      - name: Commit feature changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/Navbar.js pages/admin pages/guides/'[slug].tsx'
+          git commit -m "Fix published guide editor access"
+          git push origin HEAD:fix/published-guide-editor
