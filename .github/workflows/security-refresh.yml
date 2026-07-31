@@ -36,10 +36,10 @@ jobs:
         run: |
           npm pkg set 'dependencies.next=^15.5.22'
           npm pkg set 'dependencies.next-auth=^4.24.15'
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
 
       - name: Apply remaining non-breaking npm fixes
-        run: npm audit fix --package-lock-only || true
+        run: npm audit fix --package-lock-only --ignore-scripts || true
 
       - name: Install refreshed dependency tree
         run: npm ci
