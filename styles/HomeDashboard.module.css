@@ -1,0 +1,174 @@
+.page {
+  padding-top: 38px;
+  padding-bottom: 64px;
+}
+
+.hero {
+  margin-bottom: 26px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #3fb950;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.4rem, 7vw, 4.6rem);
+  line-height: 1;
+}
+
+.intro {
+  max-width: 680px;
+  margin: 14px 0 0;
+  color: #8b949e;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  min-height: 210px;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  padding: 22px;
+  background: #161b22;
+  color: #f0f6fc;
+  text-decoration: none;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.card:hover,
+.card:focus-visible {
+  transform: translateY(-3px);
+  border-color: #58a6ff;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+  outline: none;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  border: 1px solid #30363d;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #8b949e;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.card h2 {
+  margin: 22px 0 8px;
+  font-size: 1.65rem;
+}
+
+.card p {
+  margin: 0;
+  color: #b1bac4;
+  line-height: 1.55;
+}
+
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 24px;
+  color: #79c0ff;
+  font-weight: 800;
+}
+
+.friendCodes {
+  background:
+    radial-gradient(circle at top right, rgba(163, 113, 247, 0.22), transparent 42%),
+    #161b22;
+}
+
+.events {
+  background:
+    radial-gradient(circle at top right, rgba(46, 160, 67, 0.22), transparent 42%),
+    #161b22;
+}
+
+.guides {
+  background:
+    radial-gradient(circle at top right, rgba(56, 139, 253, 0.22), transparent 42%),
+    #161b22;
+}
+
+.gyms {
+  background:
+    radial-gradient(circle at top right, rgba(242, 204, 96, 0.2), transparent 42%),
+    #161b22;
+}
+
+.admin {
+  grid-column: 1 / -1;
+  min-height: 180px;
+  border-color: #6e5500;
+  background:
+    radial-gradient(circle at top right, rgba(242, 204, 96, 0.2), transparent 36%),
+    linear-gradient(135deg, #1f1b0d, #161b22 68%);
+}
+
+.admin .label {
+  border-color: #6e5500;
+  color: #f2cc60;
+}
+
+.loginNote {
+  margin: 20px 0 0;
+  color: #8b949e;
+  text-align: center;
+}
+
+.loginNote a {
+  color: #79c0ff;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding-top: 24px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin {
+    grid-column: auto;
+  }
+
+  .card {
+    min-height: 185px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}
