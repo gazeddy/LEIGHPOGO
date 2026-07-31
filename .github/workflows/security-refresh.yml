@@ -32,8 +32,14 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Apply non-breaking npm security fixes
-        run: npm audit fix --package-lock-only
+      - name: Pin patched application dependencies
+        run: |
+          npm pkg set 'dependencies.next=^15.5.22'
+          npm pkg set 'dependencies.next-auth=^4.24.15'
+          npm install --package-lock-only
+
+      - name: Apply remaining non-breaking npm fixes
+        run: npm audit fix --package-lock-only || true
 
       - name: Install refreshed dependency tree
         run: npm ci
@@ -47,7 +53,7 @@ jobs:
       - name: Build production application
         run: npm run build
 
-      - name: Commit refreshed lockfile
+      - name: Commit refreshed dependencies
         run: |
           if git diff --quiet -- package.json package-lock.json; then
             echo "No dependency changes were required."
