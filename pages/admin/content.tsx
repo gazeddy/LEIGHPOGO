@@ -4,11 +4,12 @@ import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { useMemo, useRef, useState } from "react";
 import GuideImageUploader from "../../components/admin/GuideImageUploader";
-import { getAllGuides, type GuideSummary } from "../../lib/guides";
+import { getAllGuides, getGuideBySlug, type GuideSummary } from "../../lib/guides";
 import { authOptions } from "../api/auth/[...nextauth]";
 
 interface GuideEditorPageProps {
   initialGuides: GuideSummary[];
+  initialGuide: EditableGuide | null;
 }
 
 interface EditableGuide {
@@ -84,6 +85,30 @@ function summaryForGuide(guide: EditableGuide): GuideSummary {
   };
 }
 
+function editableGuideForSlug(slug: string): EditableGuide | null {
+  const guide = getGuideBySlug(slug);
+
+  if (!guide) {
+    return null;
+  }
+
+  return {
+    slug: guide.slug,
+    title: guide.title,
+    description: guide.description,
+    date: guide.date?.slice(0, 10) ?? "",
+    order: guide.order ?? null,
+    eventTypes: guide.eventTypes ?? [],
+    tags: guide.tags ?? [],
+    series: guide.series ?? "",
+    seriesOrder: guide.seriesOrder ?? null,
+    relatedGuides: guide.relatedGuides ?? [],
+    body: guide.content,
+    coverImage: guide.coverImage ?? "",
+    coverImageAlt: guide.coverImageAlt ?? "",
+  };
+}
+
 export const getServerSideProps: GetServerSideProps<GuideEditorPageProps> = async (
   context,
 ) => {
@@ -99,22 +124,35 @@ export const getServerSideProps: GetServerSideProps<GuideEditorPageProps> = asyn
     };
   }
 
+  const requestedSlug =
+    typeof context.query.guide === "string" ? context.query.guide : "";
+
   return {
     props: {
       initialGuides: getAllGuides(),
+      initialGuide: requestedSlug ? editableGuideForSlug(requestedSlug) : null,
     },
   };
 };
 
 export default function GuideCreatorEditorPage({
   initialGuides,
+  initialGuide,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
   const [guides, setGuides] = useState(initialGuides);
-  const [selectedSlug, setSelectedSlug] = useState(NEW_GUIDE_VALUE);
-  const [guide, setGuide] = useState<EditableGuide | null>(() => createBlankGuide());
-  const [eventTypesText, setEventTypesText] = useState("");
-  const [tagsText, setTagsText] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [selectedSlug, setSelectedSlug] = useState(
+    initialGuide?.slug ?? NEW_GUIDE_VALUE,
+  );
+  const [guide, setGuide] = useState<EditableGuide | null>(() =>
+    initialGuide ?? createBlankGuide(),
+  );
+  const [eventTypesText, setEventTypesText] = useState(
+    initialGuide?.eventTypes.join(", ") ?? "",
+  );
+  const [tagsText, setTagsText] = useState(
+    initialGuide?.tags.join(", ") ?? "",
+  );
+  const [slugTouched, setSlugTouched] = useState(Boolean(initialGuide));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

@@ -10,6 +10,7 @@ describe("unified guide creator and editor", () => {
   const editor = readSource("pages/admin/content.tsx");
   const oldEditor = readSource("pages/admin/guide-images.tsx");
   const oldLinks = readSource("pages/admin/guide-links.tsx");
+  const publishedGuide = readSource("pages/guides/[slug].tsx");
 
   it("shows one guide administration entry", () => {
     expect(navbar).toContain('href="/admin/content"');
@@ -32,6 +33,24 @@ describe("unified guide creator and editor", () => {
   it("redirects the two superseded guide tools", () => {
     expect(oldEditor).toContain('destination: "/admin/content"');
     expect(oldLinks).toContain('destination: "/admin/content"');
+  });
+
+
+  it("opens published guides directly in the unified editor", () => {
+    expect(editor).toContain("getGuideBySlug");
+    expect(editor).toContain("initialGuide: EditableGuide | null");
+    expect(editor).toContain("context.query.guide");
+    expect(editor).toContain("initialGuide?.slug ?? NEW_GUIDE_VALUE");
+    expect(publishedGuide).toContain('pathname: "/admin/content"');
+    expect(publishedGuide).toContain("query: { guide: guide.slug }");
+    expect(publishedGuide).toContain("Edit this guide");
+  });
+
+  it("preserves selected guides through legacy editor redirects", () => {
+    expect(oldEditor).toContain("context.query.slug");
+    expect(oldEditor).toContain("/admin/content?guide=");
+    expect(oldLinks).toContain("context.query.slug");
+    expect(oldLinks).toContain("/admin/content?guide=");
   });
 
   it("removes the local event creator surface and endpoint", () => {

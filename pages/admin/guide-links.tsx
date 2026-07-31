@@ -16,6 +16,18 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
+  const slug =
+    typeof context.query.slug === "string" ? context.query.slug : "";
+
+  if (slug) {
+    return {
+      redirect: {
+        destination: `/admin/content?guide=${encodeURIComponent(slug)}`,
+        permanent: false,
+      },
+    };
+  }
+
   return {
     redirect: { destination: "/admin/content", permanent: false },
   };
