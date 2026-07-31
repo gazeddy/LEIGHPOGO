@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      DATABASE_URL: file:./prisma/ci.db
+      DATABASE_URL: file:./ci.db
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ci-only-secret
     steps:
