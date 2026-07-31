@@ -49,13 +49,9 @@ export function normaliseDittoDisguises(payload: unknown): DittoDisguise[] {
   );
 }
 
-export function isDittoCacheForSeason(
-  cachedSeasonID: string | null | undefined,
-  currentSeasonID: string | null | undefined,
+export function isDittoCacheForHash(
+  cachedHash: string | null | undefined,
+  currentHash: string | null | undefined,
 ): boolean {
-  return Boolean(
-    cachedSeasonID &&
-      currentSeasonID &&
-      cachedSeasonID === currentSeasonID,
-  );
+  return Boolean(cachedHash && currentHash && cachedHash === currentHash);
 }

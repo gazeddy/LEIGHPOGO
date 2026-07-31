@@ -1,12 +1,9 @@
 const fs = require("fs")
 const path = require("path")
 const {
-  isDittoCacheForSeason,
+  isDittoCacheForHash,
   normaliseDittoDisguises,
 } = require("../../lib/ditto-disguises")
-const {
-  selectCurrentPokemonGoSeason,
-} = require("../../lib/season-server")
 
 describe("Ditto disguise helpers", () => {
   it("normalises, sorts and de-duplicates the PoGoAPI object payload", () => {
@@ -23,78 +20,28 @@ describe("Ditto disguise helpers", () => {
     ])
   })
 
-  it("keeps the cache while the ScrapedDuck season ID is unchanged", () => {
-    expect(
-      isDittoCacheForSeason(
-        "season-23-forever-forward",
-        "season-23-forever-forward",
-      ),
-    ).toBe(true)
-    expect(
-      isDittoCacheForSeason(
-        "season-23-forever-forward",
-        "season-24-next-season",
-      ),
-    ).toBe(false)
+  it("keeps the cached dataset only while its PoGoAPI hash is unchanged", () => {
+    expect(isDittoCacheForHash("same-hash", "same-hash")).toBe(true)
+    expect(isDittoCacheForHash("old-hash", "new-hash")).toBe(false)
+    expect(isDittoCacheForHash(null, "new-hash")).toBe(false)
   })
 
-  it("selects the active ScrapedDuck season using London-local timestamps", () => {
-    const events = [
-      {
-        eventID: "season-old",
-        name: "Old Season",
-        eventType: "season",
-        heading: "Season",
-        link: null,
-        image: null,
-        start: "2026-03-01T10:00:00.000",
-        end: "2026-06-02T10:00:00.000",
-      },
-      {
-        eventID: "season-23-forever-forward",
-        name: "Forever Forward",
-        eventType: "season",
-        heading: "Season",
-        link: null,
-        image: null,
-        start: "2026-06-02T10:00:00.000",
-        end: "2026-09-08T10:00:00.000",
-      },
-    ]
+  it("uses the shared daily hash manifest instead of ScrapedDuck seasons", () => {
+    const serverSource = fs.readFileSync(
+      path.join(process.cwd(), "lib/ditto-disguises-server.ts"),
+      "utf8",
+    )
 
-    expect(
-      selectCurrentPokemonGoSeason(
-        events,
-        new Date("2026-07-31T15:00:00.000Z"),
-      ),
-    ).toEqual({
-      eventID: "season-23-forever-forward",
-      name: "Forever Forward",
-      start: "2026-06-02T10:00:00.000",
-      end: "2026-09-08T10:00:00.000",
-    })
-  })
-
-  it("stops using a season at its exact ScrapedDuck end time", () => {
-    const events = [
-      {
-        eventID: "season-23-forever-forward",
-        name: "Forever Forward",
-        eventType: "season",
-        heading: "Season",
-        link: null,
-        image: null,
-        start: "2026-06-02T10:00:00.000",
-        end: "2026-09-08T10:00:00.000",
-      },
-    ]
-
-    expect(
-      selectCurrentPokemonGoSeason(
-        events,
-        new Date("2026-09-08T09:00:00.000Z"),
-      ),
-    ).toBeNull()
+    expect(serverSource).toContain(
+      "getPogoApiFileHash(DITTO_API_FILENAME)",
+    )
+    expect(serverSource).toContain(
+      'const DITTO_API_FILENAME = "possible_ditto_pokemon.json"',
+    )
+    expect(serverSource).toContain("isDittoCacheForHash")
+    expect(serverSource).toContain("!cache.sourceHash")
+    expect(serverSource).not.toContain("getCurrentPokemonGoSeason")
+    expect(serverSource).not.toContain("ScrapedDuck did not provide")
   })
 
   it("stores a successful PoGoAPI response in memory before writing the file cache", () => {
