@@ -35,6 +35,7 @@ export default function Navbar() {
 
           {session && (
             <>
+              <Link href="/trades" className="nav-item">Trades</Link>
               <Link href="/account" className="nav-item">Account</Link>
               {isAdmin && <Link href="/admin" className="nav-item">Admin Panel</Link>}
               <button
