@@ -1,0 +1,158 @@
+.page {
+  padding-top: 28px;
+  padding-bottom: 60px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.header p:last-child {
+  color: #8b949e;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #3fb950;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.links a,
+.reportDetails a {
+  color: #58a6ff;
+}
+
+.card {
+  padding: 22px;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  background: #161b22;
+}
+
+.cardHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.cardHeading h2 {
+  margin: 0 0 6px;
+}
+
+.cardHeading p,
+.empty {
+  margin: 0;
+  color: #8b949e;
+}
+
+.reportList {
+  display: grid;
+  gap: 12px;
+}
+
+.report {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid #30363d;
+  border-radius: 9px;
+  background: #0d1117;
+}
+
+.reportDetails {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.reportDetails strong,
+.reportDetails small {
+  overflow-wrap: anywhere;
+}
+
+.reportDetails small {
+  color: #8b949e;
+}
+
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions button {
+  border-radius: 7px;
+  padding: 9px 12px;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.approve {
+  border: 0;
+  background: #da3633;
+}
+
+.reject {
+  border: 1px solid #30363d;
+  background: #21262d;
+}
+
+.success,
+.error {
+  padding: 11px 14px;
+  border-radius: 8px;
+}
+
+.success {
+  border: 1px solid #238636;
+  background: rgba(35, 134, 54, 0.15);
+}
+
+.error {
+  border: 1px solid #f85149;
+  background: rgba(248, 81, 73, 0.12);
+}
+
+@media (max-width: 760px) {
+  .header,
+  .report {
+    display: grid;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions button {
+    flex: 1 1 180px;
+  }
+}

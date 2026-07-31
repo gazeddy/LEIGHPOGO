@@ -1,0 +1,37 @@
+.reportControl {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.reportButton {
+  width: 100%;
+  border: 1px solid #d29922;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff8c5;
+  color: #7d4e00;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reportButton:hover,
+.reportButton:focus-visible {
+  background: #fae17d;
+}
+
+.reportButton:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.success {
+  color: #1a7f37;
+  line-height: 1.35;
+}
+
+.error {
+  color: #cf222e;
+  line-height: 1.35;
+}

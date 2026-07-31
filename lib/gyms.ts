@@ -17,11 +17,27 @@ export interface GymRecord {
   firstSeenAt: string | null;
 }
 
+export type GymRemovalReportStatus = "pending" | "approved" | "rejected";
+
+export interface GymRemovalReport {
+  id: string;
+  gymId: string;
+  gymName: string;
+  reportedById: string;
+  reportedByIgn: string | null;
+  reportedAt: string;
+  status: GymRemovalReportStatus;
+  reviewedAt: string | null;
+  reviewedById: string | null;
+  reviewedByIgn: string | null;
+}
+
 export interface GymState {
   version: 1;
   importedAt: string | null;
   sourceFile: string | null;
   gyms: GymRecord[];
+  removalReports: GymRemovalReport[];
 }
 
 export interface GymImportSummary {
@@ -39,6 +55,7 @@ const EMPTY_STATE: GymState = {
   importedAt: null,
   sourceFile: null,
   gyms: [],
+  removalReports: [],
 };
 
 function validGym(value: unknown): value is GymRecord {
@@ -62,6 +79,31 @@ function validGym(value: unknown): value is GymRecord {
     gym.lon >= -180 &&
     gym.lon <= 180
   );
+}
+
+function validRemovalReport(value: unknown): value is GymRemovalReport {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const report = value as Partial<GymRemovalReport>;
+
+  return (
+    typeof report.id === "string" &&
+    report.id.length > 0 &&
+    typeof report.gymId === "string" &&
+    report.gymId.length > 0 &&
+    typeof report.gymName === "string" &&
+    report.gymName.length > 0 &&
+    typeof report.reportedById === "string" &&
+    report.reportedById.length > 0 &&
+    typeof report.reportedAt === "string" &&
+    ["pending", "approved", "rejected"].includes(report.status || "")
+  );
+}
+
+function optionalText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 export async function readGymState(): Promise<GymState> {
@@ -91,6 +133,15 @@ export async function readGymState(): Promise<GymState> {
             ? gym.firstSeenAt
             : null,
       })),
+      removalReports: Array.isArray(parsed.removalReports)
+        ? parsed.removalReports.filter(validRemovalReport).map((report) => ({
+            ...report,
+            reportedByIgn: optionalText(report.reportedByIgn),
+            reviewedAt: optionalText(report.reviewedAt),
+            reviewedById: optionalText(report.reviewedById),
+            reviewedByIgn: optionalText(report.reviewedByIgn),
+          }))
+        : [],
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -136,6 +187,16 @@ export function getNewGymOpacity(gym: GymRecord, now = Date.now()): number {
 export function sortGyms(gyms: GymRecord[]): GymRecord[] {
   return [...gyms].sort((left, right) =>
     getGymDisplayName(left).localeCompare(getGymDisplayName(right), "en-GB"),
+  );
+}
+
+export function approvedRemovalGymIds(
+  reports: GymRemovalReport[],
+): Set<string> {
+  return new Set(
+    reports
+      .filter((report) => report.status === "approved")
+      .map((report) => report.gymId),
   );
 }
 

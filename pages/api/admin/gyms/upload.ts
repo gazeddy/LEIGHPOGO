@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth/next";
 import { parse } from "csv-parse/sync";
 import { isCommunityGym } from "../../../../lib/communityGyms";
 import {
+  approvedRemovalGymIds,
   readGymState,
   writeGymState,
   type GymImportSummary,
@@ -243,8 +244,10 @@ export default async function handler(
 
   try {
     const buffer = decodeCsv(req.body as UploadBody);
-    const importedGyms = parseGyms(buffer);
+    const parsedGyms = parseGyms(buffer);
     const previous = await readGymState();
+    const suppressedGymIds = approvedRemovalGymIds(previous.removalReports);
+    const importedGyms = parsedGyms.filter((gym) => !suppressedGymIds.has(gym.id));
     const previousImportedGyms = previous.gyms.filter((gym) => !isCommunityGym(gym));
     const communityGyms = previous.gyms.filter(isCommunityGym);
     const previousById = new Map(previousImportedGyms.map((gym) => [gym.id, gym]));
@@ -282,7 +285,7 @@ export default async function handler(
 
     const importedIds = new Set(importedGymRecords.map((gym) => gym.id));
     const preservedCommunityGyms = communityGyms.filter(
-      (gym) => !importedIds.has(gym.id),
+      (gym) => !importedIds.has(gym.id) && !suppressedGymIds.has(gym.id),
     );
     const gyms = [...importedGymRecords, ...preservedCommunityGyms];
     const removed = previousImportedGyms.filter(
@@ -295,6 +298,7 @@ export default async function handler(
       importedAt,
       sourceFile,
       gyms,
+      removalReports: previous.removalReports,
     });
 
     const summary: GymImportSummary = {

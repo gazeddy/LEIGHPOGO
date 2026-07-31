@@ -4,6 +4,7 @@ import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import AddGymForm from "../components/gyms/AddGymForm";
+import GymRemovalReporter from "../components/gyms/GymRemovalReporter";
 import { readGymState, sortGyms } from "../lib/gyms";
 import { authOptions } from "./api/auth/[...nextauth]";
 
@@ -66,8 +67,8 @@ export default function GymsPage({
             <h1>Community gym map</h1>
             <p>
               Search official names and community aliases, find the nearest gyms,
-              add missing gyms from your current GPS location, and open turn-by-turn
-              directions in Google Maps.
+              add missing gyms, report removed gyms for admin review, and open
+              turn-by-turn directions in Google Maps.
             </p>
           </div>
           <div className="gym-legend" aria-label="Map legend">
@@ -77,6 +78,7 @@ export default function GymsPage({
           </div>
         </header>
         <AddGymForm />
+        <GymRemovalReporter gyms={gyms} />
         <GymMap gyms={gyms} importedAt={importedAt} />
       </main>
     </>
