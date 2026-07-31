@@ -74,6 +74,7 @@ export default function GuideEditorPage({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const loadedQuerySlugRef = useRef<string | null>(null);
   const seriesOptions = useMemo(
     () =>
       Array.from(
@@ -90,12 +91,13 @@ export default function GuideEditorPage({
     const requestedSlug =
       typeof router.query.slug === "string" ? router.query.slug : "";
 
-    if (!requestedSlug || requestedSlug === selectedSlug) {
+    if (!requestedSlug || loadedQuerySlugRef.current === requestedSlug) {
       return;
     }
 
+    loadedQuerySlugRef.current = requestedSlug;
     void loadGuide(requestedSlug);
-  }, [router.isReady, router.query.slug, selectedSlug]);
+  }, [router.isReady, router.query.slug]);
 
   async function loadGuide(slug: string) {
     setSelectedSlug(slug);
@@ -296,19 +298,19 @@ export default function GuideEditorPage({
               <label>
                 Event types
                 <input
-        value={eventTypesText}
-        placeholder="max-battles, max-mondays"
-        onChange={(event) => setEventTypesText(event.target.value)}
-      />
+                  value={eventTypesText}
+                  placeholder="max-battles, max-mondays"
+                  onChange={(event) => setEventTypesText(event.target.value)}
+                />
               </label>
 
               <label>
                 Tags
                 <input
-        value={tagsText}
-        placeholder="max, dynamax, gigantamax"
-        onChange={(event) => setTagsText(event.target.value)}
-      />
+                  value={tagsText}
+                  placeholder="max, dynamax, gigantamax"
+                  onChange={(event) => setTagsText(event.target.value)}
+                />
               </label>
 
               <label>
