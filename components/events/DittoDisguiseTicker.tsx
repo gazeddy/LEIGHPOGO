@@ -7,7 +7,7 @@ import type {
 
 type DittoTickerStatus = "loading" | "ready" | "error";
 
-const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function DittoItems({
   disguises,
