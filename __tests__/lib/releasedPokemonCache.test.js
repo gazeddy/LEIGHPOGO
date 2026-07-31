@@ -37,10 +37,11 @@ describe("released Pokémon cache helpers", () => {
     expect(filterReleasedDexNumbers([1, 2, 3, 999], [1, 3, 4])).toEqual([1, 3]);
   });
 
-  it("treats the cache as fresh for seven days", () => {
+  it("checks the released Pokémon hash once per day", () => {
     const now = Date.parse("2026-07-31T12:00:00.000Z");
     const cache = { checkedAt: new Date(now - CACHE_TTL_MS + 1_000).toISOString() };
 
+    expect(CACHE_TTL_MS).toBe(24 * 60 * 60 * 1000);
     expect(isCacheFresh(cache, CACHE_TTL_MS, now)).toBe(true);
     expect(
       isCacheFresh(
