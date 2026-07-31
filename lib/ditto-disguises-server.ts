@@ -23,6 +23,7 @@ interface StoredDittoCache extends DittoDisguisePayload {
   season: DittoSeason;
 }
 
+let memoryCache: StoredDittoCache | null = null;
 let refreshInFlight: Promise<StoredDittoCache> | null = null;
 
 function requiredString(value: unknown): string | null {
@@ -45,7 +46,21 @@ function normaliseSeason(value: unknown): DittoSeason | null {
     : null;
 }
 
+function cachePayload(cache: StoredDittoCache): DittoDisguisePayload {
+  return {
+    disguises: cache.disguises,
+    season: cache.season,
+    fetchedAt: cache.fetchedAt,
+    isStale: false,
+    warning: cache.warning,
+  };
+}
+
 async function readDittoCache(): Promise<StoredDittoCache | null> {
+  if (memoryCache) {
+    return memoryCache;
+  }
+
   try {
     const source = await fs.readFile(DITTO_CACHE_PATH, "utf8");
     const parsed: unknown = JSON.parse(source);
@@ -68,7 +83,7 @@ async function readDittoCache(): Promise<StoredDittoCache | null> {
       return null;
     }
 
-    return {
+    memoryCache = {
       version: DITTO_CACHE_VERSION,
       fetchedAt,
       season,
@@ -76,6 +91,8 @@ async function readDittoCache(): Promise<StoredDittoCache | null> {
       isStale: false,
       warning: null,
     };
+
+    return memoryCache;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
 
@@ -129,7 +146,18 @@ async function fetchLatestDisguises(
     warning: null,
   };
 
-  await writeDittoCache(cache);
+  // Put the successful response into memory before attempting the disk write.
+  // This prevents repeat PoGoAPI calls if the runtime can read the project but
+  // cannot persist a cache file for any reason.
+  memoryCache = cache;
+
+  try {
+    await writeDittoCache(cache);
+  } catch (error) {
+    console.error("Failed to persist Ditto disguise cache", error);
+    cache.warning =
+      "Ditto disguises are cached in memory, but the cache file could not be written.";
+  }
 
   return cache;
 }
@@ -187,17 +215,11 @@ export async function getDittoDisguiseData(): Promise<DittoDisguisePayload> {
   }
 
   if (cache && isDittoCacheForSeason(cache.season.eventID, season.eventID)) {
-    return {
-      disguises: cache.disguises,
-      season: cache.season,
-      fetchedAt: cache.fetchedAt,
-      isStale: false,
-      warning: null,
-    };
+    return cachePayload(cache);
   }
 
   try {
-    return await refreshDittoCache(season);
+    return cachePayload(await refreshDittoCache(season));
   } catch (error) {
     if (cache) {
       return staleFallback(cache, error);
