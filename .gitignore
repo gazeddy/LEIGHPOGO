@@ -3,6 +3,7 @@ node_modules
 .env
 .DS_Store
 .nextauth-secret
+/data/.cache/
 /data/events-cache.json*
 /data/local-events.json*
 /data/event-overrides.json*
