@@ -10,6 +10,7 @@ describe("ticker regression wiring", () => {
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
   const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
+  const dittoApi = readSource("pages/api/ditto-disguises.ts");
 
   it("uses a Campfire URL as the primary event link with an Events-page fallback", () => {
     expect(eventTicker).toMatch(
@@ -32,9 +33,12 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("display: none;");
   });
 
-  it("keeps the Ditto ticker public and between raids and new gyms", () => {
+  it("keeps the Ditto ticker public, cached and between raids and new gyms", () => {
     expect(dittoTicker).toContain('fetch("/api/ditto-disguises"');
     expect(dittoTicker).not.toContain("useSession");
+    expect(dittoTicker).not.toContain('cache: "no-store"');
+    expect(dittoApi).toContain("max-age=3600");
+    expect(dittoApi).toContain("s-maxage=86400");
     expect(dittoTicker).toContain("<DittoItems disguises={disguises} />");
     expect(dittoTicker).toContain("<DittoItems disguises={disguises} duplicate />");
 
