@@ -16,6 +16,7 @@ model User {
   role           String         @default("user")
   searchStrings  SearchString[]
   pokedexEntries PokedexEntry[]
+  tradeListings  TradeListing[]
 }
 
 model Entry {
@@ -48,4 +49,36 @@ model PokedexEntry {
   updatedAt DateTime @updatedAt
 
   @@unique([ownerId, dexNumber])
+}
+
+model TradeListing {
+  id        Int                @id @default(autoincrement())
+  ownerId   Int
+  owner     User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  location  String?
+  notes     String?
+  status    String             @default("ACTIVE")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  expiresAt DateTime
+  items     TradeListingItem[]
+
+  @@index([status, expiresAt])
+  @@index([ownerId, createdAt])
+}
+
+model TradeListingItem {
+  id          Int          @id @default(autoincrement())
+  listingId   Int
+  listing     TradeListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  direction   String
+  pokemonName String
+  shiny       Boolean      @default(false)
+  costume     Boolean      @default(false)
+  background  Boolean      @default(false)
+  dynamax     Boolean      @default(false)
+  gigantamax  Boolean      @default(false)
+  notes       String?
+
+  @@index([listingId, direction])
 }
