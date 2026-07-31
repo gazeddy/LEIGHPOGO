@@ -48,7 +48,7 @@ function isCacheFresh(
   cache: StoredDittoCache | null,
   now: number = Date.now(),
 ): boolean {
-  if (!cache?.checkedAt) {
+  if (!cache?.checkedAt || !cache.sourceHash) {
     return false;
   }
 
