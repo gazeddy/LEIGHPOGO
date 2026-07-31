@@ -32,6 +32,12 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Audit complete dependency tree
+        run: npm audit --audit-level=high
+
+      - name: Run lint checks
+        run: npm run lint
+
       - name: Run tests
         run: npm test -- --runInBand
 
