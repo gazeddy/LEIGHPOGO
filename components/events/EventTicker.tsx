@@ -63,30 +63,41 @@ function TickerItems({
     >
       {items.map((item) => {
         const key = `${duplicate ? "duplicate-" : ""}${item.eventID}`;
+        const primaryContent = (
+          <>
+            <span className="ticker-heading">{item.heading}</span>
+            <span className="ticker-name">{item.name}</span>
+            <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
+            {item.eventUrl && item.eventUrlLabel && (
+              <span className="ticker-action ticker-meetup">
+                {item.eventUrlLabel} ↗
+              </span>
+            )}
+          </>
+        );
 
         return (
           <span key={key} className="ticker-item">
-            <Link
-              href={{ pathname: "/events", query: { event: item.eventID } }}
-              className="ticker-event-link"
-              tabIndex={duplicate ? -1 : undefined}
-              title={`View ${item.name} on the Events page`}
-            >
-              <span className="ticker-heading">{item.heading}</span>
-              <span className="ticker-name">{item.name}</span>
-              <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
-            </Link>
-
-            {item.eventUrl && item.eventUrlLabel && (
+            {item.eventUrl ? (
               <a
                 href={item.eventUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ticker-action ticker-meetup"
+                className="ticker-event-link"
                 tabIndex={duplicate ? -1 : undefined}
+                title={`Open ${item.eventUrlLabel || "Campfire meetup"} for ${item.name}`}
               >
-                {item.eventUrlLabel} ↗
+                {primaryContent}
               </a>
+            ) : (
+              <Link
+                href={{ pathname: "/events", query: { event: item.eventID } }}
+                className="ticker-event-link"
+                tabIndex={duplicate ? -1 : undefined}
+                title={`View ${item.name} on the Events page`}
+              >
+                {primaryContent}
+              </Link>
             )}
 
             {item.guideSlug && item.guideTitle && (
