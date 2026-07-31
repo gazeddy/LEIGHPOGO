@@ -33,7 +33,7 @@ function coordinate(
   const maximum = field === "latitude" ? 90 : 180;
 
   if (!Number.isFinite(number) || number < minimum || number > maximum) {
-    throw new Error(`The GPS ${field} is invalid.`);
+    throw new Error(`The ${field} is invalid.`);
   }
 
   return number;
@@ -79,7 +79,7 @@ export default async function handler(
 
     res.setHeader("Cache-Control", "private, no-store");
     return res.status(201).json({
-      message: "Gym added at your current location.",
+      message: "Gym added successfully.",
       gym,
     });
   } catch (error) {
