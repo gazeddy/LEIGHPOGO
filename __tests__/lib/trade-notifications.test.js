@@ -1,3 +1,6 @@
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || "file:trade-notification-tests?mode=memory&cache=shared"
+
 const {
   tradeModifierLabels,
   wantedTradeMatchesOffer,
