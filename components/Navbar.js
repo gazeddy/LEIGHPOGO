@@ -106,6 +106,9 @@ export default function Navbar() {
                   <Link href="/trades" className="nav-item nav-subitem">
                     Trades
                   </Link>
+                  <Link href="/trades/wanted" className="nav-item nav-subitem">
+                    Wanted Trades
+                  </Link>
                 </>
               )}
             </div>
