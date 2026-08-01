@@ -15,6 +15,9 @@ import {
 
 const attributeLabels = (item) => [
   item.shiny && "Shiny",
+  item.lucky && "Lucky",
+  item.xxl && "XXL",
+  item.xxs && "XXS",
   item.costume && "Costume",
   item.background && "Special background",
   item.dynamax && "Dynamax",
