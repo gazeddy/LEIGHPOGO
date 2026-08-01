@@ -1,0 +1,87 @@
+.wanted-trade-card {
+  display: grid;
+  align-content: space-between;
+  gap: 18px;
+  min-height: 220px;
+}
+
+.wanted-card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.wanted-pokemon-sprite {
+  width: 76px;
+  height: 76px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.wanted-card-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.wanted-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wanted-card-heading h2 {
+  margin-top: 2px;
+}
+
+.wanted-dex-number {
+  font-family: monospace;
+}
+
+.wanted-modifier-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.wanted-modifier {
+  display: inline-flex;
+  padding: 4px 8px;
+  border: 1px solid #6e40c9;
+  border-radius: 999px;
+  background: #271052;
+  color: #d2a8ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.wanted-notes {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
+.wanted-owner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #30363d;
+}
+
+.wanted-owner code {
+  color: #9ecbff;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .wanted-owner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wanted-card-main {
+    flex-direction: column;
+  }
+}
