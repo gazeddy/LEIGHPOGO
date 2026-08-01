@@ -18,7 +18,7 @@ const notificationMessage = (notification) => {
   return `${notification.listing.owner.ign} listed ${modifiers}${notification.pokemonName}, matching your wanted list.`
 }
 
-export default function NotificationsPage({ initialNotifications }) {
+export default function NotificationsPage({ initialNotifications, renderedAt }) {
   const router = useRouter()
   const [notifications, setNotifications] = useState(initialNotifications)
   const unreadCount = notifications.filter((notification) => !notification.readAt).length
@@ -92,7 +92,7 @@ export default function NotificationsPage({ initialNotifications }) {
             const isAvailable =
               notification.listing.status === "ACTIVE" &&
               notification.listing.expiresAt &&
-              new Date(notification.listing.expiresAt).getTime() > Date.now()
+              new Date(notification.listing.expiresAt).getTime() > renderedAt
 
             return (
               <article
@@ -152,6 +152,7 @@ export async function getServerSideProps(context) {
   return {
     props: {
       initialNotifications: notifications.map(serializeTradeNotification),
+      renderedAt: Date.now(),
     },
   }
 }
