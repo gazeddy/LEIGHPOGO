@@ -14,6 +14,8 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "You must be logged in." })
   }
 
+  res.setHeader("Cache-Control", "private, no-store")
+
   if (req.method !== "PUT") {
     res.setHeader("Allow", ["PUT"])
     return res.status(405).json({ error: "Method not allowed" })
