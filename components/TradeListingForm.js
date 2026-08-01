@@ -3,6 +3,9 @@ import { useState } from "react"
 const emptyItem = () => ({
   pokemonName: "",
   shiny: false,
+  lucky: false,
+  xxl: false,
+  xxs: false,
   costume: false,
   background: false,
   dynamax: false,
@@ -10,11 +13,24 @@ const emptyItem = () => ({
   notes: "",
 })
 
+const itemSize = (item) => {
+  if (item.xxl) return "XXL"
+  if (item.xxs) return "XXS"
+  return "ANY"
+}
+
 function TradeItemsEditor({ title, items, onChange }) {
   const updateItem = (index, patch) => {
     onChange(items.map((item, itemIndex) => (
       itemIndex === index ? { ...item, ...patch } : item
     )))
+  }
+
+  const updateItemSize = (index, size) => {
+    updateItem(index, {
+      xxl: size === "XXL",
+      xxs: size === "XXS",
+    })
   }
 
   const removeItem = (index) => {
@@ -62,9 +78,32 @@ function TradeItemsEditor({ title, items, onChange }) {
               />
             </label>
 
+            <fieldset className="trade-size-fieldset">
+              <legend>Size</legend>
+              <div className="trade-flags">
+                {[
+                  ["ANY", "Any size"],
+                  ["XXL", "XXL"],
+                  ["XXS", "XXS"],
+                ].map(([value, label]) => (
+                  <label className="checkbox" key={value}>
+                    <input
+                      type="radio"
+                      name={`${title}-${index}-size`}
+                      value={value}
+                      checked={itemSize(item) === value}
+                      onChange={() => updateItemSize(index, value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <div className="trade-flags">
               {[
                 ["shiny", "Shiny"],
+                ["lucky", "Lucky"],
                 ["costume", "Costume"],
                 ["background", "Special background"],
                 ["dynamax", "Dynamax"],
@@ -73,7 +112,7 @@ function TradeItemsEditor({ title, items, onChange }) {
                 <label className="checkbox" key={key}>
                   <input
                     type="checkbox"
-                    checked={item[key]}
+                    checked={Boolean(item[key])}
                     onChange={(event) => updateItem(index, { [key]: event.target.checked })}
                   />
                   {label}
@@ -85,7 +124,7 @@ function TradeItemsEditor({ title, items, onChange }) {
               Item notes
               <input
                 type="text"
-                value={item.notes}
+                value={item.notes || ""}
                 onChange={(event) => updateItem(index, { notes: event.target.value })}
                 maxLength={250}
                 placeholder="Form, level, legacy move, or anything else useful"

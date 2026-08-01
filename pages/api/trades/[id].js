@@ -6,12 +6,21 @@ import {
   purgeExpiredTradeListings,
   tradeListingInclude,
 } from "../../../lib/tradeServer"
+import { syncWantedTradeNotificationsForListing } from "../../../lib/tradeNotifications"
 import {
   serializeTradeListing,
   validateTradeListingPayload,
 } from "../../../lib/tradeUtils"
 
 const VALID_STATUSES = ["ACTIVE", "CLOSED"]
+
+const createMatchNotifications = async (listing) => {
+  try {
+    await syncWantedTradeNotificationsForListing(listing)
+  } catch (error) {
+    console.error("Unable to create wishlist match notifications", error)
+  }
+}
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions)
@@ -99,6 +108,10 @@ export default async function handler(req, res) {
       data,
       include: tradeListingInclude,
     })
+
+    if (hasListingContent && updated.status === "ACTIVE") {
+      await createMatchNotifications(updated)
+    }
 
     return res.status(200).json(serializeTradeListing(updated))
   }
