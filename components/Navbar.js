@@ -11,6 +11,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     const closeNavigation = () => {
@@ -22,6 +23,38 @@ export default function Navbar() {
     router.events.on("routeChangeStart", closeNavigation);
     return () => router.events.off("routeChangeStart", closeNavigation);
   }, [router.events]);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setUnreadNotifications(0);
+      return undefined;
+    }
+
+    let isActive = true;
+
+    const loadUnreadNotifications = async () => {
+      try {
+        const response = await fetch("/api/notifications?summary=1");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (isActive) setUnreadNotifications(Number(data.unreadCount) || 0);
+      } catch {
+        // Keep navigation usable if the notification endpoint is temporarily unavailable.
+      }
+    };
+
+    loadUnreadNotifications();
+    const interval = window.setInterval(loadUnreadNotifications, 60_000);
+    router.events.on("routeChangeComplete", loadUnreadNotifications);
+    window.addEventListener("trade-notifications-updated", loadUnreadNotifications);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+      router.events.off("routeChangeComplete", loadUnreadNotifications);
+      window.removeEventListener("trade-notifications-updated", loadUnreadNotifications);
+    };
+  }, [router.events, session?.user?.id]);
 
   if (status === "loading") return null;
 
@@ -117,6 +150,14 @@ export default function Navbar() {
           {session && (
             <>
               <Link href="/account" className="nav-item">Account</Link>
+              <Link href="/notifications" className="nav-item nav-notifications">
+                <span>Notifications</span>
+                {unreadNotifications > 0 && (
+                  <span className="nav-notification-count" aria-label={`${unreadNotifications} unread notifications`}>
+                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                  </span>
+                )}
+              </Link>
 
               {isAdmin && (
                 <div className={`nav-group nav-group-admin ${adminOpen ? "open" : ""}`}>
