@@ -8,6 +8,7 @@ process.env.DATABASE_URL =
 
 const { createMocks } = require("node-mocks-http")
 const { getServerSession } = require("next-auth/next")
+const { syncWantedTradeNotificationsForListing } = require("../../lib/tradeNotifications")
 
 jest.mock("next-auth/next", () => ({
   getServerSession: jest.fn(),
@@ -15,6 +16,10 @@ jest.mock("next-auth/next", () => ({
 
 jest.mock("../../pages/api/auth/[...nextauth]", () => ({
   authOptions: {},
+}))
+
+jest.mock("../../lib/tradeNotifications", () => ({
+  syncWantedTradeNotificationsForListing: jest.fn().mockResolvedValue([]),
 }))
 
 const prisma = require("../../lib/prisma")
@@ -73,6 +78,9 @@ const ensureSchema = async () => {
       "direction" TEXT NOT NULL,
       "pokemonName" TEXT NOT NULL,
       "shiny" BOOLEAN NOT NULL DEFAULT false,
+      "lucky" BOOLEAN NOT NULL DEFAULT false,
+      "xxl" BOOLEAN NOT NULL DEFAULT false,
+      "xxs" BOOLEAN NOT NULL DEFAULT false,
       "costume" BOOLEAN NOT NULL DEFAULT false,
       "background" BOOLEAN NOT NULL DEFAULT false,
       "dynamax" BOOLEAN NOT NULL DEFAULT false,
@@ -116,6 +124,7 @@ beforeEach(async () => {
   await prisma.entry.deleteMany()
   await prisma.user.deleteMany()
   jest.clearAllMocks()
+  syncWantedTradeNotificationsForListing.mockResolvedValue([])
 })
 
 afterAll(async () => {
@@ -145,7 +154,7 @@ describe("POST /api/trades", () => {
     expect(JSON.parse(res._getData()).code).toBe("FRIEND_CODE_REQUIRED")
   })
 
-  it("creates a listing that expires one calendar month later", async () => {
+  it("creates a listing with complete modifiers and triggers match notifications", async () => {
     const user = await createUser()
     getServerSession.mockResolvedValueOnce({
       user: { id: user.id, ign: user.ign, role: user.role },
@@ -156,7 +165,12 @@ describe("POST /api/trades", () => {
       body: {
         location: "Leigh town centre",
         notes: "Available evenings",
-        offeredItems: [{ pokemonName: "Mewtwo", shiny: true }],
+        offeredItems: [{
+          pokemonName: "Mewtwo",
+          shiny: true,
+          lucky: true,
+          xxl: true,
+        }],
         wantedItems: [{ pokemonName: "Rayquaza" }],
       },
     })
@@ -166,11 +180,38 @@ describe("POST /api/trades", () => {
     expect(res._getStatusCode()).toBe(201)
     const payload = JSON.parse(res._getData())
     expect(payload.items).toHaveLength(2)
+    expect(payload.items[0]).toMatchObject({
+      pokemonName: "Mewtwo",
+      shiny: true,
+      lucky: true,
+      xxl: true,
+      xxs: false,
+    })
+    expect(syncWantedTradeNotificationsForListing).toHaveBeenCalledTimes(1)
 
     const createdAt = new Date(payload.createdAt)
     const expiresAt = new Date(payload.expiresAt)
     expect(expiresAt.getTime()).toBeGreaterThan(createdAt.getTime() + 27 * 86400000)
     expect(expiresAt.getTime()).toBeLessThan(createdAt.getTime() + 32 * 86400000)
+  })
+
+  it("rejects a Pokémon marked as both XXL and XXS", async () => {
+    const user = await createUser()
+    getServerSession.mockResolvedValueOnce({
+      user: { id: user.id, ign: user.ign, role: user.role },
+    })
+    const { req, res } = createMocks({
+      method: "POST",
+      body: {
+        offeredItems: [{ pokemonName: "Pikachu", xxl: true, xxs: true }],
+        wantedItems: [{ pokemonName: "Eevee" }],
+      },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(400)
+    expect(JSON.parse(res._getData()).error).toContain("both XXL and XXS")
   })
 })
 
