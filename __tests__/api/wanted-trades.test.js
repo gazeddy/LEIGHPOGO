@@ -1,6 +1,8 @@
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || "file:wanted-trade-tests?mode=memory&cache=shared"
 
+const fs = require("fs")
+const path = require("path")
 const { createMocks } = require("node-mocks-http")
 const { getServerSession } = require("next-auth/next")
 
@@ -60,6 +62,7 @@ const ensureSchema = async () => {
       "dexNumber" INTEGER NOT NULL,
       "pokemonName" TEXT NOT NULL,
       "shiny" BOOLEAN NOT NULL DEFAULT false,
+      "lucky" BOOLEAN NOT NULL DEFAULT false,
       "xxl" BOOLEAN NOT NULL DEFAULT false,
       "xxs" BOOLEAN NOT NULL DEFAULT false,
       "costume" BOOLEAN NOT NULL DEFAULT false,
@@ -133,6 +136,7 @@ describe("POST /api/trades/wanted", () => {
       body: {
         dexNumber: 25,
         shiny: true,
+        lucky: true,
         xxl: true,
         costume: true,
         notes: "Libre Pikachu",
@@ -147,6 +151,7 @@ describe("POST /api/trades/wanted", () => {
       dexNumber: 25,
       pokemonName: "Pikachu",
       shiny: true,
+      lucky: true,
       xxl: true,
       xxs: false,
       costume: true,
@@ -168,7 +173,7 @@ describe("POST /api/trades/wanted", () => {
     expect(JSON.parse(res._getData()).error).toContain("both XXL and XXS")
   })
 
-  it("blocks an exact duplicate for the same trainer", async () => {
+  it("blocks an exact duplicate for the same trainer including Lucky", async () => {
     const user = await createUser()
     await prisma.wantedTrade.create({
       data: {
@@ -176,18 +181,55 @@ describe("POST /api/trades/wanted", () => {
         dexNumber: 150,
         pokemonName: "Mewtwo",
         shiny: true,
+        lucky: true,
       },
     })
 
     authenticate(user)
     const { req, res } = createMocks({
       method: "POST",
-      body: { dexNumber: 150, shiny: true },
+      body: { dexNumber: 150, shiny: true, lucky: true },
     })
 
     await collectionHandler(req, res)
 
     expect(res._getStatusCode()).toBe(409)
+  })
+
+  it("allows Lucky and non-Lucky requests as separate modifier combinations", async () => {
+    const user = await createUser()
+    await prisma.wantedTrade.create({
+      data: {
+        ownerId: user.id,
+        dexNumber: 150,
+        pokemonName: "Mewtwo",
+        shiny: true,
+        lucky: false,
+      },
+    })
+
+    authenticate(user)
+    const { req, res } = createMocks({
+      method: "POST",
+      body: { dexNumber: 150, shiny: true, lucky: true },
+    })
+
+    await collectionHandler(req, res)
+
+    expect(res._getStatusCode()).toBe(201)
+    expect(await prisma.wantedTrade.count()).toBe(2)
+  })
+})
+
+describe("wanted trades page", () => {
+  it("offers and displays the Lucky modifier", () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "pages/trades/wanted.js"),
+      "utf8",
+    )
+
+    expect(source).toContain('["lucky", "Lucky"]')
+    expect(source).toContain('entry.lucky && "Lucky"')
   })
 })
 
