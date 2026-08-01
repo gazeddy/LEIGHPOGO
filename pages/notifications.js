@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { useState } from "react"
 import { useRouter } from "next/router"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "./api/auth/[...nextauth]"
@@ -19,7 +20,7 @@ const notificationMessage = (notification) => {
 
 export default function NotificationsPage({ initialNotifications }) {
   const router = useRouter()
-  const [notifications, setNotifications] = React.useState(initialNotifications)
+  const [notifications, setNotifications] = useState(initialNotifications)
   const unreadCount = notifications.filter((notification) => !notification.readAt).length
 
   const notifyNavbar = () => {
