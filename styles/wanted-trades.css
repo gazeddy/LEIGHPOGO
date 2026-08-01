@@ -1,3 +1,67 @@
+.wanted-trades-page {
+  max-width: 1100px;
+}
+
+.wanted-trades-hero,
+.wanted-board-heading,
+.wanted-card-heading,
+.wanted-owner,
+.wanted-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wanted-trade-form {
+  display: grid;
+  gap: 18px;
+}
+
+.wanted-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.wanted-fieldset {
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.wanted-fieldset legend {
+  padding: 0 7px;
+  font-weight: 700;
+}
+
+.wanted-radio-row,
+.wanted-modifier-grid,
+.wanted-modifier-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.wanted-form-actions {
+  justify-content: flex-start;
+}
+
+.wanted-board-heading {
+  margin: 28px 0 14px;
+  align-items: end;
+}
+
+.wanted-board-search {
+  width: min(340px, 100%);
+}
+
+.wanted-trade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
 .wanted-trade-card {
   display: grid;
   align-content: space-between;
@@ -24,10 +88,7 @@
 }
 
 .wanted-card-heading {
-  display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .wanted-card-heading h2 {
@@ -39,8 +100,6 @@
 }
 
 .wanted-modifier-list {
-  display: flex;
-  flex-wrap: wrap;
   gap: 7px;
   margin-top: 10px;
 }
@@ -62,10 +121,7 @@
 }
 
 .wanted-owner {
-  display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
   padding-top: 14px;
   border-top: 1px solid #30363d;
 }
@@ -76,9 +132,21 @@
 }
 
 @media (max-width: 700px) {
-  .wanted-owner {
+  .wanted-trades-hero,
+  .wanted-board-heading,
+  .wanted-owner,
+  .wanted-form-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .wanted-picker-grid,
+  .wanted-trade-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wanted-board-search {
+    width: 100%;
   }
 
   .wanted-card-main {
