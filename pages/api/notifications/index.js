@@ -19,6 +19,8 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "You must be logged in." })
   }
 
+  res.setHeader("Cache-Control", "private, no-store")
+
   if (req.method === "GET") {
     const unreadCount = await prisma.tradeNotification.count({
       where: {
