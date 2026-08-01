@@ -98,9 +98,14 @@ export default function TradesPage({ listings, myListings }) {
             Listings are private to registered traders and expire one month after creation.
           </p>
         </div>
-        <Link className="button-link" href="/trades/new">
-          Create listing
-        </Link>
+        <div className="trade-card-actions">
+          <Link className="button-link secondary-button" href="/trades/wanted">
+            Wanted board
+          </Link>
+          <Link className="button-link" href="/trades/new">
+            Create listing
+          </Link>
+        </div>
       </div>
 
       <section>
