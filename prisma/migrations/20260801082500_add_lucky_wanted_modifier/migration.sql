@@ -1,0 +1,1 @@
+ALTER TABLE "WantedTrade" ADD COLUMN "lucky" BOOLEAN NOT NULL DEFAULT false;

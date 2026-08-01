@@ -14,17 +14,28 @@ import {
 
 const modifierDefinitions = [
   ["shiny", "Shiny"],
+  ["lucky", "Lucky"],
   ["costume", "Costume"],
   ["background", "Special background"],
   ["dynamax", "Dynamax"],
   ["gigantamax", "Gigantamax"],
 ]
 
+const emptyModifiers = () => ({
+  shiny: false,
+  lucky: false,
+  costume: false,
+  background: false,
+  dynamax: false,
+  gigantamax: false,
+})
+
 const pokemonSpriteUrl = (dexNumber) =>
   `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber}.png`
 
 const entryModifiers = (entry) => [
   entry.shiny && "Shiny",
+  entry.lucky && "Lucky",
   entry.xxl && "XXL",
   entry.xxs && "XXS",
   entry.costume && "Costume",
@@ -108,13 +119,7 @@ export default function WantedTradesPage({
   const [pokemonSearch, setPokemonSearch] = useState("")
   const [selectedDexNumber, setSelectedDexNumber] = useState("")
   const [sizeModifier, setSizeModifier] = useState("ANY")
-  const [modifiers, setModifiers] = useState({
-    shiny: false,
-    costume: false,
-    background: false,
-    dynamax: false,
-    gigantamax: false,
-  })
+  const [modifiers, setModifiers] = useState(emptyModifiers)
   const [notes, setNotes] = useState("")
   const [boardSearch, setBoardSearch] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -123,9 +128,10 @@ export default function WantedTradesPage({
   const matchingPokemon = useMemo(() => {
     const query = pokemonSearch.trim().toLowerCase()
     const matches = query
-      ? pokemonOptions.filter((pokemon) =>
-          pokemon.name.toLowerCase().includes(query) ||
-          String(pokemon.dexNumber).includes(query),
+      ? pokemonOptions.filter(
+          (pokemon) =>
+            pokemon.name.toLowerCase().includes(query) ||
+            String(pokemon.dexNumber).includes(query),
         )
       : pokemonOptions
 
@@ -136,12 +142,13 @@ export default function WantedTradesPage({
     const query = boardSearch.trim().toLowerCase()
     if (!query) return entries
 
-    return entries.filter((entry) =>
-      entry.pokemonName.toLowerCase().includes(query) ||
-      entry.owner.ign.toLowerCase().includes(query) ||
-      entryModifiers(entry).some((modifier) =>
-        modifier.toLowerCase().includes(query),
-      ),
+    return entries.filter(
+      (entry) =>
+        entry.pokemonName.toLowerCase().includes(query) ||
+        entry.owner.ign.toLowerCase().includes(query) ||
+        entryModifiers(entry).some((modifier) =>
+          modifier.toLowerCase().includes(query),
+        ),
     )
   }, [boardSearch, entries])
 
@@ -149,13 +156,7 @@ export default function WantedTradesPage({
     setPokemonSearch("")
     setSelectedDexNumber("")
     setSizeModifier("ANY")
-    setModifiers({
-      shiny: false,
-      costume: false,
-      background: false,
-      dynamax: false,
-      gigantamax: false,
-    })
+    setModifiers(emptyModifiers())
     setNotes("")
   }
 
@@ -372,167 +373,6 @@ export default function WantedTradesPage({
           </div>
         )}
       </section>
-
-      <style jsx>{`
-        .wanted-trades-page {
-          max-width: 1100px;
-        }
-
-        .wanted-trades-hero,
-        .wanted-board-heading,
-        .wanted-card-heading,
-        .wanted-owner,
-        .wanted-form-actions {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-        }
-
-        .wanted-trade-form {
-          display: grid;
-          gap: 18px;
-        }
-
-        .wanted-picker-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-        }
-
-        .wanted-fieldset {
-          border: 1px solid #30363d;
-          border-radius: 10px;
-          padding: 14px;
-        }
-
-        .wanted-fieldset legend {
-          padding: 0 7px;
-          font-weight: 700;
-        }
-
-        .wanted-radio-row,
-        .wanted-modifier-grid,
-        .wanted-modifier-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px 16px;
-        }
-
-        .wanted-form-actions {
-          justify-content: flex-start;
-        }
-
-        .wanted-board-heading {
-          margin: 28px 0 14px;
-          align-items: end;
-        }
-
-        .wanted-board-search {
-          width: min(340px, 100%);
-        }
-
-        .wanted-trade-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-          gap: 16px;
-        }
-
-        :global(.wanted-trade-card) {
-          display: grid;
-          align-content: space-between;
-          gap: 18px;
-          min-height: 220px;
-        }
-
-        .wanted-card-main {
-          display: flex;
-          align-items: flex-start;
-          gap: 14px;
-        }
-
-        .wanted-pokemon-sprite {
-          width: 76px;
-          height: 76px;
-          flex: 0 0 auto;
-          object-fit: contain;
-        }
-
-        .wanted-card-content {
-          min-width: 0;
-          flex: 1;
-        }
-
-        .wanted-card-heading {
-          align-items: flex-start;
-        }
-
-        .wanted-card-heading h2 {
-          margin-top: 2px;
-        }
-
-        .wanted-dex-number {
-          font-family: monospace;
-        }
-
-        .wanted-modifier-list {
-          margin-top: 10px;
-          gap: 7px;
-        }
-
-        .wanted-modifier {
-          display: inline-flex;
-          padding: 4px 8px;
-          border: 1px solid #6e40c9;
-          border-radius: 999px;
-          background: #271052;
-          color: #d2a8ff;
-          font-size: 0.78rem;
-          font-weight: 700;
-        }
-
-        .wanted-notes {
-          margin-top: 12px;
-          overflow-wrap: anywhere;
-        }
-
-        .wanted-owner {
-          padding-top: 14px;
-          border-top: 1px solid #30363d;
-          align-items: flex-end;
-        }
-
-        .wanted-owner code {
-          color: #9ecbff;
-          font-weight: 700;
-        }
-
-        @media (max-width: 700px) {
-          .wanted-trades-hero,
-          .wanted-board-heading,
-          .wanted-owner,
-          .wanted-form-actions {
-            align-items: stretch;
-            flex-direction: column;
-          }
-
-          .wanted-picker-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .wanted-trade-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .wanted-board-search {
-            width: 100%;
-          }
-
-          .wanted-card-main {
-            flex-direction: column;
-          }
-        }
-      `}</style>
     </div>
   )
 }

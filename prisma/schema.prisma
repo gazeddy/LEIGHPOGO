@@ -91,6 +91,7 @@ model WantedTrade {
   dexNumber   Int
   pokemonName String
   shiny       Boolean  @default(false)
+  lucky       Boolean  @default(false)
   xxl         Boolean  @default(false)
   xxs         Boolean  @default(false)
   costume     Boolean  @default(false)
