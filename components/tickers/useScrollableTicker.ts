@@ -28,6 +28,7 @@ export function useScrollableTicker({
   const copyWidthRef = useRef(0);
   const copyCountRef = useRef(0);
   const scrollableRef = useRef(false);
+  const virtualScrollLeftRef = useRef(0);
   const durationSecondsRef = useRef(durationSeconds);
   const pausedRef = useRef(false);
   const autoScrollAllowedRef = useRef(true);
@@ -97,62 +98,75 @@ export function useScrollableTicker({
     scrollableRef.current = scrollable;
 
     if (!scrollable) {
+      virtualScrollLeftRef.current = 0;
       viewport.scrollLeft = 0;
       return false;
     }
 
     if (resetPosition || viewport.scrollLeft <= 0.5) {
-      const preferredPosition = copyWidth * Math.floor(copyCount / 2);
-      const minimumSafePosition = Math.min(copyWidth, maxScrollLeft);
-      const maximumSafePosition = Math.max(
-        minimumSafePosition,
-        maxScrollLeft - copyWidth,
-      );
+    const preferredPosition = copyWidth * Math.floor(copyCount / 2);
+    const minimumSafePosition = Math.min(copyWidth, maxScrollLeft);
+    const maximumSafePosition = Math.max(
+      minimumSafePosition,
+      maxScrollLeft - copyWidth,
+    );
+    const nextScrollLeft = Math.min(
+      Math.max(preferredPosition, minimumSafePosition),
+      maximumSafePosition,
+    );
 
-      viewport.scrollLeft = Math.min(
-        Math.max(preferredPosition, minimumSafePosition),
-        maximumSafePosition,
-      );
-    }
+    virtualScrollLeftRef.current = nextScrollLeft;
+    viewport.scrollLeft = nextScrollLeft;
+  } else if (
+    Math.abs(viewport.scrollLeft - virtualScrollLeftRef.current) > 1
+  ) {
+    virtualScrollLeftRef.current = viewport.scrollLeft;
+  }
 
-    return true;
+  return true;
   }, []);
 
   const normaliseScrollPosition = useCallback(() => {
-    const viewport = viewportRef.current;
-    const track = viewport?.firstElementChild as HTMLElement | null;
-    const copyWidth = copyWidthRef.current;
-    const copyCount = copyCountRef.current;
+  const viewport = viewportRef.current;
+  const track = viewport?.firstElementChild as HTMLElement | null;
+  const copyWidth = copyWidthRef.current;
+  const copyCount = copyCountRef.current;
 
-    if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
-      return;
-    }
+  if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
+    return;
+  }
 
-    const maxScrollLeft = Math.max(
-      0,
-      track.scrollWidth - viewport.clientWidth,
-    );
-    if (maxScrollLeft <= 0) {
-      return;
-    }
+  const maxScrollLeft = Math.max(
+    0,
+    track.scrollWidth - viewport.clientWidth,
+  );
+  if (maxScrollLeft <= 0) {
+    return;
+  }
 
-    const edgeBuffer = Math.min(copyWidth / 2, maxScrollLeft / 4);
+  const edgeBuffer = Math.min(copyWidth / 2, maxScrollLeft / 4);
+  let nextScrollLeft = virtualScrollLeftRef.current;
 
-    if (
-      viewport.scrollLeft <= edgeBuffer &&
-      viewport.scrollLeft + copyWidth <= maxScrollLeft
-    ) {
-      viewport.scrollLeft += copyWidth;
-    } else if (
-      viewport.scrollLeft >= maxScrollLeft - edgeBuffer &&
-      viewport.scrollLeft - copyWidth >= 0
-    ) {
-      viewport.scrollLeft -= copyWidth;
-    }
-  }, []);
+  if (
+    nextScrollLeft <= edgeBuffer &&
+    nextScrollLeft + copyWidth <= maxScrollLeft
+  ) {
+    nextScrollLeft += copyWidth;
+  } else if (
+    nextScrollLeft >= maxScrollLeft - edgeBuffer &&
+    nextScrollLeft - copyWidth >= 0
+  ) {
+    nextScrollLeft -= copyWidth;
+  }
 
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  if (nextScrollLeft !== virtualScrollLeftRef.current) {
+    virtualScrollLeftRef.current = nextScrollLeft;
+    viewport.scrollLeft = nextScrollLeft;
+  }
+}, []);
+
+useEffect(() => {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const desktopFinePointer = window.matchMedia(
       "(any-hover: hover) and (any-pointer: fine)",
     );
@@ -243,7 +257,9 @@ export function useScrollableTicker({
         autoScrollAllowedRef.current
       ) {
         const seconds = Math.max(durationSecondsRef.current, 1);
-        viewport.scrollLeft += (copyWidth / seconds) * elapsedSeconds;
+        virtualScrollLeftRef.current +=
+          (copyWidth / seconds) * elapsedSeconds;
+        viewport.scrollLeft = virtualScrollLeftRef.current;
         normaliseScrollPosition();
       }
 
@@ -272,6 +288,7 @@ export function useScrollableTicker({
     }
 
     pauseTicker();
+    virtualScrollLeftRef.current = viewport.scrollLeft;
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -308,6 +325,7 @@ export function useScrollableTicker({
       nextScrollLeft -= copyWidth;
     }
 
+    virtualScrollLeftRef.current = nextScrollLeft;
     viewport.scrollLeft = nextScrollLeft;
   }
 
@@ -360,10 +378,16 @@ export function useScrollableTicker({
   }
 
   function handleWheel(_event: WheelEvent<HTMLDivElement>) {
-    pauseTicker();
-    window.requestAnimationFrame(normaliseScrollPosition);
-    scheduleResume();
-  }
+  pauseTicker();
+  window.requestAnimationFrame(() => {
+    const viewport = viewportRef.current;
+    if (viewport) {
+      virtualScrollLeftRef.current = viewport.scrollLeft;
+    }
+    normaliseScrollPosition();
+  });
+  scheduleResume();
+}
 
   return {
     viewportRef,

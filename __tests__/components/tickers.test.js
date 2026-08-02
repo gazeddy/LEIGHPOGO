@@ -107,7 +107,10 @@ describe("ticker regression wiring", () => {
 
     expect(scrollableTicker).toContain("const AUTO_RESUME_DELAY_MS = 3000;");
     expect(scrollableTicker).toContain("const DRAG_THRESHOLD_PX = 5;");
-    expect(scrollableTicker).toContain("viewport.scrollLeft +=");
+    expect(scrollableTicker).toContain("virtualScrollLeftRef.current +=");
+    expect(scrollableTicker).toContain(
+      "viewport.scrollLeft = virtualScrollLeftRef.current",
+    );
     expect(scrollableTicker).toContain("normaliseScrollPosition");
     expect(scrollableTicker).toContain("scrollableRef.current");
     expect(scrollableTicker).toContain("scheduleResume");
