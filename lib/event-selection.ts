@@ -1,6 +1,7 @@
-import type {
-  PokemonGoEventSummary,
-  RaidBossTickerItem,
+import {
+  getEventDestination,
+  type PokemonGoEventSummary,
+  type RaidBossTickerItem,
 } from "./events";
 
 const EVENTS_PAGE_EXCLUDED_TYPES = new Set([
@@ -94,6 +95,7 @@ function raidBossItem(
   event: PokemonGoEventSummary,
 ): RaidBossTickerItem | null {
   const name = event.name.trim();
+  const link = getEventDestination(event);
   const fiveStar = name.match(/^(.*?) in (?:5-star|five-star) Raid Battles$/i);
 
   if (fiveStar) {
@@ -103,7 +105,7 @@ function raidBossItem(
       label: "5★",
       boss: fiveStar[1].trim(),
       end: event.end,
-      link: event.link,
+      link,
     };
   }
 
@@ -116,7 +118,7 @@ function raidBossItem(
       label: "Shadow",
       boss: shadow[1].trim(),
       end: event.end,
-      link: event.link,
+      link,
     };
   }
 
@@ -129,7 +131,7 @@ function raidBossItem(
       label: "Mega",
       boss: mega[1].trim(),
       end: event.end,
-      link: event.link,
+      link,
     };
   }
 
