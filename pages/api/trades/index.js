@@ -65,6 +65,7 @@ export default async function handler(req, res) {
     const listing = await prisma.tradeListing.create({
       data: {
         ownerId: tradeUser.id,
+        friendshipRequirement: validated.value.friendshipRequirement,
         location: validated.value.location,
         notes: validated.value.notes,
         status: "ACTIVE",
