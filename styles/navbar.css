@@ -25,7 +25,56 @@
 
 .nav-links {
   flex: 0 0 auto;
-  gap: 12px;
+  gap: 8px;
+}
+
+.nav-main-item,
+.nav-btn {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #484f58;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #f0f6fc;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
+}
+
+.nav-main-item {
+  background: #30363d;
+}
+
+.nav-main-item:hover,
+.nav-main-item:focus-visible {
+  border-color: #6e7681;
+  background: #484f58;
+  color: #fff;
+}
+
+.nav-main-item:focus-visible,
+.nav-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #161b22, 0 0 0 4px #58a6ff;
+}
+
+.nav-btn {
+  border-color: #d73a49;
+  background: #d73a49;
+}
+
+.nav-btn:hover,
+.nav-btn:focus-visible {
+  border-color: #f85149;
+  background: #f85149;
 }
 
 .nav-group {
@@ -33,70 +82,87 @@
 }
 
 .nav-group-toggle {
-  display: inline-flex;
   width: auto;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 0;
+  overflow: hidden;
   padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: #c9d1d9;
-  font: inherit;
+  cursor: pointer;
 }
 
-.nav-group-toggle:hover,
-.nav-group-toggle:focus-visible {
-  background: none;
-  color: #fff;
+.nav-group-toggle > span:first-child {
+  padding: 0 11px;
 }
 
 .nav-caret {
-  display: inline-block;
-  font-size: 0.9rem;
+  display: inline-grid;
+  width: 31px;
+  align-self: stretch;
+  place-items: center;
+  border-left: 1px solid #484f58;
+  background: #21262d;
+}
+
+.nav-caret::before {
+  content: "▾";
+  display: block;
+  font-size: 0.82rem;
   line-height: 1;
   transition: transform 0.15s ease;
 }
 
+.nav-group-toggle:hover .nav-caret,
+.nav-group-toggle:focus-visible .nav-caret,
 .nav-group.open .nav-caret {
+  background: #30363d;
+}
+
+.nav-group.open .nav-group-toggle {
+  border-color: #8c959f;
+  background: #484f58;
+  box-shadow: inset 0 -2px 0 #58a6ff;
+}
+
+.nav-group.open .nav-caret::before {
   transform: rotate(180deg);
 }
 
 .nav-submenu {
   position: absolute;
-  top: calc(100% + 12px);
-  left: -10px;
+  top: calc(100% + 8px);
+  left: 0;
   z-index: 70;
   display: none;
-  min-width: 190px;
+  min-width: 205px;
   padding: 8px;
-  border: 1px solid #30363d;
+  border: 1px solid #484f58;
   border-radius: 9px;
   background: #161b22;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
 }
 
 .nav-group-admin .nav-submenu {
-  right: -10px;
+  right: 0;
   left: auto;
 }
 
 .nav-group.open .nav-submenu {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .nav-subitem {
   display: block;
   padding: 10px 12px;
   border-radius: 6px;
+  color: #c9d1d9;
   white-space: nowrap;
 }
 
 .nav-subitem:hover,
 .nav-subitem:focus-visible {
-  background: #21262d;
+  background: #30363d;
+  color: #fff;
+  outline: none;
 }
 
 .nav-toggle {
@@ -174,9 +240,9 @@
     width: 100%;
     max-height: calc(100dvh - 64px);
     margin-top: 8px;
-    padding: 6px 0;
+    padding: 8px 0;
     overflow-y: auto;
-    gap: 0;
+    gap: 6px;
     align-items: stretch;
     border-top: 1px solid #30363d;
     background: #161b22;
@@ -186,11 +252,17 @@
     display: flex;
   }
 
-  .nav-item,
+  .nav-main-item,
   .nav-btn {
     width: 100%;
+    min-height: 42px;
+    justify-content: flex-start;
     padding: 10px 12px;
     text-align: left;
+  }
+
+  .nav-notifications {
+    justify-content: flex-start;
   }
 
   .nav-group {
@@ -200,17 +272,26 @@
   .nav-group-toggle {
     width: 100%;
     justify-content: space-between;
-    padding: 10px 12px;
+    padding: 0;
+  }
+
+  .nav-group-toggle > span:first-child {
+    padding: 0 12px;
+  }
+
+  .nav-caret {
+    width: 42px;
+    margin-left: auto;
   }
 
   .nav-submenu,
   .nav-group-admin .nav-submenu {
     position: static;
     min-width: 0;
-    margin: 0;
-    padding: 3px 0 5px 18px;
-    border: 0;
-    border-radius: 0;
+    margin-top: 4px;
+    padding: 5px 6px 5px 18px;
+    border: 1px solid #30363d;
+    border-radius: 7px;
     background: #0d1117;
     box-shadow: none;
   }
@@ -218,12 +299,12 @@
   .nav-subitem {
     padding: 9px 12px;
     border-left: 2px solid #30363d;
-    border-radius: 0;
+    border-radius: 0 5px 5px 0;
   }
 
   .nav-btn {
-    margin-top: 5px;
-    border-radius: 6px;
+    justify-content: center;
+    margin-top: 2px;
     text-align: center;
   }
 }
