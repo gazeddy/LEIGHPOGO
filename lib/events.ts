@@ -41,6 +41,7 @@ export interface RaidBossCatchCp {
   boss: string;
   maxUnboostedCp: number;
   maxBoostedCp: number;
+  possibleShiny: boolean;
 }
 
 export interface RaidBossTickerItem {
