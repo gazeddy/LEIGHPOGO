@@ -11,6 +11,7 @@ import {
 import {
   formatFriendCode,
   serializeTradeListing,
+  tradeFriendshipRequirementLabel,
 } from "../../lib/tradeUtils"
 
 const attributeLabels = (item) => [
@@ -124,6 +125,10 @@ export default function TradeListingPage({ listing, viewer }) {
           <span className="entry-code">
             {formatFriendCode(listing.owner.friendCode) || "Unavailable"}
           </span>
+        </p>
+        <p>
+          <strong>Friendship requirement:</strong>{" "}
+          {tradeFriendshipRequirementLabel(listing.friendshipRequirement)}
         </p>
         {listing.location && (
           <p><strong>General location:</strong> {listing.location}</p>
