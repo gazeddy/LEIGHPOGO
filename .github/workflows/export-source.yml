@@ -1,0 +1,20 @@
+name: Export source
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        run: tar --exclude=.git --exclude=source.tar.gz -czf source.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leighpogo-source
+          path: source.tar.gz
+          retention-days: 1
