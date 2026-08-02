@@ -13,6 +13,7 @@ const pogoApiPayload = {
         form: "Normal",
         max_unboosted_cp: 2145,
         max_boosted_cp: 2681,
+        possible_shiny: true,
       },
     ],
     mega: [
@@ -21,6 +22,7 @@ const pogoApiPayload = {
         form: "Normal",
         max_unboosted_cp: 1110,
         max_boosted_cp: 1387,
+        possible_shiny: true,
       },
     ],
   },
@@ -31,6 +33,7 @@ const pogoApiPayload = {
         form: "Normal",
         max_unboosted_cp: 1714,
         max_boosted_cp: 2143,
+        possible_shiny: false,
       },
     ],
     5: [
@@ -39,6 +42,7 @@ const pogoApiPayload = {
         form: "Normal",
         max_unboosted_cp: 2042,
         max_boosted_cp: 2553,
+        possible_shiny: true,
       },
       {
         name: "Palkia",
@@ -47,30 +51,35 @@ const pogoApiPayload = {
         max_boosted_cp: 2850,
         min_unboosted_cp: 2190,
         min_boosted_cp: 2737,
+        possible_shiny: true,
       },
       {
         name: "Uxie",
         form: "Normal",
         max_unboosted_cp: 1442,
         max_boosted_cp: 1803,
+        possible_shiny: true,
       },
       {
         name: "Mesprit",
         form: "Normal",
         max_unboosted_cp: 1747,
         max_boosted_cp: 2184,
+        possible_shiny: false,
       },
       {
         name: "Azelf",
         form: "Normal",
         max_unboosted_cp: 1834,
         max_boosted_cp: 2293,
+        possible_shiny: true,
       },
       {
         name: "Dialga",
         form: "Origin",
         max_unboosted_cp: 2337,
         max_boosted_cp: 2921,
+        possible_shiny: true,
       },
     ],
     mega: [
@@ -80,6 +89,7 @@ const pogoApiPayload = {
         tier: 6,
         max_unboosted_cp: 2378,
         max_boosted_cp: 2973,
+        possible_shiny: true,
       },
     ],
   },
@@ -108,11 +118,16 @@ describe("raid boss max catch CP cache", () => {
     expect(
       findRaidBossCpMatches(tickerItem("five-star", "Kyurem"), bosses),
     ).toEqual([
-      { boss: "Kyurem", maxUnboostedCp: 2042, maxBoostedCp: 2553 },
+      {
+        boss: "Kyurem",
+        maxUnboostedCp: 2042,
+        maxBoostedCp: 2553,
+        possibleShiny: true,
+      },
     ]);
   });
 
-  it("extracts only maximum boosted and unboosted CP values", () => {
+  it("extracts maximum CP and shiny availability while excluding minimum CP", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
     const palkia = bosses.find(
       (boss) => boss.name === "Palkia" && boss.tier === "5",
@@ -124,9 +139,19 @@ describe("raid boss max catch CP cache", () => {
       tier: "5",
       maxUnboostedCp: 2280,
       maxBoostedCp: 2850,
+      possibleShiny: true,
     });
     expect(palkia).not.toHaveProperty("minUnboostedCp");
     expect(palkia).not.toHaveProperty("minBoostedCp");
+  });
+
+  it("keeps false possible_shiny values false", () => {
+    const bosses = extractCurrentRaidBosses(pogoApiPayload);
+    const mesprit = bosses.find(
+      (boss) => boss.name === "Mesprit" && boss.tier === "5",
+    );
+
+    expect(mesprit?.possibleShiny).toBe(false);
   });
 
   it("uses the previous Mega record rather than ordinary Aggron CP", () => {
@@ -135,7 +160,12 @@ describe("raid boss max catch CP cache", () => {
     expect(
       findRaidBossCpMatches(tickerItem("mega", "Aggron"), bosses),
     ).toEqual([
-      { boss: "Aggron", maxUnboostedCp: 2378, maxBoostedCp: 2973 },
+      {
+        boss: "Aggron",
+        maxUnboostedCp: 2378,
+        maxBoostedCp: 2973,
+        possibleShiny: true,
+      },
     ]);
   });
 
@@ -151,13 +181,28 @@ describe("raid boss max catch CP cache", () => {
     );
 
     expect(items[0].catchCp).toEqual([
-      { boss: "Kyurem", maxUnboostedCp: 2042, maxBoostedCp: 2553 },
+      {
+        boss: "Kyurem",
+        maxUnboostedCp: 2042,
+        maxBoostedCp: 2553,
+        possibleShiny: true,
+      },
     ]);
     expect(items[1].catchCp).toEqual([
-      { boss: "Palkia", maxUnboostedCp: 2280, maxBoostedCp: 2850 },
+      {
+        boss: "Palkia",
+        maxUnboostedCp: 2280,
+        maxBoostedCp: 2850,
+        possibleShiny: true,
+      },
     ]);
     expect(items[2].catchCp).toEqual([
-      { boss: "Aggron", maxUnboostedCp: 2378, maxBoostedCp: 2973 },
+      {
+        boss: "Aggron",
+        maxUnboostedCp: 2378,
+        maxBoostedCp: 2973,
+        possibleShiny: true,
+      },
     ]);
   });
 
@@ -174,11 +219,12 @@ describe("raid boss max catch CP cache", () => {
         boss: "Origin Dialga",
         maxUnboostedCp: 2337,
         maxBoostedCp: 2921,
+        possibleShiny: true,
       },
     ]);
   });
 
-  it("returns a CP entry for every boss in a shared raid rotation", () => {
+  it("returns CP and shiny availability for every boss in a shared raid rotation", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
     const matches = findRaidBossCpMatches(
       tickerItem("five-star", "Uxie, Mesprit, and Azelf"),
@@ -186,9 +232,24 @@ describe("raid boss max catch CP cache", () => {
     );
 
     expect(matches).toEqual([
-      { boss: "Uxie", maxUnboostedCp: 1442, maxBoostedCp: 1803 },
-      { boss: "Mesprit", maxUnboostedCp: 1747, maxBoostedCp: 2184 },
-      { boss: "Azelf", maxUnboostedCp: 1834, maxBoostedCp: 2293 },
+      {
+        boss: "Uxie",
+        maxUnboostedCp: 1442,
+        maxBoostedCp: 1803,
+        possibleShiny: true,
+      },
+      {
+        boss: "Mesprit",
+        maxUnboostedCp: 1747,
+        maxBoostedCp: 2184,
+        possibleShiny: false,
+      },
+      {
+        boss: "Azelf",
+        maxUnboostedCp: 1834,
+        maxBoostedCp: 2293,
+        possibleShiny: true,
+      },
     ]);
   });
 
