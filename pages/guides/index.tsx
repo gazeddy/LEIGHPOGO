@@ -60,9 +60,9 @@ export default function GuidesIndexPage({
                     <Link
                       key={guideSeries.slug}
                       href={`/guides/series/${guideSeries.slug}`}
-                      className="series-card"
+                      className="series-card-link"
                     >
-                      <article>
+                      <article className="series-card">
                         <div className="series-card__heading">
                           <h3>{guideSeries.title}</h3>
                           <span aria-hidden="true">→</span>
@@ -148,26 +148,15 @@ export default function GuidesIndexPage({
         }
 
         .series-card {
-          display: block;
-          color: inherit;
-          text-decoration: none;
-        }
-
-        .series-card article {
           height: 100%;
           padding: 20px;
           border: 1px solid #30363d;
           border-radius: 10px;
           background: #161b22;
+          color: #f0f6fc;
           transition:
             border-color 0.15s ease,
             transform 0.15s ease;
-        }
-
-        .series-card:hover article,
-        .series-card:focus-visible article {
-          border-color: #58a6ff;
-          transform: translateY(-2px);
         }
 
         .series-card__heading {
@@ -179,6 +168,7 @@ export default function GuidesIndexPage({
 
         .series-card h3 {
           margin: 0;
+          color: #f0f6fc;
           font-size: 1.25rem;
         }
 
@@ -215,6 +205,24 @@ export default function GuidesIndexPage({
         .empty-state h2 {
           margin-bottom: 8px;
           color: #f0f6fc;
+        }
+      `}</style>
+
+      <style jsx global>{`
+        .series-card-link {
+          display: block;
+          color: inherit;
+          text-decoration: none;
+        }
+
+        .series-card-link:hover .series-card,
+        .series-card-link:focus-visible .series-card {
+          border-color: #58a6ff;
+          transform: translateY(-2px);
+        }
+
+        .series-card-link:focus-visible {
+          outline: none;
         }
       `}</style>
     </>
