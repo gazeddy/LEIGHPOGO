@@ -2,6 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { RaidBossTickerItem } from "../../../lib/events";
 import { selectCurrentRaidBosses } from "../../../lib/event-selection";
 import { getEventsPageData } from "../../../lib/events-server";
+import {
+  attachRaidBossCp,
+  getRaidBossCpData,
+} from "../../../lib/raidBossCpCache";
 
 type RaidTickerResponse =
   | {
@@ -23,7 +27,18 @@ export default async function handler(
 
   try {
     const eventData = await getEventsPageData(160);
-    const items = selectCurrentRaidBosses(eventData.events);
+    const currentRaidBosses = selectCurrentRaidBosses(eventData.events);
+    let items = currentRaidBosses;
+
+    try {
+      const raidBossCpData = await getRaidBossCpData();
+      items = attachRaidBossCp(currentRaidBosses, raidBossCpData.bosses);
+    } catch (error) {
+      console.error(
+        "Failed to enrich current raid bosses with PoGoAPI catch CP data",
+        error,
+      );
+    }
 
     res.setHeader("Cache-Control", "private, no-store");
 
