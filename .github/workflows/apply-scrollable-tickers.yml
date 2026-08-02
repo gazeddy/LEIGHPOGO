@@ -1,0 +1,856 @@
+name: Apply scrollable tickers
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - .github/workflows/apply-scrollable-tickers.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./validation.db
+      NEXTAUTH_SECRET: validation-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Implement manually scrollable tickers
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, text):
+              Path(path).parent.mkdir(parents=True, exist_ok=True)
+              Path(path).write_text(text, encoding="utf-8")
+
+          def replace_once(path, old, new):
+              text = read(path)
+              if old not in text:
+                  raise RuntimeError(f"Expected text not found in {path}: {old[:120]!r}")
+              write(path, text.replace(old, new, 1))
+
+          def replace_between(path, start_marker, end_marker, replacement):
+              text = read(path)
+              start = text.find(start_marker)
+              if start < 0:
+                  raise RuntimeError(f"Start marker not found in {path}: {start_marker!r}")
+              end = text.find(end_marker, start)
+              if end < 0:
+                  raise RuntimeError(f"End marker not found in {path}: {end_marker!r}")
+              write(path, text[:start] + replacement + text[end:])
+
+          hook = '''import {
+            useCallback,
+            useEffect,
+            useRef,
+            useState,
+            type FocusEvent,
+            type MouseEvent,
+            type PointerEvent,
+            type WheelEvent,
+          } from "react";
+
+          interface ScrollableTickerOptions {
+            durationSeconds: number;
+            contentKey: string | number;
+            enabled?: boolean;
+          }
+
+          const AUTO_RESUME_DELAY_MS = 3000;
+          const DRAG_THRESHOLD_PX = 5;
+
+          export function useScrollableTicker({
+            durationSeconds,
+            contentKey,
+            enabled = true,
+          }: ScrollableTickerOptions) {
+            const viewportRef = useRef<HTMLDivElement>(null);
+            const copyWidthRef = useRef(0);
+            const durationSecondsRef = useRef(durationSeconds);
+            const pausedRef = useRef(false);
+            const autoScrollAllowedRef = useRef(true);
+            const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+            const suppressClickRef = useRef(false);
+            const dragRef = useRef<{
+              pointerId: number;
+              startX: number;
+              startScrollLeft: number;
+              dragged: boolean;
+            } | null>(null);
+            const [paused, setPausedState] = useState(false);
+            const [dragging, setDragging] = useState(false);
+
+            durationSecondsRef.current = durationSeconds;
+
+            const clearResumeTimer = useCallback(() => {
+              if (resumeTimerRef.current !== null) {
+                clearTimeout(resumeTimerRef.current);
+                resumeTimerRef.current = null;
+              }
+            }, []);
+
+            const setPaused = useCallback((nextPaused: boolean) => {
+              pausedRef.current = nextPaused;
+              setPausedState(nextPaused);
+            }, []);
+
+            const pauseTicker = useCallback(() => {
+              clearResumeTimer();
+              setPaused(true);
+            }, [clearResumeTimer, setPaused]);
+
+            const scheduleResume = useCallback(() => {
+              clearResumeTimer();
+              resumeTimerRef.current = setTimeout(() => {
+                resumeTimerRef.current = null;
+                setPaused(false);
+              }, AUTO_RESUME_DELAY_MS);
+            }, [clearResumeTimer, setPaused]);
+
+            const normaliseScrollPosition = useCallback(() => {
+              const viewport = viewportRef.current;
+              const copyWidth = copyWidthRef.current;
+
+              if (!viewport || copyWidth <= viewport.clientWidth) {
+                return;
+              }
+
+              if (viewport.scrollLeft <= 0) {
+                viewport.scrollLeft += copyWidth;
+              } else if (viewport.scrollLeft >= copyWidth * 2) {
+                viewport.scrollLeft -= copyWidth;
+              }
+            }, []);
+
+            useEffect(() => {
+              const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+              const desktopFinePointer = window.matchMedia(
+                "(hover: hover) and (pointer: fine)",
+              );
+
+              const updateMotionPreference = () => {
+                autoScrollAllowedRef.current = !(
+                  reducedMotion.matches && !desktopFinePointer.matches
+                );
+              };
+
+              updateMotionPreference();
+              reducedMotion.addEventListener("change", updateMotionPreference);
+              desktopFinePointer.addEventListener("change", updateMotionPreference);
+
+              return () => {
+                reducedMotion.removeEventListener("change", updateMotionPreference);
+                desktopFinePointer.removeEventListener("change", updateMotionPreference);
+              };
+            }, []);
+
+            useEffect(() => {
+              const viewport = viewportRef.current;
+
+              if (!viewport || !enabled) {
+                copyWidthRef.current = 0;
+                return;
+              }
+
+              let initialised = false;
+              let frameId = 0;
+              const measure = () => {
+                const track = viewport.firstElementChild as HTMLElement | null;
+                const firstCopy = track?.firstElementChild as HTMLElement | null;
+                const copyWidth = firstCopy?.getBoundingClientRect().width ?? 0;
+
+                copyWidthRef.current = copyWidth;
+
+                if (copyWidth > viewport.clientWidth) {
+                  if (!initialised || viewport.scrollLeft <= 0) {
+                    viewport.scrollLeft = copyWidth;
+                  }
+                } else {
+                  viewport.scrollLeft = 0;
+                }
+
+                initialised = true;
+              };
+
+              frameId = window.requestAnimationFrame(measure);
+              const observer = new ResizeObserver(measure);
+              observer.observe(viewport);
+
+              const track = viewport.firstElementChild as HTMLElement | null;
+              const firstCopy = track?.firstElementChild as HTMLElement | null;
+              if (firstCopy) {
+                observer.observe(firstCopy);
+              }
+
+              return () => {
+                window.cancelAnimationFrame(frameId);
+                observer.disconnect();
+              };
+            }, [contentKey, enabled]);
+
+            useEffect(() => {
+              if (!enabled) {
+                return;
+              }
+
+              let frameId = 0;
+              let previousTime = performance.now();
+
+              const animate = (time: number) => {
+                const viewport = viewportRef.current;
+                const copyWidth = copyWidthRef.current;
+                const elapsedSeconds = Math.min(time - previousTime, 100) / 1000;
+                previousTime = time;
+
+                if (
+                  viewport &&
+                  copyWidth > viewport.clientWidth &&
+                  !pausedRef.current &&
+                  autoScrollAllowedRef.current
+                ) {
+                  const seconds = Math.max(durationSecondsRef.current, 1);
+                  viewport.scrollLeft += (copyWidth / seconds) * elapsedSeconds;
+                  normaliseScrollPosition();
+                }
+
+                frameId = window.requestAnimationFrame(animate);
+              };
+
+              frameId = window.requestAnimationFrame(animate);
+              return () => window.cancelAnimationFrame(frameId);
+            }, [enabled, normaliseScrollPosition]);
+
+            useEffect(
+              () => () => {
+                clearResumeTimer();
+              },
+              [clearResumeTimer],
+            );
+
+            function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+              if (event.pointerType === "mouse" && event.button !== 0) {
+                return;
+              }
+
+              const viewport = viewportRef.current;
+              if (
+                !viewport ||
+                copyWidthRef.current <= viewport.clientWidth
+              ) {
+                return;
+              }
+
+              pauseTicker();
+              dragRef.current = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startScrollLeft: viewport.scrollLeft,
+                dragged: false,
+              };
+              viewport.setPointerCapture(event.pointerId);
+            }
+
+            function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+              const viewport = viewportRef.current;
+              const drag = dragRef.current;
+
+              if (!viewport || !drag || drag.pointerId !== event.pointerId) {
+                return;
+              }
+
+              const deltaX = event.clientX - drag.startX;
+              if (!drag.dragged && Math.abs(deltaX) < DRAG_THRESHOLD_PX) {
+                return;
+              }
+
+              drag.dragged = true;
+              setDragging(true);
+              event.preventDefault();
+
+              const copyWidth = copyWidthRef.current;
+              let nextScrollLeft = drag.startScrollLeft - deltaX;
+
+              while (nextScrollLeft < 0) {
+                nextScrollLeft += copyWidth;
+              }
+              while (nextScrollLeft >= copyWidth * 2) {
+                nextScrollLeft -= copyWidth;
+              }
+
+              viewport.scrollLeft = nextScrollLeft;
+            }
+
+            function finishPointerInteraction(event: PointerEvent<HTMLDivElement>) {
+              const viewport = viewportRef.current;
+              const drag = dragRef.current;
+
+              if (!drag || drag.pointerId !== event.pointerId) {
+                return;
+              }
+
+              if (viewport?.hasPointerCapture(event.pointerId)) {
+                viewport.releasePointerCapture(event.pointerId);
+              }
+
+              if (drag.dragged) {
+                suppressClickRef.current = true;
+                window.setTimeout(() => {
+                  suppressClickRef.current = false;
+                }, 0);
+              }
+
+              dragRef.current = null;
+              setDragging(false);
+              normaliseScrollPosition();
+              scheduleResume();
+            }
+
+            function handleClickCapture(event: MouseEvent<HTMLDivElement>) {
+              if (!suppressClickRef.current) {
+                return;
+              }
+
+              suppressClickRef.current = false;
+              event.preventDefault();
+              event.stopPropagation();
+            }
+
+            function handleFocus(event: FocusEvent<HTMLDivElement>) {
+              if ((event.target as HTMLElement).matches(":focus-visible")) {
+                pauseTicker();
+              }
+            }
+
+            function handleBlur(event: FocusEvent<HTMLDivElement>) {
+              const nextTarget = event.relatedTarget as Node | null;
+              if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+                scheduleResume();
+              }
+            }
+
+            function handleWheel(_event: WheelEvent<HTMLDivElement>) {
+              pauseTicker();
+              window.requestAnimationFrame(normaliseScrollPosition);
+              scheduleResume();
+            }
+
+            return {
+              viewportRef,
+              paused,
+              dragging,
+              viewportHandlers: {
+                onPointerDown: handlePointerDown,
+                onPointerMove: handlePointerMove,
+                onPointerUp: finishPointerInteraction,
+                onPointerCancel: finishPointerInteraction,
+                onClickCapture: handleClickCapture,
+                onFocusCapture: handleFocus,
+                onBlurCapture: handleBlur,
+                onWheel: handleWheel,
+              },
+            };
+          }
+          '''
+          hook = "\n".join(line[10:] if line.startswith("          ") else line for line in hook.splitlines()) + "\n"
+          write("components/tickers/useScrollableTicker.ts", hook)
+
+          event = "components/events/EventTicker.tsx"
+          replace_once(event, '''import {
+            useEffect,
+            useMemo,
+            useRef,
+            useState,
+            type CSSProperties,
+            type FocusEvent,
+            type PointerEvent,
+          } from "react";''', 'import { useEffect, useMemo, useState } from "react";')
+          replace_once(event, '''} from "../../lib/event-visibility-client";''', '''} from "../../lib/event-visibility-client";
+          import { useScrollableTicker } from "../tickers/useScrollableTicker";''')
+          replace_once(event, '''const AUTO_RESUME_DELAY_MS = 3000;
+          const TAP_MAX_DURATION_MS = 450;
+
+          ''', '')
+          replace_once(event, '''  const [paused, setPaused] = useState(false);
+            const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+            const pointerStartedAtRef = useRef<number | null>(null);
+            const pointerWasPausedRef = useRef(false);
+            const activePointerIdRef = useRef<number | null>(null);
+          ''', '')
+          replace_between(event, '''  useEffect(
+              () => () => {
+                if (resumeTimerRef.current !== null) {''', '''  const message =''', '''  const animationDurationSeconds = useMemo(
+              () => Math.max(32, items.length * 10),
+              [items.length],
+            );
+            const { viewportRef, paused, dragging, viewportHandlers } =
+              useScrollableTicker({
+                durationSeconds: animationDurationSeconds,
+                contentKey: items.length,
+                enabled: items.length > 0,
+              });
+
+          ''')
+          replace_between(event, '''    <section
+              className={`event-ticker${paused ? " paused" : ""}`}''', '''    >
+              <div className="ticker-label">''', '''    <section
+              className={`event-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
+              aria-label="Upcoming events"
+            >
+              <div className="ticker-label">''')
+          replace_once(event, '<div className="ticker-viewport">', '<div ref={viewportRef} className="ticker-viewport" {...viewportHandlers}>')
+          replace_between(event, '''          <div
+                    className="ticker-track"''', '''          >
+                    <TickerItems items={items} />''', '''          <div className="ticker-track">
+                    <TickerItems items={items} duplicate />
+                    <TickerItems items={items} />''')
+          replace_once(event, '''            <TickerItems items={items} />
+                    <TickerItems items={items} duplicate />''', '''            <TickerItems items={items} />
+                    <TickerItems items={items} duplicate />''')
+          replace_once(event, '''          overflow: hidden;
+                    mask-image:''', '''          overflow-x: auto;
+                    overflow-y: hidden;
+                    cursor: grab;
+                    overscroll-behavior-x: contain;
+                    scrollbar-width: none;
+                    touch-action: pan-y;
+                    -ms-overflow-style: none;
+                    mask-image:''')
+          replace_once(event, '''        .ticker-track {
+                    display: flex;
+                    width: max-content;
+                    min-width: 100%;
+                    animation: ticker-scroll var(--ticker-duration) linear infinite;
+                    will-change: transform;
+                  }
+
+                  .event-ticker.paused .ticker-track {
+                    animation-play-state: paused;
+                  }
+          ''', '''        .ticker-viewport::-webkit-scrollbar {
+                    display: none;
+                  }
+
+                  .event-ticker.dragging .ticker-viewport {
+                    cursor: grabbing;
+                  }
+
+                  .ticker-track {
+                    display: flex;
+                    width: max-content;
+                    min-width: 100%;
+                    animation: none;
+                    transform: none;
+                  }
+          ''')
+          replace_between(event, '''        @keyframes ticker-scroll {''', '''        @media (max-width: 620px) {''', '''        @media (max-width: 620px) {''')
+          replace_once(event, '''        @media (prefers-reduced-motion: reduce) {
+                    .ticker-viewport {
+                      overflow-x: auto;
+                      mask-image: none;
+                    }
+
+                    .ticker-track {
+                      animation: none;
+                    }
+                  }
+          ''', '''        @media (prefers-reduced-motion: reduce) {
+                    .ticker-viewport {
+                      mask-image: none;
+                    }
+                  }
+          ''')
+          replace_once(event, '''        @media (prefers-reduced-motion: reduce) {
+                    .ticker-group-duplicate {
+                      display: none;
+                    }
+                  }
+          ''', '')
+
+          raid = "components/events/RaidBossTicker.tsx"
+          replace_once(raid, '''import {
+            useEffect,
+            useMemo,
+            useRef,
+            useState,
+            type CSSProperties,
+            type FocusEvent,
+            type PointerEvent,
+          } from "react";''', 'import { useEffect, useMemo, useState } from "react";')
+          replace_once(raid, '''} from "../../lib/event-visibility-client";''', '''} from "../../lib/event-visibility-client";
+          import { useScrollableTicker } from "../tickers/useScrollableTicker";''')
+          replace_once(raid, '''const AUTO_RESUME_DELAY_MS = 3000;
+          const TAP_MAX_DURATION_MS = 450;
+
+          ''', '')
+          replace_once(raid, '''  const [paused, setPaused] = useState(false);
+            const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+            const pointerStartedAtRef = useRef<number | null>(null);
+            const pointerWasPausedRef = useRef(false);
+            const activePointerIdRef = useRef<number | null>(null);
+          ''', '')
+          replace_between(raid, '''  useEffect(
+              () => () => {
+                if (resumeTimerRef.current !== null) {''', '''  const message =''', '''  const animationDurationSeconds = useMemo(
+              () => Math.max(32, items.length * 10),
+              [items.length],
+            );
+            const { viewportRef, paused, dragging, viewportHandlers } =
+              useScrollableTicker({
+                durationSeconds: animationDurationSeconds,
+                contentKey: items.length,
+                enabled: items.length > 0,
+              });
+
+          ''')
+          replace_between(raid, '''    <section
+              className={`raid-ticker${paused ? " paused" : ""}`}''', '''    >
+              <div className="raid-label">''', '''    <section
+              className={`raid-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
+              aria-label="Current raid bosses"
+            >
+              <div className="raid-label">''')
+          replace_once(raid, '<div className="raid-viewport">', '<div ref={viewportRef} className="raid-viewport" {...viewportHandlers}>')
+          replace_between(raid, '''          <div
+                    className="raid-track"''', '''          >
+                    <RaidItems items={items} />''', '''          <div className="raid-track">
+                    <RaidItems items={items} duplicate />
+                    <RaidItems items={items} />''')
+          replace_once(raid, '''          overflow: hidden;
+                    mask-image:''', '''          overflow-x: auto;
+                    overflow-y: hidden;
+                    cursor: grab;
+                    overscroll-behavior-x: contain;
+                    scrollbar-width: none;
+                    touch-action: pan-y;
+                    -ms-overflow-style: none;
+                    mask-image:''')
+          replace_once(raid, '''        .raid-track {
+                    display: flex;
+                    width: max-content;
+                    min-width: 100%;
+                    animation: raid-ticker-scroll var(--raid-ticker-duration) linear infinite;
+                    will-change: transform;
+                  }
+
+                  .raid-ticker.paused .raid-track {
+                    animation-play-state: paused;
+                  }
+          ''', '''        .raid-viewport::-webkit-scrollbar {
+                    display: none;
+                  }
+
+                  .raid-ticker.dragging .raid-viewport {
+                    cursor: grabbing;
+                  }
+
+                  .raid-track {
+                    display: flex;
+                    width: max-content;
+                    min-width: 100%;
+                    animation: none;
+                    transform: none;
+                  }
+          ''')
+          replace_between(raid, '''        @keyframes raid-ticker-scroll {''', '''        @media (max-width: 620px) {''', '''        @media (max-width: 620px) {''')
+          replace_once(raid, '''        @media (prefers-reduced-motion: reduce) {
+                    .raid-viewport {
+                      overflow-x: auto;
+                      mask-image: none;
+                    }
+
+                    .raid-track {
+                      animation: none;
+                    }
+                  }
+          ''', '''        @media (prefers-reduced-motion: reduce) {
+                    .raid-viewport {
+                      mask-image: none;
+                    }
+                  }
+          ''')
+          replace_once(raid, '''        @media (prefers-reduced-motion: reduce) {
+                    .raid-group-duplicate {
+                      display: none;
+                    }
+
+                    .raid-shiny-sparkle {
+                      animation: none;
+                    }
+                  }
+          ''', '''        @media (prefers-reduced-motion: reduce) {
+                    .raid-shiny-sparkle {
+                      animation: none;
+                    }
+                  }
+          ''')
+
+          ditto = "components/events/DittoDisguiseTicker.tsx"
+          replace_once(ditto, 'import { useEffect, useMemo, useState, type CSSProperties } from "react";', 'import { useEffect, useMemo, useState } from "react";')
+          replace_once(ditto, '''} from "../../lib/ditto-disguises";''', '''} from "../../lib/ditto-disguises";
+          import { useScrollableTicker } from "../tickers/useScrollableTicker";''')
+          replace_once(ditto, '''  const animationDuration = useMemo(
+              () => `${Math.max(32, disguises.length * 8)}s`,
+              [disguises.length],
+            );''', '''  const animationDurationSeconds = useMemo(
+              () => Math.max(32, disguises.length * 8),
+              [disguises.length],
+            );
+            const { viewportRef, paused, dragging, viewportHandlers } =
+              useScrollableTicker({
+                durationSeconds: animationDurationSeconds,
+                contentKey: disguises.length,
+                enabled: disguises.length > 0,
+              });''')
+          replace_once(ditto, 'className="ditto-ticker"', 'className={`ditto-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}')
+          replace_once(ditto, '<div className="ditto-viewport">', '<div ref={viewportRef} className="ditto-viewport" {...viewportHandlers}>')
+          replace_between(ditto, '''          <div
+                    className="ditto-track"''', '''          >
+                    <DittoItems disguises={disguises} />''', '''          <div className="ditto-track">
+                    <DittoItems disguises={disguises} duplicate />
+                    <DittoItems disguises={disguises} />''')
+          replace_once(ditto, '''          overflow: hidden;
+                    mask-image:''', '''          overflow-x: auto;
+                    overflow-y: hidden;
+                    cursor: grab;
+                    overscroll-behavior-x: contain;
+                    scrollbar-width: none;
+                    touch-action: pan-y;
+                    -ms-overflow-style: none;
+                    mask-image:''')
+          replace_once(ditto, '''        .ditto-track {
+                    display: flex;
+                    width: max-content;
+                    min-width: 100%;
+                    animation: ditto-ticker-scroll var(--ditto-ticker-duration) linear infinite;
+                    will-change: transform;
+                  }
+
+                  .ditto-ticker:hover .ditto-track,
+                  .ditto-ticker:focus-within .ditto-track {
+                    animation-play-state: paused;
+                  }
+          ''', '''        .ditto-viewport::-webkit-scrollbar {
+                    display: none;
+                  }
+
+                  .ditto-ticker.dragging .ditto-viewport {
+                    cursor: grabbing;
+                  }
+
+                  .ditto-track {
+                    display: flex;
+                    width: max-content;
+                    min-width: 100%;
+                    animation: none;
+                    transform: none;
+                  }
+          ''')
+          replace_between(ditto, '''        @keyframes ditto-ticker-scroll {''', '''        @media (max-width: 620px) {''', '''        @media (max-width: 620px) {''')
+          replace_once(ditto, '''        @media (prefers-reduced-motion: reduce) {
+                    .ditto-viewport {
+                      overflow-x: auto;
+                      mask-image: none;
+                    }
+
+                    .ditto-track {
+                      animation: none;
+                    }
+                  }
+          ''', '''        @media (prefers-reduced-motion: reduce) {
+                    .ditto-viewport {
+                      mask-image: none;
+                    }
+                  }
+          ''')
+          replace_once(ditto, '''        @media (prefers-reduced-motion: reduce) {
+                    .ditto-group-duplicate {
+                      display: none;
+                    }
+                  }
+          ''', '')
+
+          new_gym = "components/gyms/NewGymTicker.tsx"
+          replace_once(new_gym, '''import {
+            useEffect,
+            useMemo,
+            useState,
+            type CSSProperties,
+          } from "react";''', 'import { useEffect, useMemo, useState } from "react";')
+          replace_once(new_gym, 'import { useSession } from "next-auth/react";', 'import { useSession } from "next-auth/react";\nimport { useScrollableTicker } from "../tickers/useScrollableTicker";')
+          replace_once(new_gym, '''const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+          ''', '''const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+          function NewGymItems({
+            gyms,
+            duplicate = false,
+          }: {
+            gyms: NewGymItem[];
+            duplicate?: boolean;
+          }) {
+            return (
+              <div className="new-gym-copy" aria-hidden={duplicate || undefined}>
+                {gyms.map((gym) => (
+                  <Link
+                    key={`${duplicate ? "duplicate-" : ""}${gym.id}`}
+                    href={`/gyms?gym=${encodeURIComponent(gym.id)}`}
+                    className="new-gym-item"
+                    tabIndex={duplicate ? -1 : undefined}
+                  >
+                    <strong>{gym.displayName}</strong>
+                    {gym.alias && <span className="official-name">({gym.name})</span>}
+                  </Link>
+                ))}
+              </div>
+            );
+          }
+
+          ''')
+          replace_once(new_gym, '''  const animationDuration = useMemo(
+              () => `${Math.max(32, gyms.length * 10)}s`,
+              [gyms.length],
+            );
+
+            if (status !== "authenticated") {''', '''  const animationDurationSeconds = useMemo(
+              () => Math.max(32, gyms.length * 10),
+              [gyms.length],
+            );
+            const { viewportRef, paused, dragging, viewportHandlers } =
+              useScrollableTicker({
+                durationSeconds: animationDurationSeconds,
+                contentKey: gyms.length,
+                enabled: status === "authenticated" && gyms.length > 0,
+              });
+
+            if (status !== "authenticated") {''')
+          replace_between(new_gym, '''  const items = gyms.map((gym) => (''', '''  const statusMessage =''', '')
+          replace_once(new_gym, '<aside className="new-gym-ticker" aria-label="Newly added gyms">', '<aside className={`new-gym-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`} aria-label="Newly added gyms">')
+          replace_once(new_gym, '<div className="new-gym-viewport" aria-live="polite">', '<div ref={viewportRef} className="new-gym-viewport" aria-live="polite" {...viewportHandlers}>')
+          replace_between(new_gym, '''          <div
+                    className="new-gym-track"''', '''          >
+                    <div className="new-gym-copy">{items}</div>''', '''          <div className="new-gym-track">
+                    <NewGymItems gyms={gyms} duplicate />
+                    <NewGymItems gyms={gyms} />
+                    <NewGymItems gyms={gyms} duplicate />
+                  </div>
+                )}
+              </div>
+
+              <style jsx>{`''')
+
+          gyms_css = "styles/gyms.css"
+          replace_once(gyms_css, '''.new-gym-viewport {
+            overflow: hidden;
+          }
+
+          .new-gym-track {
+            display: flex;
+            width: max-content;
+            min-width: 100%;
+            animation: new-gym-scroll 32s linear infinite;
+          }
+
+          .new-gym-ticker:hover .new-gym-track,
+          .new-gym-ticker:focus-within .new-gym-track {
+            animation-play-state: paused;
+          }
+          ''', '''.new-gym-viewport {
+            overflow-x: auto;
+            overflow-y: hidden;
+            cursor: grab;
+            overscroll-behavior-x: contain;
+            scrollbar-width: none;
+            touch-action: pan-y;
+            -ms-overflow-style: none;
+          }
+
+          .new-gym-viewport::-webkit-scrollbar {
+            display: none;
+          }
+
+          .new-gym-ticker.dragging .new-gym-viewport {
+            cursor: grabbing;
+          }
+
+          .new-gym-track {
+            display: flex;
+            width: max-content;
+            min-width: 100%;
+            animation: none;
+            transform: none;
+          }
+          ''')
+          replace_once(gyms_css, '''@keyframes new-gym-scroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+          }
+
+          ''', '')
+
+          tickers_css = "styles/tickers.css"
+          replace_between(tickers_css, '''/*
+           * Mouse hover previously left the desktop tickers paused''', '''@media (max-width: 620px) {''', '''/* Automatic movement is driven by scrollLeft so every ticker remains draggable. */
+          .event-ticker .ticker-viewport,
+          .raid-ticker .raid-viewport,
+          .ditto-ticker .ditto-viewport,
+          .new-gym-ticker .new-gym-viewport {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scrollbar-width: none;
+          }
+
+          .event-ticker .ticker-track,
+          .raid-ticker .raid-track,
+          .ditto-ticker .ditto-track,
+          .new-gym-ticker .new-gym-track {
+            animation: none !important;
+            transform: none !important;
+          }
+
+          .event-ticker .ticker-viewport::-webkit-scrollbar,
+          .raid-ticker .raid-viewport::-webkit-scrollbar,
+          .ditto-ticker .ditto-viewport::-webkit-scrollbar,
+          .new-gym-ticker .new-gym-viewport::-webkit-scrollbar {
+            display: none;
+          }
+
+          @media (max-width: 620px) {''')
+
+          Path(".github/workflows/temporary-inspect-tickers.yml").unlink(missing_ok=True)
+          Path(".github/workflows/apply-scrollable-tickers.yml").unlink(missing_ok=True)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Commit validated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components styles .github/workflows
+          git commit -m "Make tickers manually scrollable"
+          git push origin HEAD:develop
