@@ -21,6 +21,11 @@ interface RollbackResult {
   recoveryBackupFile: string;
 }
 
+interface GymBackupFile {
+  fileName: string;
+  modifiedAt: number;
+}
+
 function ukTimestampParts(date: Date): Record<string, string> {
   return Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", {
@@ -52,17 +57,26 @@ function backupBaseName(date: Date, reason: string): string {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}-${parts.minute}-${parts.second}-${milliseconds} - ${safeReason}.json`;
 }
 
-async function backupFiles(): Promise<string[]> {
+async function backupFiles(): Promise<GymBackupFile[]> {
   try {
     const entries = await fs.readdir(GYM_BACKUP_DIRECTORY, {
       withFileTypes: true,
     });
-
-    return entries
+    const fileNames = entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map((entry) => entry.name)
-      .sort()
-      .reverse();
+      .map((entry) => entry.name);
+    const files = await Promise.all(
+      fileNames.map(async (fileName) => {
+        const stats = await fs.stat(path.join(GYM_BACKUP_DIRECTORY, fileName));
+        return { fileName, modifiedAt: stats.mtimeMs };
+      }),
+    );
+
+    return files.sort(
+      (left, right) =>
+        right.modifiedAt - left.modifiedAt ||
+        right.fileName.localeCompare(left.fileName, "en-GB"),
+    );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
@@ -124,17 +138,15 @@ export async function backupGymState(
 }
 
 export async function latestGymStateBackup(): Promise<GymStateBackupInfo | null> {
-  const [fileName] = await backupFiles();
+  const [latest] = await backupFiles();
 
-  if (!fileName) {
+  if (!latest) {
     return null;
   }
 
-  const stats = await fs.stat(path.join(GYM_BACKUP_DIRECTORY, fileName));
-
   return {
-    fileName,
-    createdAt: stats.mtime.toISOString(),
+    fileName: latest.fileName,
+    createdAt: new Date(latest.modifiedAt).toISOString(),
   };
 }
 
