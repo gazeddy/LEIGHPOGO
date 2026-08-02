@@ -43,6 +43,11 @@ function PokedexStyles() {
     .pokemon-caught-toggle input { width: 20px; height: 20px; padding: 0; accent-color: #2ea043; }
     .pokemon-caught-toggle input:disabled { cursor: not-allowed; opacity: 0.45; }
     .pokemon-unavailable-note { margin: 0; padding: 8px 10px; border: 1px solid #6e7681; border-radius: 8px; background: rgba(110, 118, 129, 0.12); color: #c9d1d9; font-size: 0.84rem; font-weight: 700; text-align: center; }
+    .pokemon-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .pokemon-resource-card { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid #30363d; border-radius: 8px; background: #161b22; }
+    .pokemon-resource-card > span { color: #8b949e; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    .pokemon-resource-card strong { color: #f0c36b; font-size: 0.9rem; }
+    .pokemon-resource-card small { color: #c9d1d9; font-size: 0.72rem; }
     .pokemon-evolution-sections { display: grid; gap: 12px; padding-top: 10px; border-top: 1px solid #21262d; }
     .pokemon-evolution-section { display: grid; gap: 7px; }
     .pokemon-evolution-section h4 { margin: 0; color: #c9d1d9; font-size: 0.84rem; }
@@ -67,6 +72,7 @@ function PokedexStyles() {
       .pokemon-card-heading { grid-template-columns: 62px 1fr; }
       .pokemon-card-sprite { width: 62px; height: 62px; }
       .pokemon-caught-toggle { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; align-items: center; }
+      .pokemon-resource-grid { grid-template-columns: 1fr; }
       .region-meta p { display: none; }
     }
   `}</style>
@@ -92,6 +98,46 @@ function candyCostLabel(candyRequired) {
     return `${Number(candyRequired)} Candy`
   }
   return "Candy cost unavailable"
+}
+
+function formatNumber(value) {
+  return Number(value).toLocaleString()
+}
+
+function PokemonResourceDetails({ details }) {
+  const secondMoveCost = details?.secondMoveCost
+  const buddyDistance = Number(details?.buddyDistance)
+
+  return (
+    <div className="pokemon-resource-grid">
+      <div className="pokemon-resource-card">
+        <span>Second charged move</span>
+        {secondMoveCost ? (
+          <>
+            <strong>{formatNumber(secondMoveCost.stardust)} Stardust</strong>
+            <small>
+              {secondMoveCost.candy === null
+                ? "Candy cost unavailable"
+                : `${formatNumber(secondMoveCost.candy)} Candy`}
+            </small>
+          </>
+        ) : (
+          <strong>Cost unavailable</strong>
+        )}
+      </div>
+      <div className="pokemon-resource-card">
+        <span>Buddy reward</span>
+        {Number.isFinite(buddyDistance) && buddyDistance > 0 ? (
+          <>
+            <strong>{buddyDistance} km</strong>
+            <small>Walk per Candy earned</small>
+          </>
+        ) : (
+          <strong>Distance unavailable</strong>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function EvolutionLink({ relationship, direction, onNavigate }) {
@@ -231,6 +277,7 @@ function PokemonCard({
         </p>
       )}
 
+      <PokemonResourceDetails details={details} />
       <EvolutionStageLinks details={details} onNavigate={onNavigate} />
     </article>
   )
@@ -448,7 +495,7 @@ export default function PokedexPage() {
   }
 
   if (catalogLoading && !catalog) {
-    return <div className="container"><div className="card"><h1>Pokédex</h1><p className="muted">Loading the National Dex from the local POGOAPI cache…</p></div></div>
+    return <div className="container"><div className="card"><h1>Pokédex</h1><p className="muted">Loading the National Dex from the local data cache…</p></div></div>
   }
 
   if (catalogError && !catalog) {
@@ -461,19 +508,19 @@ export default function PokedexPage() {
         <div>
           <h1>Pokédex</h1>
           <p className="muted">
-            Full National Dex grouped by region, with POGOAPI typing, evolution stages, and Candy costs.
+            Full National Dex grouped by region, with typing, evolution costs, second charged-move costs and Buddy Candy distances.
           </p>
           <p className="muted">
             Progress: {caughtCount} / {trackableCount} released Pokémon ({caughtPercentage}%)
           </p>
           {catalog?.stale && (
-            <p className="muted">Using the last locally cached POGOAPI data while an update check is unavailable.</p>
+            <p className="muted">Using the last locally cached data while an update check is unavailable.</p>
           )}
           {catalog && !catalog.availabilityKnown && (
-            <p className="status-text">POGOAPI release status is temporarily unavailable, so availability labels are hidden.</p>
+            <p className="status-text">Release status is temporarily unavailable, so availability labels are hidden.</p>
           )}
           {catalog?.checkedAt && (
-            <p className="muted">POGOAPI hashes last checked: {new Date(catalog.checkedAt).toLocaleString()}</p>
+            <p className="muted">Data hashes last checked: {new Date(catalog.checkedAt).toLocaleString()}</p>
           )}
           {lastSaved && <p className="muted">Last saved: {lastSaved.toLocaleString()}</p>}
         </div>
