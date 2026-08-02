@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/fix-event-override-ticker-links
+  pull_request:
+    branches:
+      - develop
   workflow_dispatch:
 
 permissions:
