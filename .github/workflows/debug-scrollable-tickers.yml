@@ -1,0 +1,53 @@
+name: Debug scrollable tickers
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  debug-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./validation.db
+      NEXTAUTH_SECRET: validation-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Run the pending transformation locally
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-scrollable-tickers.yml').read_text(encoding='utf-8')
+          start_marker = "          python <<'PY'\n"
+          end_marker = "          PY\n\n      - name: Install dependencies"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          script = workflow[start:end]
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script.splitlines())
+          Path('/tmp/apply-scrollable-tickers.py').write_text(script + '\n', encoding='utf-8')
+          PY
+          python /tmp/apply-scrollable-tickers.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
