@@ -12,8 +12,8 @@ export interface PogoApiRaidBossCp {
 }
 
 export interface RaidBossCpCacheData {
+  version: number;
   checkedAt: string;
-  sourceHash: string | null;
   bosses: PogoApiRaidBossCp[];
   stale: boolean;
 }
@@ -23,7 +23,6 @@ export interface RaidBossCpCacheOptions {
   cachePath?: string;
   forceRefresh?: boolean;
   strictWrite?: boolean;
-  touchWhenUnchanged?: boolean;
 }
 
 export const CACHE_TTL_MS: number;
