@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 
 interface NewGymItem {
   id: string;
@@ -88,6 +93,11 @@ export default function NewGymTicker() {
     };
   }, [status]);
 
+  const animationDuration = useMemo(
+    () => `${Math.max(32, gyms.length * 10)}s`,
+    [gyms.length],
+  );
+
   if (status !== "authenticated") {
     return null;
   }
@@ -120,7 +130,14 @@ export default function NewGymTicker() {
             {statusMessage}
           </p>
         ) : (
-          <div className="new-gym-track">
+          <div
+            className="new-gym-track"
+            style={
+              {
+                "--new-gym-ticker-duration": animationDuration,
+              } as CSSProperties
+            }
+          >
             <div className="new-gym-copy">{items}</div>
             <div className="new-gym-copy" aria-hidden="true">{items}</div>
           </div>
