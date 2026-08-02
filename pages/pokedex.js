@@ -1,62 +1,307 @@
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
-import pokedexByRegion from "../lib/pokedexData"
 
-const buildSpriteUrl = ({ dexNumber }) =>
-  `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber.toString()}.png`
+const buildSpriteUrl = (dexNumber) =>
+  `https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/${dexNumber}.png`
 
-function PokedexRegion({ region, caughtSet, onToggle }) {
-  const [isOpen, setIsOpen] = useState(true)
-  const caughtCount = useMemo(
-    () => region.pokemon.filter((pokemon) => caughtSet.has(pokemon.dexNumber)).length,
-    [region.pokemon, caughtSet]
+const TYPE_COLOURS = {
+  Bug: "#729f3f",
+  Dark: "#4f3a34",
+  Dragon: "#5368c4",
+  Electric: "#b99400",
+  Fairy: "#b94f91",
+  Fighting: "#a9422f",
+  Fire: "#c9502e",
+  Flying: "#607fae",
+  Ghost: "#5d4d80",
+  Grass: "#468c3f",
+  Ground: "#9e7938",
+  Ice: "#4f9fad",
+  Normal: "#70767b",
+  Poison: "#7f488e",
+  Psychic: "#bd496c",
+  Rock: "#887734",
+  Steel: "#58727d",
+  Water: "#376daa",
+}
+
+function PokedexStyles() {
+  return <style jsx global>{`
+    .pokedex-page { max-width: 1200px; }
+    .pokemon-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 18px; }
+    .pokemon-dex-card { display: grid; align-content: start; gap: 12px; padding: 14px; border: 1px solid #30363d; border-radius: 10px; background: #0d1117; scroll-margin-top: 88px; }
+    .pokemon-dex-card.caught { border-color: #2ea043; background: rgba(35, 134, 54, 0.12); }
+    .pokemon-dex-card.unavailable { border-style: dashed; border-color: #6e7681; }
+    .pokemon-card-heading { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 12px; }
+    .pokemon-card-sprite { width: 72px; height: 72px; object-fit: contain; padding: 6px; border: 1px solid #21262d; border-radius: 10px; background: #070b10; }
+    .pokemon-card-name { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+    .pokemon-card-name h3 { margin: 0; overflow-wrap: anywhere; }
+    .pokemon-type-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pokemon-type-badge { display: inline-flex; padding: 5px 9px; border-radius: 999px; color: #fff; font-size: 0.75rem; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px #000; }
+    .pokemon-type-missing { font-size: 0.8rem; }
+    .pokemon-caught-toggle { display: grid; justify-items: center; gap: 4px; margin: 0; color: #8b949e; font-size: 0.72rem; }
+    .pokemon-caught-toggle input { width: 20px; height: 20px; padding: 0; accent-color: #2ea043; }
+    .pokemon-caught-toggle input:disabled { cursor: not-allowed; opacity: 0.45; }
+    .pokemon-unavailable-note { margin: 0; padding: 8px 10px; border: 1px solid #6e7681; border-radius: 8px; background: rgba(110, 118, 129, 0.12); color: #c9d1d9; font-size: 0.84rem; font-weight: 700; text-align: center; }
+    .pokemon-evolution-sections { display: grid; gap: 12px; padding-top: 10px; border-top: 1px solid #21262d; }
+    .pokemon-evolution-section { display: grid; gap: 7px; }
+    .pokemon-evolution-section h4 { margin: 0; color: #c9d1d9; font-size: 0.84rem; }
+    .pokemon-evolution-list { display: grid; gap: 7px; }
+    .pokemon-evolution-link { display: grid; grid-template-columns: auto 42px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #30363d; border-radius: 8px; background: #161b22; color: #fff; text-decoration: none; }
+    .pokemon-evolution-link:hover { border-color: #58a6ff; background: #1c2128; }
+    .pokemon-evolution-direction { color: #9ecbff; font-size: 1.1rem; font-weight: 800; }
+    .pokemon-evolution-link img { width: 42px; height: 42px; object-fit: contain; padding: 3px; border-radius: 7px; background: #070b10; }
+    .pokemon-evolution-name { display: grid; gap: 2px; min-width: 0; }
+    .pokemon-evolution-name strong { overflow-wrap: anywhere; }
+    .pokemon-evolution-name small { color: #8b949e; font-family: monospace; }
+    .pokemon-evolution-cost { display: grid; justify-items: end; gap: 2px; color: #f0c36b; font-size: 0.8rem; font-weight: 800; text-align: right; }
+    .pokemon-evolution-cost small { max-width: 130px; color: #8b949e; font-size: 0.68rem; font-weight: 600; }
+    .pokemon-no-evolutions { margin: 0; padding-top: 10px; border-top: 1px solid #21262d; font-size: 0.82rem; }
+    @media (max-width: 700px) {
+      .pokemon-card-grid { grid-template-columns: 1fr; }
+      .pokemon-evolution-link { grid-template-columns: auto 42px minmax(0, 1fr); }
+      .pokemon-evolution-cost { grid-column: 2 / -1; justify-items: start; text-align: left; }
+    }
+    @media (max-width: 430px) {
+      .pokemon-card-heading { grid-template-columns: 62px 1fr; }
+      .pokemon-card-sprite { width: 62px; height: 62px; }
+      .pokemon-caught-toggle { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; align-items: center; }
+      .region-meta p { display: none; }
+    }
+  `}</style>
+}
+
+function TypeBadge({ type }) {
+  return (
+    <span
+      className="pokemon-type-badge"
+      style={{ backgroundColor: TYPE_COLOURS[type] || "#57606a" }}
+    >
+      {type}
+    </span>
   )
+}
+
+function candyCostLabel(candyRequired) {
+  if (candyRequired === null || candyRequired === undefined || candyRequired === "") {
+    return "Candy cost unavailable"
+  }
+  if (Number(candyRequired) === 0) return "No Candy required"
+  if (Number.isFinite(Number(candyRequired))) {
+    return `${Number(candyRequired)} Candy`
+  }
+  return "Candy cost unavailable"
+}
+
+function EvolutionLink({ relationship, direction, onNavigate }) {
+  const formNotes = []
+  if (relationship.sourceForm) formNotes.push(`${relationship.sourceForm} source`)
+  if (relationship.targetForm) formNotes.push(`${relationship.targetForm} target`)
+
+  return (
+    <a
+      href={`#pokemon-${relationship.pokemonId}`}
+      className="pokemon-evolution-link"
+      onClick={(event) => {
+        event.preventDefault()
+        onNavigate(relationship.pokemonId)
+      }}
+    >
+      <span className="pokemon-evolution-direction" aria-hidden="true">
+        {direction === "previous" ? "←" : "→"}
+      </span>
+      <img
+        src={buildSpriteUrl(relationship.pokemonId)}
+        alt=""
+        loading="lazy"
+      />
+      <span className="pokemon-evolution-name">
+        <strong>{relationship.pokemonName}</strong>
+        <small>#{String(relationship.pokemonId).padStart(3, "0")}</small>
+      </span>
+      <span className="pokemon-evolution-cost">
+        {candyCostLabel(relationship.candyRequired)}
+        {formNotes.length > 0 && <small>{formNotes.join(" · ")}</small>}
+      </span>
+    </a>
+  )
+}
+
+function EvolutionStageLinks({ details, onNavigate }) {
+  const previous = details?.previous || []
+  const next = details?.next || []
+
+  if (!previous.length && !next.length) {
+    return <p className="muted pokemon-no-evolutions">No evolutions</p>
+  }
+
+  return (
+    <div className="pokemon-evolution-sections">
+      {previous.length > 0 && (
+        <section className="pokemon-evolution-section">
+          <h4>Previous evolution</h4>
+          <div className="pokemon-evolution-list">
+            {previous.map((relationship, index) => (
+              <EvolutionLink
+                key={`previous-${relationship.pokemonId}-${index}`}
+                relationship={relationship}
+                direction="previous"
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {next.length > 0 && (
+        <section className="pokemon-evolution-section">
+          <h4>Next evolution</h4>
+          <div className="pokemon-evolution-list">
+            {next.map((relationship, index) => (
+              <EvolutionLink
+                key={`next-${relationship.pokemonId}-${index}`}
+                relationship={relationship}
+                direction="next"
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function PokemonCard({
+  pokemon,
+  details,
+  caught,
+  released,
+  availabilityKnown,
+  onToggle,
+  onNavigate,
+}) {
+  const unavailable = availabilityKnown && !released
+
+  return (
+    <article
+      id={`pokemon-${pokemon.dexNumber}`}
+      className={`pokemon-dex-card ${caught ? "caught" : ""} ${
+        unavailable ? "unavailable" : ""
+      }`}
+    >
+      <div className="pokemon-card-heading">
+        <img
+          src={buildSpriteUrl(pokemon.dexNumber)}
+          alt={pokemon.name}
+          className="pokemon-card-sprite"
+          loading="lazy"
+        />
+        <div className="pokemon-card-name">
+          <span className="dex-number">
+            #{String(pokemon.dexNumber).padStart(3, "0")}
+          </span>
+          <h3>{pokemon.name}</h3>
+          <div className="pokemon-type-list">
+            {details?.types?.length ? (
+              details.types.map((type) => <TypeBadge key={type} type={type} />)
+            ) : (
+              <span className="muted pokemon-type-missing">Typing unavailable</span>
+            )}
+          </div>
+        </div>
+        <label className="pokemon-caught-toggle">
+          <input
+            type="checkbox"
+            checked={caught}
+            disabled={unavailable}
+            onChange={() => onToggle(pokemon.dexNumber)}
+          />
+          <span>{caught ? "Caught" : "Missing"}</span>
+        </label>
+      </div>
+
+      {unavailable && (
+        <p className="pokemon-unavailable-note">
+          Not available in Pokémon GO yet
+        </p>
+      )}
+
+      <EvolutionStageLinks details={details} onNavigate={onNavigate} />
+    </article>
+  )
+}
+
+function PokedexRegion({
+  region,
+  detailsByPokemon,
+  caughtSet,
+  releasedSet,
+  availabilityKnown,
+  onToggle,
+  onNavigate,
+  focusedDex,
+}) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  useEffect(() => {
+    if (
+      focusedDex &&
+      region.pokemon.some((pokemon) => pokemon.dexNumber === focusedDex)
+    ) {
+      setIsOpen(true)
+    }
+  }, [focusedDex, region.pokemon])
+
+  const releasedPokemon = availabilityKnown
+    ? region.pokemon.filter((pokemon) => releasedSet.has(pokemon.dexNumber))
+    : region.pokemon
+  const caughtCount = releasedPokemon.filter((pokemon) =>
+    caughtSet.has(pokemon.dexNumber)
+  ).length
 
   return (
     <div className="card pokedex-region">
       <button
         type="button"
         className="region-header"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => setIsOpen((previous) => !previous)}
         aria-expanded={isOpen}
       >
         <div>
           <h2>{region.region}</h2>
           <p className="muted region-count">
-            {caughtCount}:{region.pokemon.length} caught
+            {caughtCount}/{releasedPokemon.length} caught · {region.pokemon.length} in National Dex
           </p>
         </div>
         <div className="region-meta">
           <p className="muted">
-            #{region.pokemon[0].dexNumber} - #{region.pokemon[region.pokemon.length - 1].dexNumber}
+            #{region.pokemon[0].dexNumber} – #{
+              region.pokemon[region.pokemon.length - 1].dexNumber
+            }
           </p>
           <span className={`chevron ${isOpen ? "open" : ""}`} aria-hidden="true">
             ▾
           </span>
         </div>
       </button>
+
       {isOpen && (
-        <div className="pokedex-grid">
+        <div className="pokemon-card-grid">
           {region.pokemon.map((pokemon) => {
-            const checked = caughtSet.has(pokemon.dexNumber)
+            const released =
+              !availabilityKnown || releasedSet.has(pokemon.dexNumber)
             return (
-              <label key={pokemon.dexNumber} className={`pokedex-item ${checked ? "caught" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => onToggle(pokemon.dexNumber)}
-                />
-                <img
-                  src={buildSpriteUrl(pokemon)}
-                  alt={pokemon.name}
-                  className="pokemon-sprite"
-                  loading="lazy"
-                />
-                <div className="pokemon-info">
-                  <span className="dex-number">#{pokemon.dexNumber.toString().padStart(3, "0")}</span>
-                  <span className="pokemon-name">{pokemon.name}</span>
-                </div>
-              </label>
+              <PokemonCard
+                key={pokemon.dexNumber}
+                pokemon={pokemon}
+                details={detailsByPokemon?.[pokemon.dexNumber]}
+                caught={caughtSet.has(pokemon.dexNumber)}
+                released={released}
+                availabilityKnown={availabilityKnown}
+                onToggle={onToggle}
+                onNavigate={onNavigate}
+              />
             )
           })}
         </div>
@@ -65,99 +310,106 @@ function PokedexRegion({ region, caughtSet, onToggle }) {
   )
 }
 
-export default function PokedexPage({
-  releasedDexNumbers = [],
-  releaseDataStale = false,
-  releaseDataError = "",
-}) {
+export default function PokedexPage() {
   const { data: session, status } = useSession()
+  const [catalog, setCatalog] = useState(null)
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState("")
   const [caughtSet, setCaughtSet] = useState(new Set())
-  const [statusMessage, setStatusMessage] = useState("")
+  const [isLoadingCaught, setIsLoadingCaught] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [statusMessage, setStatusMessage] = useState("")
   const [lastSaved, setLastSaved] = useState(null)
-
-  const releasedSet = useMemo(
-    () => new Set(releasedDexNumbers.map((dexNumber) => Number(dexNumber))),
-    [releasedDexNumbers]
-  )
-
-  const availablePokedex = useMemo(
-    () =>
-      pokedexByRegion
-        .map((region) => ({
-          ...region,
-          pokemon: region.pokemon.filter((pokemon) => releasedSet.has(pokemon.dexNumber)),
-        }))
-        .filter((region) => region.pokemon.length > 0),
-    [releasedSet]
-  )
-
-  const availablePokemonList = useMemo(
-    () => availablePokedex.flatMap((region) => region.pokemon),
-    [availablePokedex]
-  )
+  const [focusedDex, setFocusedDex] = useState(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
 
-    const fetchData = async () => {
-      setIsLoading(true)
+    const fetchCatalog = async () => {
+      setCatalogLoading(true)
+      setCatalogError("")
       try {
-        const response = await fetch("/api/pokedex")
-        if (!response.ok) throw new Error("Unable to load your Pokédex")
+        const response = await fetch("/api/pokedex-catalog")
         const data = await response.json()
-        setCaughtSet(
-          new Set(data.dexNumbers.filter((dexNumber) => releasedSet.has(Number(dexNumber))))
-        )
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to load the Pokédex")
+        }
+        setCatalog(data)
       } catch (error) {
-        setStatusMessage(error.message)
+        setCatalogError(error.message)
       } finally {
-        setIsLoading(false)
+        setCatalogLoading(false)
       }
     }
 
-    fetchData()
-  }, [releasedSet, status])
+    const fetchCaught = async () => {
+      setIsLoadingCaught(true)
+      try {
+        const response = await fetch("/api/pokedex")
+        if (!response.ok) throw new Error("Unable to load your Pokédex progress")
+        const data = await response.json()
+        setCaughtSet(new Set(data.dexNumbers.map(Number)))
+      } catch (error) {
+        setStatusMessage(error.message)
+      } finally {
+        setIsLoadingCaught(false)
+      }
+    }
+
+    fetchCatalog()
+    fetchCaught()
+  }, [status])
+
+  const allDexNumbers = useMemo(
+    () =>
+      new Set(
+        catalog?.regions?.flatMap((region) =>
+          region.pokemon.map((pokemon) => pokemon.dexNumber)
+        ) || []
+      ),
+    [catalog]
+  )
+
+  const releasedSet = useMemo(
+    () => new Set((catalog?.releasedDexNumbers || []).map(Number)),
+    [catalog]
+  )
+
+  const trackableSet = catalog?.availabilityKnown ? releasedSet : allDexNumbers
+  const caughtCount = Array.from(caughtSet).filter((dexNumber) =>
+    trackableSet.has(dexNumber)
+  ).length
+  const trackableCount = trackableSet.size
+  const caughtPercentage = trackableCount
+    ? Math.round((caughtCount / trackableCount) * 100)
+    : 0
 
   const toggleCaught = (dexNumber) => {
-    if (!releasedSet.has(dexNumber)) return
+    if (!trackableSet.has(dexNumber)) return
 
-    setCaughtSet((prev) => {
-      const next = new Set(prev)
-      if (next.has(dexNumber)) {
-        next.delete(dexNumber)
-      } else {
-        next.add(dexNumber)
-      }
+    setCaughtSet((previous) => {
+      const next = new Set(previous)
+      next.has(dexNumber) ? next.delete(dexNumber) : next.add(dexNumber)
       return next
     })
   }
-
-  const caughtCount = useMemo(
-    () => Array.from(caughtSet).filter((dexNumber) => releasedSet.has(dexNumber)).length,
-    [caughtSet, releasedSet]
-  )
-  const caughtPercentage = availablePokemonList.length
-    ? Math.round((caughtCount / availablePokemonList.length) * 100)
-    : 0
 
   const handleSave = async () => {
     setIsSaving(true)
     setStatusMessage("")
     try {
-      const releasedCaughtDexNumbers = Array.from(caughtSet).filter((dexNumber) =>
-        releasedSet.has(dexNumber)
+      const dexNumbers = Array.from(caughtSet).filter((dexNumber) =>
+        trackableSet.has(dexNumber)
       )
       const response = await fetch("/api/pokedex", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dexNumbers: releasedCaughtDexNumbers }),
+        body: JSON.stringify({ dexNumbers }),
       })
 
       if (!response.ok) throw new Error("Failed to save your Pokédex.")
       const data = await response.json()
-      setCaughtSet(new Set(data.dexNumbers))
+      setCaughtSet(new Set(data.dexNumbers.map(Number)))
       setLastSaved(new Date())
       setStatusMessage("Pokédex saved successfully!")
     } catch (error) {
@@ -165,6 +417,15 @@ export default function PokedexPage({
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const navigateToPokemon = (dexNumber) => {
+    setFocusedDex(dexNumber)
+    window.setTimeout(() => {
+      document
+        .getElementById(`pokemon-${dexNumber}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }, 150)
   }
 
   if (status === "loading") {
@@ -175,85 +436,70 @@ export default function PokedexPage({
     return (
       <div className="container">
         <div className="card">
-          <h1>Pokédex Tracker</h1>
-          <p className="muted">Please sign in to track your progress.</p>
+          <h1>Pokédex</h1>
+          <p className="muted">Please sign in to view and track your Pokédex.</p>
         </div>
       </div>
     )
   }
 
-  if (!availablePokemonList.length) {
-    return (
-      <div className="container">
-        <div className="card">
-          <h1>Pokédex Tracker</h1>
-          <p className="status-text">
-            {releaseDataError || "The released Pokémon list is temporarily unavailable."}
-          </p>
-        </div>
-      </div>
-    )
+  if (catalogLoading && !catalog) {
+    return <div className="container"><div className="card"><h1>Pokédex</h1><p className="muted">Loading the National Dex from the local POGOAPI cache…</p></div></div>
+  }
+
+  if (catalogError && !catalog) {
+    return <div className="container"><div className="card"><h1>Pokédex</h1><p className="status-text">{catalogError}</p></div></div>
   }
 
   return (
-    <div className="container">
+    <div className="container pokedex-page">
       <div className="card pokedex-hero">
         <div>
-          <h1>Pokédex Tracker</h1>
-          <p className="muted">Mark Pokémon you’ve obtained by National Dex order, grouped by region.</p>
+          <h1>Pokédex</h1>
           <p className="muted">
-            Progress: {caughtCount} / {availablePokemonList.length} ({caughtPercentage}%)
+            Full National Dex grouped by region, with POGOAPI typing, evolution stages, and Candy costs.
           </p>
-          {releaseDataStale && (
-            <p className="muted">Using the last cached release list while PogoAPI is unavailable.</p>
+          <p className="muted">
+            Progress: {caughtCount} / {trackableCount} released Pokémon ({caughtPercentage}%)
+          </p>
+          {catalog?.stale && (
+            <p className="muted">Using the last locally cached POGOAPI data while an update check is unavailable.</p>
           )}
-          {lastSaved && (
-            <p className="muted">Last saved: {lastSaved.toLocaleString()}</p>
+          {catalog && !catalog.availabilityKnown && (
+            <p className="status-text">POGOAPI release status is temporarily unavailable, so availability labels are hidden.</p>
           )}
+          {catalog?.checkedAt && (
+            <p className="muted">POGOAPI hashes last checked: {new Date(catalog.checkedAt).toLocaleString()}</p>
+          )}
+          {lastSaved && <p className="muted">Last saved: {lastSaved.toLocaleString()}</p>}
         </div>
         <div className="pokedex-actions">
-          <button onClick={handleSave} disabled={isSaving || isLoading}>
+          <button
+            onClick={handleSave}
+            disabled={isSaving || isLoadingCaught || !catalog}
+          >
             {isSaving ? "Saving…" : "Save progress"}
           </button>
           {statusMessage && <p className="status-text">{statusMessage}</p>}
         </div>
       </div>
 
-      {isLoading && <p className="muted">Loading your saved Pokédex…</p>}
+      {isLoadingCaught && <p className="muted">Loading your saved Pokédex progress…</p>}
 
-      {availablePokedex.map((region) => (
+      {catalog?.regions?.map((region) => (
         <PokedexRegion
           key={region.region}
           region={region}
+          detailsByPokemon={catalog.pokemon}
           caughtSet={caughtSet}
+          releasedSet={releasedSet}
+          availabilityKnown={catalog.availabilityKnown}
           onToggle={toggleCaught}
+          onNavigate={navigateToPokemon}
+          focusedDex={focusedDex}
         />
       ))}
+      <PokedexStyles />
     </div>
   )
-}
-
-export async function getServerSideProps() {
-  try {
-    const { getReleasedPokemonData } = require("../lib/releasedPokemonCache")
-    const releasedPokemonData = await getReleasedPokemonData()
-
-    return {
-      props: {
-        releasedDexNumbers: releasedPokemonData.dexNumbers,
-        releaseDataStale: releasedPokemonData.stale,
-        releaseDataError: "",
-      },
-    }
-  } catch (error) {
-    console.error("Unable to load the released Pokémon list", error)
-
-    return {
-      props: {
-        releasedDexNumbers: [],
-        releaseDataStale: false,
-        releaseDataError: "The released Pokémon list could not be loaded. Please try again shortly.",
-      },
-    }
-  }
 }
