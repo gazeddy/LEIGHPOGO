@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      DATABASE_URL: file:./prisma/validation.db
+      DATABASE_URL: file:./validation.db
       NEXTAUTH_SECRET: branch-validation-secret
       NEXTAUTH_URL: http://localhost:3000
     steps:
