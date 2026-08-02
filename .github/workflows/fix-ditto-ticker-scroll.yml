@@ -1,0 +1,255 @@
+name: Fix Ditto ticker scrolling
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - .github/workflows/fix-ditto-ticker-scroll.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./validation.db
+      NEXTAUTH_SECRET: validation-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Fix short ticker looping
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise RuntimeError(
+                      f"Expected exactly one match in {path}, found {text.count(old)}"
+                  )
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          hook_path = "components/tickers/useScrollableTicker.ts"
+
+          replace_once(
+              hook_path,
+              "  const copyWidthRef = useRef(0);\n",
+              "  const copyWidthRef = useRef(0);\n"
+              "  const copyCountRef = useRef(0);\n"
+              "  const scrollableRef = useRef(false);\n",
+          )
+
+          replace_once(
+              hook_path,
+              '''  const normaliseScrollPosition = useCallback(() => {
+            const viewport = viewportRef.current;
+            const copyWidth = copyWidthRef.current;
+
+            if (!viewport || copyWidth <= viewport.clientWidth) {
+              return;
+            }
+
+            if (viewport.scrollLeft <= 0) {
+              viewport.scrollLeft += copyWidth;
+            } else if (viewport.scrollLeft >= copyWidth * 2) {
+              viewport.scrollLeft -= copyWidth;
+            }
+          }, []);
+          ''',
+              '''  const normaliseScrollPosition = useCallback(() => {
+            const viewport = viewportRef.current;
+            const track = viewport?.firstElementChild as HTMLElement | null;
+            const copyWidth = copyWidthRef.current;
+            const copyCount = copyCountRef.current;
+
+            if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
+              return;
+            }
+
+            const maxScrollLeft = Math.max(
+              0,
+              track.scrollWidth - viewport.clientWidth,
+            );
+            if (maxScrollLeft <= 0) {
+              return;
+            }
+
+            const middleCopyIndex = Math.floor(copyCount / 2);
+            const centreScrollLeft = Math.min(
+              copyWidth * middleCopyIndex,
+              maxScrollLeft,
+            );
+            const lowerBoundary = Math.max(0, centreScrollLeft - copyWidth);
+            const upperBoundary = Math.min(
+              maxScrollLeft,
+              centreScrollLeft + copyWidth,
+            );
+
+            if (
+              viewport.scrollLeft <= lowerBoundary &&
+              viewport.scrollLeft + copyWidth <= maxScrollLeft
+            ) {
+              viewport.scrollLeft += copyWidth;
+            } else if (
+              viewport.scrollLeft >= upperBoundary &&
+              viewport.scrollLeft - copyWidth >= 0
+            ) {
+              viewport.scrollLeft -= copyWidth;
+            }
+          }, []);
+          ''',
+          )
+
+          replace_once(
+              hook_path,
+              '''    const measure = () => {
+              const track = viewport.firstElementChild as HTMLElement | null;
+              const firstCopy = track?.firstElementChild as HTMLElement | null;
+              const copyWidth = firstCopy?.getBoundingClientRect().width ?? 0;
+
+              copyWidthRef.current = copyWidth;
+
+              if (copyWidth > viewport.clientWidth) {
+                if (!initialised || viewport.scrollLeft <= 0) {
+          viewport.scrollLeft = copyWidth;
+                }
+              } else {
+                viewport.scrollLeft = 0;
+              }
+
+              initialised = true;
+            };
+          ''',
+              '''    const measure = () => {
+              const track = viewport.firstElementChild as HTMLElement | null;
+              const firstCopy = track?.firstElementChild as HTMLElement | null;
+              const copyWidth = firstCopy?.getBoundingClientRect().width ?? 0;
+              const copyCount = track?.childElementCount ?? 0;
+              const maxScrollLeft = Math.max(
+                0,
+                (track?.scrollWidth ?? 0) - viewport.clientWidth,
+              );
+
+              copyWidthRef.current = copyWidth;
+              copyCountRef.current = copyCount;
+              scrollableRef.current = copyWidth > 0 && maxScrollLeft > 0;
+
+              if (scrollableRef.current) {
+                const middleCopyIndex = Math.floor(copyCount / 2);
+                const initialScrollLeft = Math.min(
+                  copyWidth * middleCopyIndex,
+                  maxScrollLeft,
+                );
+
+                if (!initialised || viewport.scrollLeft <= 0) {
+                  viewport.scrollLeft = initialScrollLeft;
+                }
+              } else {
+                viewport.scrollLeft = 0;
+              }
+
+              initialised = true;
+            };
+          ''',
+          )
+
+          replace_once(
+              hook_path,
+              "          copyWidth > viewport.clientWidth &&\n",
+              "          scrollableRef.current &&\n",
+          )
+
+          replace_once(
+              hook_path,
+              '''    if (
+              !viewport ||
+              copyWidthRef.current <= viewport.clientWidth
+            ) {
+          ''',
+              '''    if (!viewport || !scrollableRef.current) {
+          ''',
+          )
+
+          ditto_path = "components/events/DittoDisguiseTicker.tsx"
+          replace_once(
+              ditto_path,
+              '''            <DittoItems disguises={disguises} duplicate />
+                <DittoItems disguises={disguises} />
+                <DittoItems disguises={disguises} duplicate />
+          ''',
+              '''            <DittoItems disguises={disguises} duplicate />
+                <DittoItems disguises={disguises} duplicate />
+                <DittoItems disguises={disguises} duplicate />
+                <DittoItems disguises={disguises} />
+                <DittoItems disguises={disguises} duplicate />
+                <DittoItems disguises={disguises} duplicate />
+                <DittoItems disguises={disguises} duplicate />
+          ''',
+          )
+
+          test_path = "__tests__/components/tickers.test.js"
+          replace_once(
+              test_path,
+              '''    expect(
+                (dittoTicker.match(/<DittoItems disguises=\\{disguises\\} duplicate \\/>/g) || []).length,
+              ).toBe(2);
+          ''',
+              '''    expect(
+                (dittoTicker.match(/<DittoItems disguises=\\{disguises\\} duplicate \\/>/g) || []).length,
+              ).toBe(6);
+          ''',
+          )
+
+          test_file = Path(test_path)
+          test_text = test_file.read_text(encoding="utf-8")
+          assertion = '    expect(scrollableTicker).toContain("scrollableRef.current");\n'
+          marker = '    expect(scrollableTicker).toContain("normaliseScrollPosition");\n'
+          if assertion not in test_text:
+              if marker not in test_text:
+                  raise RuntimeError("Ticker assertion marker not found")
+              test_text = test_text.replace(marker, marker + assertion, 1)
+              test_file.write_text(test_text, encoding="utf-8")
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/fix-ditto-ticker-scroll.yml
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/tickers/useScrollableTicker.ts \
+            components/events/DittoDisguiseTicker.tsx \
+            __tests__/components/tickers.test.js \
+            .github/workflows/fix-ditto-ticker-scroll.yml
+          git commit -m "Fix Ditto ticker scrolling on wide viewports"
+          git push origin develop
