@@ -9,9 +9,40 @@ const pogoApiPayload = {
   current: {
     5: [
       {
+        name: "Heatran",
+        form: "Normal",
+        max_unboosted_cp: 2145,
+        max_boosted_cp: 2681,
+      },
+    ],
+    mega: [
+      {
+        name: "Sableye",
+        form: "Normal",
+        max_unboosted_cp: 1110,
+        max_boosted_cp: 1387,
+      },
+    ],
+  },
+  previous: {
+    3: [
+      {
+        name: "Aggron",
+        form: "Normal",
+        max_unboosted_cp: 1714,
+        max_boosted_cp: 2143,
+      },
+    ],
+    5: [
+      {
+        name: "Kyurem",
+        form: "Normal",
+        max_unboosted_cp: 2042,
+        max_boosted_cp: 2553,
+      },
+      {
         name: "Palkia",
         form: "Normal",
-        tier: 5,
         max_unboosted_cp: 2280,
         max_boosted_cp: 2850,
         min_unboosted_cp: 2190,
@@ -47,12 +78,11 @@ const pogoApiPayload = {
         name: "Aggron",
         form: "Normal",
         tier: 6,
-        max_unboosted_cp: 1714,
-        max_boosted_cp: 2143,
+        max_unboosted_cp: 2378,
+        max_boosted_cp: 2973,
       },
     ],
   },
-  previous: {},
 };
 
 function tickerItem(category, boss) {
@@ -72,7 +102,17 @@ function tickerItem(category, boss) {
 }
 
 describe("raid boss max catch CP cache", () => {
-  it("extracts only the current maximum boosted and unboosted CP values", () => {
+  it("uses previous records when PoGoAPI current lags the event feed", () => {
+    const bosses = extractCurrentRaidBosses(pogoApiPayload);
+
+    expect(
+      findRaidBossCpMatches(tickerItem("five-star", "Kyurem"), bosses),
+    ).toEqual([
+      { boss: "Kyurem", maxUnboostedCp: 2042, maxBoostedCp: 2553 },
+    ]);
+  });
+
+  it("extracts only maximum boosted and unboosted CP values", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
     const palkia = bosses.find(
       (boss) => boss.name === "Palkia" && boss.tier === "5",
@@ -89,26 +129,21 @@ describe("raid boss max catch CP cache", () => {
     expect(palkia).not.toHaveProperty("minBoostedCp");
   });
 
-  it("uses the containing mega key instead of an entry's numeric tier", () => {
+  it("uses the previous Mega record rather than ordinary Aggron CP", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
 
-    expect(bosses).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "Aggron",
-          tier: "mega",
-          maxUnboostedCp: 1714,
-          maxBoostedCp: 2143,
-        }),
-      ]),
-    );
+    expect(
+      findRaidBossCpMatches(tickerItem("mega", "Aggron"), bosses),
+    ).toEqual([
+      { boss: "Aggron", maxUnboostedCp: 2378, maxBoostedCp: 2973 },
+    ]);
   });
 
   it("matches five-star, Shadow and Mega ticker entries without requiring a Shadow tier", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
     const items = attachRaidBossCp(
       [
-        tickerItem("five-star", "Palkia"),
+        tickerItem("five-star", "Kyurem"),
         tickerItem("shadow", "Palkia"),
         tickerItem("mega", "Aggron"),
       ],
@@ -116,13 +151,13 @@ describe("raid boss max catch CP cache", () => {
     );
 
     expect(items[0].catchCp).toEqual([
-      { boss: "Palkia", maxUnboostedCp: 2280, maxBoostedCp: 2850 },
+      { boss: "Kyurem", maxUnboostedCp: 2042, maxBoostedCp: 2553 },
     ]);
     expect(items[1].catchCp).toEqual([
       { boss: "Palkia", maxUnboostedCp: 2280, maxBoostedCp: 2850 },
     ]);
     expect(items[2].catchCp).toEqual([
-      { boss: "Aggron", maxUnboostedCp: 1714, maxBoostedCp: 2143 },
+      { boss: "Aggron", maxUnboostedCp: 2378, maxBoostedCp: 2973 },
     ]);
   });
 
