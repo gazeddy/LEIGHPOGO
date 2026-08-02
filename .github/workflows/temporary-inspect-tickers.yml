@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - develop
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -16,6 +19,6 @@ jobs:
       - name: Locate ticker components
         run: |
           echo '--- component files ---'
-          find components -type f -maxdepth 4 | sort
+          find components -maxdepth 4 -type f | sort
           echo '--- ticker references ---'
           grep -R -n -E 'ticker-track|raid-track|ditto-track|new-gym-track|ticker-viewport|raid-viewport|ditto-viewport|new-gym-viewport' components styles || true
