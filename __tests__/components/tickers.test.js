@@ -9,6 +9,7 @@ describe("ticker regression wiring", () => {
   const app = readSource("pages/_app.js");
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
+  const raidApi = readSource("pages/api/events/raids.ts");
   const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
   const dittoApi = readSource("pages/api/ditto-disguises.ts");
 
@@ -31,6 +32,19 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("animation-play-state: paused;");
     expect(raidTicker).toContain(".raid-group-duplicate");
     expect(raidTicker).toContain("display: none;");
+  });
+
+  it("shows perfect catch CP values from the cached PoGoAPI raid data", () => {
+    expect(raidApi).toContain("getRaidBossCpData");
+    expect(raidApi).toContain("attachRaidBossCp");
+    expect(raidApi).toContain(
+      "Failed to enrich current raid bosses with PoGoAPI catch CP data",
+    );
+    expect(raidTicker).toContain("formatCatchCp(item.catchCp)");
+    expect(raidTicker).toContain("100% CP");
+    expect(raidTicker).toContain("WB");
+    expect(raidTicker).toContain("unboosted level 20");
+    expect(raidTicker).toContain("weather-boosted level 25");
   });
 
   it("keeps the Ditto ticker public, daily cached and between raids and new gyms", () => {
