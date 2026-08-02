@@ -35,14 +35,21 @@ function TradeItemsEditor({ title, items, onChange }) {
   }
 
   const removeItem = (index) => {
-    if (items.length === 1) return
+    if (items.length === 1) {
+      onChange([emptyItem()])
+      return
+    }
+
     onChange(items.filter((_, itemIndex) => itemIndex !== index))
   }
 
   return (
     <section className="trade-form-section">
       <div className="trade-section-header">
-        <h2>{title}</h2>
+        <div>
+          <h2>{title}</h2>
+          <p className="muted">Optional — leave this section blank when it does not apply.</p>
+        </div>
         <button
           type="button"
           className="secondary-button"
@@ -57,15 +64,13 @@ function TradeItemsEditor({ title, items, onChange }) {
           <div className="trade-item-editor" key={index}>
             <div className="trade-section-header">
               <strong>Pokémon {index + 1}</strong>
-              {items.length > 1 && (
-                <button
-                  type="button"
-                  className="danger compact-button"
-                  onClick={() => removeItem(index)}
-                >
-                  Remove
-                </button>
-              )}
+              <button
+                type="button"
+                className="danger compact-button"
+                onClick={() => removeItem(index)}
+              >
+                Clear
+              </button>
             </div>
 
             <label>
@@ -75,7 +80,6 @@ function TradeItemsEditor({ title, items, onChange }) {
                 value={item.pokemonName}
                 onChange={(event) => updateItem(index, { pokemonName: event.target.value })}
                 maxLength={100}
-                required
               />
             </label>
 
@@ -169,6 +173,12 @@ export default function TradeListingForm({
 
   return (
     <form className="trade-listing-form" onSubmit={handleSubmit}>
+      <div className="card">
+        <p className="muted">
+          Add Pokémon to the offered list, the wanted list, or both. Only one side is required.
+        </p>
+      </div>
+
       <TradeItemsEditor
         title="Pokémon offered"
         items={offeredItems}
