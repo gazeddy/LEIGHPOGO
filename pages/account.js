@@ -3,13 +3,16 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
+import { formatFriendCodeInput } from "../lib/friendCode"
 
 export default function Account({ entry }) {
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [status, setStatus] = useState({ type: "", message: "" })
-  const [friendCode, setFriendCode] = useState(entry?.friendCode || "")
+  const [friendCode, setFriendCode] = useState(
+    formatFriendCodeInput(entry?.friendCode || ""),
+  )
   const [team, setTeam] = useState(entry?.team || "MYSTIC")
   const [profileStatus, setProfileStatus] = useState({ type: "", message: "" })
 
@@ -62,7 +65,9 @@ export default function Account({ entry }) {
     }
 
     if (data.team) setTeam(data.team)
-    if (typeof data.friendCode === "string") setFriendCode(data.friendCode)
+    if (typeof data.friendCode === "string") {
+      setFriendCode(formatFriendCodeInput(data.friendCode))
+    }
 
     setProfileStatus({ type: "success", message: "Trainer profile updated" })
   }
@@ -87,8 +92,11 @@ export default function Account({ entry }) {
             Friend code
             <input
               type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={14}
               value={friendCode}
-              onChange={(e) => setFriendCode(e.target.value)}
+              onChange={(e) => setFriendCode(formatFriendCodeInput(e.target.value))}
               placeholder="0000 0000 0000"
             />
           </label>

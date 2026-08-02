@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
 import prisma from "../../lib/prisma";
+import { canonicalFriendCode } from "../../lib/friendCode";
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -13,11 +14,19 @@ export default async function handler(req, res) {
     try {
       const { trainerName, friendCode, team } = req.body;
 
+      const normalizedTrainerName = String(trainerName || "").trim();
+      const normalizedFriendCode = canonicalFriendCode(friendCode);
       const normalizedTeam = String(team || "MYSTIC").toUpperCase();
       const validTeams = ["INSTINCT", "MYSTIC", "VALOR"];
 
-      if (!trainerName || !friendCode) {
+      if (!normalizedTrainerName || !friendCode) {
         return res.status(400).json({ error: "All fields are required." });
+      }
+
+      if (!normalizedFriendCode) {
+        return res.status(400).json({
+          error: "Friend code must contain exactly 12 digits.",
+        });
       }
 
       if (!validTeams.includes(normalizedTeam)) {
@@ -26,8 +35,8 @@ export default async function handler(req, res) {
 
       const entry = await prisma.entry.create({
         data: {
-          trainerName,
-          code: friendCode,
+          trainerName: normalizedTrainerName,
+          code: normalizedFriendCode,
           team: normalizedTeam,
           ownerId: session.user.id,
         },

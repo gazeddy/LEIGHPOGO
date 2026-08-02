@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { formatFriendCodeInput } from "../../lib/friendCode";
 
 export default function AddEntry() {
   const { data: session } = useSession();
@@ -50,9 +51,12 @@ export default function AddEntry() {
         />
         <input
           type="text"
-          placeholder="Friend Code"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={14}
+          placeholder="0000 0000 0000"
           value={friendCode}
-          onChange={(e) => setFriendCode(e.target.value)}
+          onChange={(e) => setFriendCode(formatFriendCodeInput(e.target.value))}
           required
         />
         <select value={team} onChange={(e) => setTeam(e.target.value)}>

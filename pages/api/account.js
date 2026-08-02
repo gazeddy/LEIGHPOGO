@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "./auth/[...nextauth]"
 import prisma from "../../lib/prisma"
+import { canonicalFriendCode } from "../../lib/friendCode"
 
 const VALID_TEAMS = ["INSTINCT", "MYSTIC", "VALOR"]
 
@@ -18,8 +19,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid team selection" })
     }
 
+    const hasFriendCode = String(friendCode ?? "").trim().length > 0
+    const normalizedFriendCode = hasFriendCode
+      ? canonicalFriendCode(friendCode)
+      : null
+
+    if (hasFriendCode && !normalizedFriendCode) {
+      return res.status(400).json({
+        error: "Friend code must contain exactly 12 digits.",
+      })
+    }
+
     try {
-      const normalizedTeam = (team || "MYSTIC").toUpperCase()
+      const normalizedTeam = String(team || "MYSTIC").toUpperCase()
       const latestEntry = await prisma.entry.findFirst({
         where: { ownerId: session.user.id },
         orderBy: { createdAt: "desc" },
@@ -28,12 +40,18 @@ export default async function handler(req, res) {
       const updatedEntry = latestEntry
         ? await prisma.entry.update({
             where: { id: latestEntry.id },
-            data: { code: friendCode || latestEntry.code, team: normalizedTeam },
+            data: {
+              code:
+                normalizedFriendCode ||
+                canonicalFriendCode(latestEntry.code) ||
+                "",
+              team: normalizedTeam,
+            },
           })
         : await prisma.entry.create({
             data: {
               trainerName: session.user.ign,
-              code: friendCode || "",
+              code: normalizedFriendCode || "",
               team: normalizedTeam,
               ownerId: session.user.id,
             },

@@ -3,6 +3,10 @@ import { useSession } from "next-auth/react"
 import { useState } from "react"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
+import {
+  formatFriendCodeInput,
+  normalizeFriendCode,
+} from "../lib/friendCode"
 
 async function copyTextToClipboard(value) {
   if (navigator.clipboard?.writeText && window.isSecureContext) {
@@ -69,7 +73,7 @@ export default function FriendCodes({ entries }) {
   }
 
   const handleCopyFriendCode = async (entry) => {
-    const code = String(entry.code || "").replace(/\D/g, "")
+    const code = normalizeFriendCode(entry.code)
 
     if (!code) {
       setCopyError("This entry does not have a valid friend code to copy.")
@@ -124,9 +128,12 @@ export default function FriendCodes({ entries }) {
                 <input
                   id="friendCode"
                   type="text"
-                  placeholder="Friend Code"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={14}
+                  placeholder="0000 0000 0000"
                   value={friendCode}
-                  onChange={(e) => setFriendCode(e.target.value)}
+                  onChange={(e) => setFriendCode(formatFriendCodeInput(e.target.value))}
                   required
                 />
               </div>
@@ -153,7 +160,8 @@ export default function FriendCodes({ entries }) {
           ) : (
             <ul className="entry-list">
               {entryList.map((entry) => {
-                const hasCode = /\d/.test(String(entry.code || ""))
+                const formattedCode = formatFriendCodeInput(entry.code)
+                const hasCode = Boolean(normalizeFriendCode(entry.code))
                 const copied = copiedEntryId === entry.id
 
                 return (
@@ -163,7 +171,9 @@ export default function FriendCodes({ entries }) {
                       <strong>{entry.trainerName || entry.owner.ign}</strong>
                     </div>
                     <div className="entry-code-actions">
-                      <div className="entry-code">{entry.code || "No code provided"}</div>
+                      <div className="entry-code">
+                        {hasCode ? formattedCode : "No code provided"}
+                      </div>
                       {hasCode && (
                         <button
                           type="button"
