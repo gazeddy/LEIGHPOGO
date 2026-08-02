@@ -34,14 +34,26 @@ jobs:
           end = workflow.index(end_marker, start)
           script = workflow[start:end]
           script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script.splitlines())
-          script = script.replace(
-              "'''    <section\n    className={`event-ticker",
-              "'''    <section\n      className={`event-ticker",
+          replacements = (
+              (
+                  "'''    <section\n    className={`event-ticker",
+                  "'''    <section\n      className={`event-ticker",
+              ),
+              (
+                  "'''    <section\n    className={`raid-ticker",
+                  "'''    <section\n      className={`raid-ticker",
+              ),
+              (
+                  "'''    >\n    <div className=\"ticker-label\">",
+                  "'''    >\n      <div className=\"ticker-label\">",
+              ),
+              (
+                  "'''    >\n    <div className=\"raid-label\">",
+                  "'''    >\n      <div className=\"raid-label\">",
+              ),
           )
-          script = script.replace(
-              "'''    <section\n    className={`raid-ticker",
-              "'''    <section\n      className={`raid-ticker",
-          )
+          for old, new in replacements:
+              script = script.replace(old, new)
           Path('/tmp/apply-scrollable-tickers.py').write_text(script + '\n', encoding='utf-8')
           PY
           python /tmp/apply-scrollable-tickers.py
