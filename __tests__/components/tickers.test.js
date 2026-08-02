@@ -124,4 +124,26 @@ describe("ticker regression wiring", () => {
     expect(scrollableTicker).toContain("scrollableRef.current");
     expect(scrollableTicker).toContain("scheduleResume");
   });
+
+  it("does not capture normal ticker clicks before the drag threshold", () => {
+    const pointerDownStart = scrollableTicker.indexOf(
+      "function handlePointerDown",
+    );
+    const pointerMoveStart = scrollableTicker.indexOf(
+      "function handlePointerMove",
+    );
+    const pointerDownSource = scrollableTicker.slice(
+      pointerDownStart,
+      pointerMoveStart,
+    );
+    const thresholdPosition = scrollableTicker.indexOf(
+      "Math.abs(deltaX) < DRAG_THRESHOLD_PX",
+    );
+    const pointerCapturePosition = scrollableTicker.indexOf(
+      "viewport.setPointerCapture(event.pointerId)",
+    );
+
+    expect(pointerDownSource).not.toContain("setPointerCapture");
+    expect(pointerCapturePosition).toBeGreaterThan(thresholdPosition);
+  });
 });
