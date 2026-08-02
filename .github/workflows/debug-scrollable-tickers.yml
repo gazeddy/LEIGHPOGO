@@ -102,11 +102,6 @@ jobs:
               ('components/events/RaidBossTicker.tsx', 'raid', 'RaidItems', 'items'),
               ('components/events/DittoDisguiseTicker.tsx', 'ditto', 'DittoItems', 'disguises'),
           ):
-              component_name = {
-                  'ticker': 'event-ticker',
-                  'raid': 'raid-ticker',
-                  'ditto': 'ditto-ticker',
-              }[label]
               if label in ('ticker', 'raid'):
                   replace_required(path, 'return (    <section', 'return (\n    <section')
                   replace_required(
@@ -128,10 +123,10 @@ jobs:
                   f'          <{item_component} {item_prop}={{{item_prop}}} />\n'
                   f'          >'
               )
-              start = Path(path).read_text(encoding='utf-8').find(old_items)
+              text = Path(path).read_text(encoding='utf-8')
+              start = text.find(old_items)
               if start < 0:
                   raise RuntimeError(f'Generated item block start not found in {path}')
-              text = Path(path).read_text(encoding='utf-8')
               end = text.find('          </div>', start)
               if end < 0:
                   raise RuntimeError(f'Generated item block end not found in {path}')
@@ -152,15 +147,16 @@ jobs:
               ') : (\n          <div className="new-gym-track">',
               1,
           )
-          duplicate_style = '''    <style jsx>{`
-          >
-            <div className="new-gym-copy">{items}</div>
-            <div className="new-gym-copy" aria-hidden="true">{items}</div>
-          </div>
-        )}
-      </div>
-
-      <style jsx>{`'''
+          duplicate_style = (
+              '    <style jsx>{`\n'
+              '          >\n'
+              '            <div className="new-gym-copy">{items}</div>\n'
+              '            <div className="new-gym-copy" aria-hidden="true">{items}</div>\n'
+              '          </div>\n'
+              '        )}\n'
+              '      </div>\n\n'
+              '      <style jsx>{`'
+          )
           if duplicate_style not in gym_text:
               raise RuntimeError('Generated duplicate new-gym block not found')
           gym_text = gym_text.replace(duplicate_style, '      <style jsx>{`', 1)
