@@ -1,17 +1,11 @@
 import { getServerSession } from "next-auth/next"
-import prisma from "../../../lib/prisma"
 import { authOptions } from "../auth/[...nextauth]"
 
-function parseDexNumber(value) {
-  const dexNumber = Number(value)
-  return Number.isInteger(dexNumber) && dexNumber > 0 ? dexNumber : null
-}
-
-function optionalNote(value) {
-  if (typeof value !== "string") return null
-  const note = value.trim()
-  return note ? note.slice(0, 500) : null
-}
+const {
+  deletePokemonAvailabilityOverride,
+  readPokemonAvailabilityOverrides,
+  savePokemonAvailabilityOverride,
+} = require("../../../lib/pokemonAvailabilityStore")
 
 async function requireAdmin(req, res) {
   const session = await getServerSession(req, res, authOptions)
@@ -19,6 +13,11 @@ async function requireAdmin(req, res) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  res.setHeader("CDN-Cache-Control", "no-store")
+  res.setHeader("Pragma", "no-cache")
+  res.setHeader("Expires", "0")
+
   if (!(await requireAdmin(req, res))) {
     res.status(403).json({ error: "Access denied" })
     return
@@ -26,54 +25,30 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
-      const overrides = await prisma.pokemonAvailabilityOverride.findMany({
-        orderBy: { dexNumber: "asc" },
-      })
-      res.status(200).json({ overrides })
+      const result = await readPokemonAvailabilityOverrides()
+      res.status(200).json(result)
       return
     }
 
     if (req.method === "PUT") {
-      const dexNumber = parseDexNumber(req.body?.dexNumber)
-      if (!dexNumber || typeof req.body?.released !== "boolean") {
-        res.status(400).json({ error: "A valid Pokédex number and release status are required." })
-        return
-      }
-
-      const override = await prisma.pokemonAvailabilityOverride.upsert({
-        where: { dexNumber },
-        create: {
-          dexNumber,
-          released: req.body.released,
-          note: optionalNote(req.body.note),
-        },
-        update: {
-          released: req.body.released,
-          note: optionalNote(req.body.note),
-        },
+      const result = await savePokemonAvailabilityOverride(req.body)
+      res.status(200).json({
+        ...result,
+        message: `Pokémon availability override saved to ${result.storage} storage.`,
       })
-
-      res.status(200).json({ override, message: "Pokémon availability override saved." })
       return
     }
 
     if (req.method === "DELETE") {
-      const dexNumber = parseDexNumber(req.query.dexNumber)
-      if (!dexNumber) {
-        res.status(400).json({ error: "A valid Pokédex number is required." })
-        return
-      }
-
-      const result = await prisma.pokemonAvailabilityOverride.deleteMany({
-        where: { dexNumber },
-      })
-
-      if (!result.count) {
+      const result = await deletePokemonAvailabilityOverride(req.query.dexNumber)
+      if (!result.deleted) {
         res.status(404).json({ error: "Pokémon availability override not found." })
         return
       }
-
-      res.status(200).json({ message: "Pokémon availability override reset." })
+      res.status(200).json({
+        ...result,
+        message: `Pokémon availability override reset in ${result.storage} storage.`,
+      })
       return
     }
 
@@ -81,6 +56,11 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Method not allowed" })
   } catch (error) {
     console.error("Pokémon availability override request failed", error)
-    res.status(500).json({ error: "The Pokémon availability override could not be saved." })
+    res.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "The Pokémon availability override could not be saved.",
+    })
   }
 }

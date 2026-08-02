@@ -13,3 +13,4 @@ node_modules
 /data/gym-imports/*.csv
 /data/gym-state-backups/*.json
 /public/uploads/guides/*
+/data/pokemon-availability-overrides.json*

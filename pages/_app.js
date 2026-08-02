@@ -13,6 +13,7 @@ import DittoDisguiseTicker from "../components/events/DittoDisguiseTicker"
 import EventTicker from "../components/events/EventTicker"
 import RaidBossTicker from "../components/events/RaidBossTicker"
 import NewGymTicker from "../components/gyms/NewGymTicker"
+import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
 
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
 
   return (
     <SessionProvider session={session}>
+      <PokedexCatalogFetchGuard />
       <Navbar />
       {showEventTicker && <EventTicker />}
       <RaidBossTicker />
