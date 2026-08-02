@@ -18,6 +18,12 @@ export interface PokemonGoEventSummary {
   source?: "feed" | "local";
 }
 
+export function getEventDestination(
+  event: Pick<PokemonGoEventSummary, "campfireUrl" | "link">,
+): string | null {
+  return event.campfireUrl?.trim() || event.link?.trim() || null;
+}
+
 export interface EventsPageData {
   events: PokemonGoEventSummary[];
   fetchedAt: string;
