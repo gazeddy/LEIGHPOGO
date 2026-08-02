@@ -14,13 +14,8 @@ const pogoApiPayload = {
         tier: 5,
         max_unboosted_cp: 2280,
         max_boosted_cp: 2850,
-      },
-      {
-        name: "Palkia",
-        form: "Shadow",
-        tier: 5,
-        max_unboosted_cp: 2280,
-        max_boosted_cp: 2850,
+        min_unboosted_cp: 2190,
+        min_boosted_cp: 2737,
       },
       {
         name: "Uxie",
@@ -40,11 +35,18 @@ const pogoApiPayload = {
         max_unboosted_cp: 1834,
         max_boosted_cp: 2293,
       },
+      {
+        name: "Dialga",
+        form: "Origin",
+        max_unboosted_cp: 2337,
+        max_boosted_cp: 2921,
+      },
     ],
     mega: [
       {
         name: "Aggron",
         form: "Normal",
+        tier: 6,
         max_unboosted_cp: 1714,
         max_boosted_cp: 2143,
       },
@@ -69,19 +71,29 @@ function tickerItem(category, boss) {
   };
 }
 
-describe("raid boss catch CP cache", () => {
-  it("extracts current perfect-IV catch CP values from PoGoAPI", () => {
+describe("raid boss max catch CP cache", () => {
+  it("extracts only the current maximum boosted and unboosted CP values", () => {
+    const bosses = extractCurrentRaidBosses(pogoApiPayload);
+    const palkia = bosses.find(
+      (boss) => boss.name === "Palkia" && boss.tier === "5",
+    );
+
+    expect(palkia).toEqual({
+      name: "Palkia",
+      form: "Normal",
+      tier: "5",
+      maxUnboostedCp: 2280,
+      maxBoostedCp: 2850,
+    });
+    expect(palkia).not.toHaveProperty("minUnboostedCp");
+    expect(palkia).not.toHaveProperty("minBoostedCp");
+  });
+
+  it("uses the containing mega key instead of an entry's numeric tier", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
 
     expect(bosses).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          name: "Palkia",
-          form: "Normal",
-          tier: "5",
-          maxUnboostedCp: 2280,
-          maxBoostedCp: 2850,
-        }),
         expect.objectContaining({
           name: "Aggron",
           tier: "mega",
@@ -92,7 +104,7 @@ describe("raid boss catch CP cache", () => {
     );
   });
 
-  it("matches five-star, Shadow and Mega ticker categories separately", () => {
+  it("matches five-star, Shadow and Mega ticker entries without requiring a Shadow tier", () => {
     const bosses = extractCurrentRaidBosses(pogoApiPayload);
     const items = attachRaidBossCp(
       [
@@ -111,6 +123,23 @@ describe("raid boss catch CP cache", () => {
     ]);
     expect(items[2].catchCp).toEqual([
       { boss: "Aggron", maxUnboostedCp: 1714, maxBoostedCp: 2143 },
+    ]);
+  });
+
+  it("matches named forms from the event feed to PoGoAPI forms", () => {
+    const bosses = extractCurrentRaidBosses(pogoApiPayload);
+
+    expect(
+      findRaidBossCpMatches(
+        tickerItem("five-star", "Origin Forme Dialga"),
+        bosses,
+      ),
+    ).toEqual([
+      {
+        boss: "Origin Dialga",
+        maxUnboostedCp: 2337,
+        maxBoostedCp: 2921,
+      },
     ]);
   });
 
@@ -137,8 +166,8 @@ describe("raid boss catch CP cache", () => {
   it("leaves an unmatched ticker item usable without CP data", () => {
     const item = tickerItem("five-star", "Unknown Boss");
 
-    expect(attachRaidBossCp([item], extractCurrentRaidBosses(pogoApiPayload))).toEqual([
-      item,
-    ]);
+    expect(
+      attachRaidBossCp([item], extractCurrentRaidBosses(pogoApiPayload)),
+    ).toEqual([item]);
   });
 });
