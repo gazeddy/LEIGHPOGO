@@ -1,8 +1,15 @@
 import { getServerSession } from "next-auth/next"
-import prisma from "../../lib/prisma"
 import { authOptions } from "./auth/[...nextauth]"
 
 const { applyPokemonAvailabilityOverrides } = require("../../lib/pokemonAvailability")
+const { readPokemonAvailabilityOverrides } = require("../../lib/pokemonAvailabilityStore")
+
+function disableCaching(res) {
+  res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  res.setHeader("CDN-Cache-Control", "no-store")
+  res.setHeader("Pragma", "no-cache")
+  res.setHeader("Expires", "0")
+}
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -17,6 +24,8 @@ export default async function handler(req, res) {
     return
   }
 
+  disableCaching(res)
+
   try {
     const { getPokedexCatalogData } = require("../../lib/pokedexCatalogCache")
     const { getReleasedPokemonData } = require("../../lib/releasedPokemonCache")
@@ -26,34 +35,50 @@ export default async function handler(req, res) {
     let releasedDexNumbers = []
     let releaseDataStale = false
     let availabilityKnown = true
+    let overrideStorage = null
+    let overrideDataAvailable = true
+    let overrideWarning = null
 
     try {
-      const [releasedPokemon, overrides] = await Promise.all([
-        getReleasedPokemonData(),
-        prisma.pokemonAvailabilityOverride.findMany({
-          select: { dexNumber: true, released: true },
-        }),
-      ])
+      const releasedPokemon = await getReleasedPokemonData()
       pogoApiReleasedDexNumbers = releasedPokemon.dexNumbers
-      releasedDexNumbers = applyPokemonAvailabilityOverrides(
-        pogoApiReleasedDexNumbers,
-        overrides
-      )
+      releasedDexNumbers = releasedPokemon.dexNumbers
       releaseDataStale = releasedPokemon.stale
     } catch (error) {
       availabilityKnown = false
-      console.error("Unable to load Pokémon release status for the Pokédex", error)
+      console.error("Unable to load POGOAPI release status for the Pokédex", error)
     }
 
-    res.setHeader("Cache-Control", "private, no-store")
+    try {
+      const overrideResult = await readPokemonAvailabilityOverrides()
+      overrideStorage = overrideResult.storage
+      if (availabilityKnown) {
+        releasedDexNumbers = applyPokemonAvailabilityOverrides(
+          pogoApiReleasedDexNumbers,
+          overrideResult.overrides
+        )
+      }
+    } catch (error) {
+      overrideDataAvailable = false
+      overrideWarning =
+        error instanceof Error
+          ? error.message
+          : "Pokémon availability overrides are temporarily unavailable."
+      console.error("Unable to load Pokémon availability overrides", error)
+    }
+
     res.status(200).json({
       ...catalog.data,
+      catalogVersion: 4,
       pogoApiReleasedDexNumbers,
       releasedDexNumbers,
       availabilityKnown,
+      overrideDataAvailable,
+      overrideStorage,
+      overrideWarning,
       stale: catalog.stale || releaseDataStale,
       checkedAt: catalog.checkedAt,
-      source: "POGOAPI + PvPoke + admin overrides",
+      source: "PvPoke + POGOAPI + admin overrides",
     })
   } catch (error) {
     console.error("Unable to load the Pokédex catalog", error)

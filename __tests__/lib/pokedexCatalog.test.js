@@ -79,10 +79,10 @@ describe("Pokédex catalog", () => {
   };
 
   const pvpokePokemon = [
-    { dex: 1, speciesName: "Bulbasaur", speciesId: "bulbasaur", thirdMoveCost: 10000 },
+    { dex: 1, speciesName: "Bulbasaur", speciesId: "bulbasaur", buddyDistance: 5, thirdMoveCost: 10000 },
     { dex: 1, speciesName: "Bulbasaur (Shadow)", speciesId: "bulbasaur_shadow", tags: ["shadow"], thirdMoveCost: 100000 },
-    { dex: 2, speciesName: "Ivysaur", speciesId: "ivysaur", thirdMoveCost: 50000 },
-    { dex: 3, speciesName: "Venusaur", speciesId: "venusaur", thirdMoveCost: 75000 },
+    { dex: 2, speciesName: "Ivysaur", speciesId: "ivysaur", buddyDistance: 3, thirdMoveCost: 50000 },
+    { dex: 3, speciesName: "Venusaur", speciesId: "venusaur", buddyDistance: 3, thirdMoveCost: 75000 },
     { dex: 3, speciesName: "Venusaur (Mega)", speciesId: "venusaur_mega", tags: ["mega"], thirdMoveCost: 10000 },
     { dex: 68, speciesName: "Machamp", speciesId: "machamp", thirdMoveCost: 100000 },
   ];
@@ -146,11 +146,12 @@ describe("Pokédex catalog", () => {
     ]);
   });
 
-  test("uses normal-form typing and buddy distance", () => {
+  test("uses PvPoke buddy distance first and POGOAPI as fallback", () => {
     const catalog = buildCatalog();
     expect(catalog.pokemon[3].types).toEqual(["Grass", "Poison"]);
-    expect(catalog.pokemon[1].buddyDistance).toBe(3);
-    expect(catalog.pokemon[3].buddyDistance).toBe(5);
+    expect(catalog.pokemon[1].buddyDistance).toBe(5);
+    expect(catalog.pokemon[3].buddyDistance).toBe(3);
+    expect(catalog.pokemon[68].buddyDistance).toBe(5);
   });
 
   test("maps all standard second charged-move cost tiers", () => {

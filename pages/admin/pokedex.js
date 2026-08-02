@@ -5,6 +5,10 @@ import { authOptions } from "../api/auth/[...nextauth]"
 
 const { applyPokemonAvailabilityOverrides, sortPokemonAvailabilityRows } = require("../../lib/pokemonAvailability")
 
+const POKEDEX_CATALOG_CLIENT_VERSION = 4
+const buildCatalogRequestUrl = () =>
+  `/api/pokedex-catalog?v=${POKEDEX_CATALOG_CLIENT_VERSION}&request=${Date.now()}`
+
 function overrideValue(override) {
   if (!override) return "auto"
   return override.released ? "released" : "unreleased"
@@ -28,8 +32,17 @@ export default function AdminPokedexAvailability() {
       setError("")
       try {
         const [catalogResponse, overridesResponse] = await Promise.all([
-          fetch("/api/pokedex-catalog"),
-          fetch("/api/admin/pokemon-availability-overrides"),
+          fetch(buildCatalogRequestUrl(), {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache" },
+          }),
+          fetch(
+            `/api/admin/pokemon-availability-overrides?request=${Date.now()}`,
+            {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" },
+            }
+          ),
         ])
         const [catalogData, overridesData] = await Promise.all([
           catalogResponse.json(),
