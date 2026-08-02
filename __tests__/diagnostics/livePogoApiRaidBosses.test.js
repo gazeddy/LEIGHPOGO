@@ -6,6 +6,7 @@ const {
 } = require("../../lib/raidBossCpCache");
 
 const URL = "https://pogoapi.net/api/v1/raid_bosses.json";
+const TARGETS = new Set(["kyurem", "aggron", "palkia"]);
 
 jest.setTimeout(45_000);
 
@@ -20,6 +21,24 @@ function tickerItem(category, boss) {
   };
 }
 
+function findTargets(section) {
+  if (!section || typeof section !== "object") return [];
+
+  return Object.entries(section).flatMap(([group, values]) =>
+    Array.isArray(values)
+      ? values
+          .filter((entry) => TARGETS.has(String(entry?.name || "").toLowerCase()))
+          .map(({ name, form, max_unboosted_cp, max_boosted_cp }) => ({
+            group,
+            name,
+            form,
+            max_unboosted_cp,
+            max_boosted_cp,
+          }))
+      : [],
+  );
+}
+
 describe("live PoGoAPI raid boss diagnostics", () => {
   it("downloads and parses the live raid CP feed", async () => {
     const plainResponse = await fetch(URL, {
@@ -31,37 +50,19 @@ describe("live PoGoAPI raid boss diagnostics", () => {
       status: plainResponse.status,
       contentType: plainResponse.headers.get("content-type"),
       bytes: plainText.length,
-      prefix: plainText.slice(0, 120),
     });
 
     expect(plainResponse.ok).toBe(true);
 
     const payload = JSON.parse(plainText);
     const current = payload.current;
-    const fiveStar = Array.isArray(current?.["5"]) ? current["5"] : [];
-    const tierSix = Array.isArray(current?.["6"]) ? current["6"] : [];
-    const mega = Array.isArray(current?.mega) ? current.mega : [];
+    const previous = payload.previous;
 
-    console.log("POGOAPI live raid groups", {
-      keys: current && typeof current === "object" ? Object.keys(current) : [],
-      fiveStar: fiveStar.map(({ name, form, max_unboosted_cp, max_boosted_cp }) => ({
-        name,
-        form,
-        max_unboosted_cp,
-        max_boosted_cp,
-      })),
-      tierSix: tierSix.map(({ name, form, max_unboosted_cp, max_boosted_cp }) => ({
-        name,
-        form,
-        max_unboosted_cp,
-        max_boosted_cp,
-      })),
-      mega: mega.map(({ name, form, max_unboosted_cp, max_boosted_cp }) => ({
-        name,
-        form,
-        max_unboosted_cp,
-        max_boosted_cp,
-      })),
+    console.log("POGOAPI target records", {
+      current: findTargets(current),
+      previous: findTargets(previous),
+      currentKeys: current && typeof current === "object" ? Object.keys(current) : [],
+      previousKeys: previous && typeof previous === "object" ? Object.keys(previous) : [],
     });
 
     const data = await getRaidBossCpData({
@@ -71,7 +72,6 @@ describe("live PoGoAPI raid boss diagnostics", () => {
       strictWrite: true,
     });
 
-    console.log("LEIGHPOGO parsed live bosses", data.bosses);
     console.log("LEIGHPOGO current matches", {
       kyurem: findRaidBossCpMatches(tickerItem("five-star", "Kyurem"), data.bosses),
       megaAggron: findRaidBossCpMatches(tickerItem("mega", "Aggron"), data.bosses),
