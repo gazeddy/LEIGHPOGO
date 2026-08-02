@@ -56,6 +56,7 @@ function PokedexStyles() {
     .pokemon-evolution-name small { color: #8b949e; font-family: monospace; }
     .pokemon-evolution-cost { display: grid; justify-items: end; gap: 2px; color: #f0c36b; font-size: 0.8rem; font-weight: 800; text-align: right; }
     .pokemon-evolution-cost small { max-width: 130px; color: #8b949e; font-size: 0.68rem; font-weight: 600; }
+    .pokemon-evolution-cost .pokemon-trade-cost { color: #7ee787; font-weight: 800; }
     .pokemon-no-evolutions { margin: 0; padding-top: 10px; border-top: 1px solid #21262d; font-size: 0.82rem; }
     @media (max-width: 700px) {
       .pokemon-card-grid { grid-template-columns: 1fr; }
@@ -121,6 +122,9 @@ function EvolutionLink({ relationship, direction, onNavigate }) {
       </span>
       <span className="pokemon-evolution-cost">
         {candyCostLabel(relationship.candyRequired)}
+        {relationship.noCandyCostIfTraded && (
+          <small className="pokemon-trade-cost">0 Candy after trade</small>
+        )}
         {formNotes.length > 0 && <small>{formNotes.join(" · ")}</small>}
       </span>
     </a>
