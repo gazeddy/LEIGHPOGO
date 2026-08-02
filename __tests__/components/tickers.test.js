@@ -10,6 +10,7 @@ describe("ticker regression wiring", () => {
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
   const raidApi = readSource("pages/api/events/raids.ts");
+  const raidCpCache = readSource("lib/raidBossCpCache.js");
   const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
   const dittoApi = readSource("pages/api/ditto-disguises.ts");
 
@@ -45,6 +46,17 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("WB");
     expect(raidTicker).toContain("unboosted level 20");
     expect(raidTicker).toContain("weather-boosted level 25");
+  });
+
+  it("shows an accessible sparkle for PoGoAPI shiny-capable raid bosses", () => {
+    expect(raidCpCache).toContain("value.possible_shiny === true");
+    expect(raidCpCache).toContain("possibleShiny: boss.possibleShiny");
+    expect(raidTicker).toContain("entry.possibleShiny");
+    expect(raidTicker).toContain('className="raid-shiny-sparkle"');
+    expect(raidTicker).toContain("✨");
+    expect(raidTicker).toContain("Shiny available:");
+    expect(raidTicker).toContain("raid-shiny-twinkle");
+    expect(raidTicker).toContain("animation: none;");
   });
 
   it("keeps the Ditto ticker public, daily cached and between raids and new gyms", () => {
