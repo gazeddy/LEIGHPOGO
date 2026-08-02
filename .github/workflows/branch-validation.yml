@@ -1,0 +1,37 @@
+name: Branch validation
+
+on:
+  push:
+    branches:
+      - agent/fix-event-override-ticker-links
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: file:./prisma/validation.db
+      NEXTAUTH_SECRET: branch-validation-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --runInBand
+
+      - name: Build production app
+        run: npm run build
