@@ -14,6 +14,8 @@ describe("POGOAPI Pokédex catalog", () => {
     1: { id: 1, name: "Bulbasaur" },
     2: { id: 2, name: "Ivysaur" },
     3: { id: 3, name: "Venusaur" },
+    67: { id: 67, name: "Machoke" },
+    68: { id: 68, name: "Machamp" },
     133: { id: 133, name: "Eevee" },
     134: { id: 134, name: "Vaporeon" },
     135: { id: 135, name: "Jolteon" },
@@ -40,6 +42,18 @@ describe("POGOAPI Pokédex catalog", () => {
       pokemon_name: "Ivysaur",
       evolutions: [
         { pokemon_id: 3, pokemon_name: "Venusaur", candy_required: 100 },
+      ],
+    },
+    {
+      pokemon_id: 67,
+      pokemon_name: "Machoke",
+      evolutions: [
+        {
+          pokemon_id: 68,
+          pokemon_name: "Machamp",
+          candy_required: 100,
+          no_candy_cost_if_traded: true,
+        },
       ],
     },
     {
@@ -81,6 +95,25 @@ describe("POGOAPI Pokédex catalog", () => {
         expect.objectContaining({ pokemonId: 135, candyRequired: 25 }),
       ])
     );
+  });
+
+  test("keeps the zero Candy after trade flag in both directions", () => {
+    const catalog = buildPokedexCatalog(names, types, evolutions);
+
+    expect(catalog.pokemon[67].next).toEqual([
+      expect.objectContaining({
+        pokemonId: 68,
+        candyRequired: 100,
+        noCandyCostIfTraded: true,
+      }),
+    ]);
+    expect(catalog.pokemon[68].previous).toEqual([
+      expect.objectContaining({
+        pokemonId: 67,
+        candyRequired: 100,
+        noCandyCostIfTraded: true,
+      }),
+    ]);
   });
 
   test("uses the normal form typing for a National Dex card", () => {
