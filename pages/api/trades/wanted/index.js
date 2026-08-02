@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "../../auth/[...nextauth]"
 import prisma from "../../../../lib/prisma"
 import pokedexByRegion from "../../../../lib/pokedexData"
-import { getEligibleTradeUser } from "../../../../lib/tradeServer"
+import { getAuthenticatedUser } from "../../../../lib/tradeServer"
 import {
   buildReleasedPokemonOptions,
   serializeWantedTrade,
@@ -18,13 +18,10 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "You must be logged in." })
   }
 
-  const tradeUser = await getEligibleTradeUser(session)
+  const currentUser = await getAuthenticatedUser(session)
 
-  if (!tradeUser) {
-    return res.status(403).json({
-      error: "Add a valid 12-digit friend code to your account before using trades.",
-      code: "FRIEND_CODE_REQUIRED",
-    })
+  if (!currentUser) {
+    return res.status(401).json({ error: "Your account could not be found." })
   }
 
   if (req.method === "GET") {
@@ -62,7 +59,7 @@ export default async function handler(req, res) {
     }
 
     const duplicate = await prisma.wantedTrade.findFirst({
-      where: wantedTradeDuplicateWhere(tradeUser.id, validated.value),
+      where: wantedTradeDuplicateWhere(currentUser.id, validated.value),
       select: { id: true },
     })
 
@@ -74,7 +71,7 @@ export default async function handler(req, res) {
 
     const entry = await prisma.wantedTrade.create({
       data: {
-        ownerId: tradeUser.id,
+        ownerId: currentUser.id,
         ...validated.value,
       },
       include: wantedTradeInclude,

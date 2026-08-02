@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "../api/auth/[...nextauth]"
 import prisma from "../../lib/prisma"
 import pokedexByRegion from "../../lib/pokedexData"
-import { getEligibleTradeUser } from "../../lib/tradeServer"
+import { getAuthenticatedUser } from "../../lib/tradeServer"
 import { formatFriendCode } from "../../lib/tradeUtils"
 import {
   buildReleasedPokemonOptions,
@@ -386,11 +386,11 @@ export async function getServerSideProps(context) {
     }
   }
 
-  const tradeUser = await getEligibleTradeUser(session)
+  const currentUser = await getAuthenticatedUser(session)
 
-  if (!tradeUser) {
+  if (!currentUser) {
     return {
-      redirect: { destination: "/friend-codes", permanent: false },
+      redirect: { destination: "/login", permanent: false },
     }
   }
 
@@ -420,8 +420,8 @@ export async function getServerSideProps(context) {
     props: {
       initialEntries: entries.map(serializeWantedTrade),
       pokemonOptions,
-      currentUserId: tradeUser.id,
-      isAdmin: tradeUser.role === "admin",
+      currentUserId: currentUser.id,
+      isAdmin: currentUser.role === "admin",
       releaseDataStale,
       releaseDataError,
     },
