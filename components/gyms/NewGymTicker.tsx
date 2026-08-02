@@ -135,6 +135,7 @@ export default function NewGymTicker() {
             style={
               {
                 "--new-gym-ticker-duration": animationDuration,
+                animationDuration,
               } as CSSProperties
             }
           >
