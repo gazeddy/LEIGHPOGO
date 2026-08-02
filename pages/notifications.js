@@ -15,6 +15,13 @@ const notificationMessage = (notification) => {
     ? `${notification.modifierSummary} `
     : ""
 
+  if (notification.type === "LISTING_MATCH") {
+    const trainers = notification.matchedTrainerSummary || "Another trainer"
+    const verb = notification.matchedTrainerCount === 1 ? "wants" : "want"
+
+    return `${trainers} ${verb} ${modifiers}${notification.pokemonName}, which you have offered in this listing.`
+  }
+
   return `${notification.listing.owner.ign} listed ${modifiers}${notification.pokemonName}, matching your wanted list.`
 }
 
@@ -69,7 +76,7 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
         <div>
           <h1>Notifications</h1>
           <p className="muted">
-            Private alerts when another trainer offers something matching your wanted list.
+            Private alerts when someone offers something you want or when your listing matches another trainer&apos;s wanted list.
           </p>
         </div>
         {unreadCount > 0 && (
