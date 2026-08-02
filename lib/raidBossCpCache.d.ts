@@ -9,6 +9,7 @@ export interface PogoApiRaidBossCp {
   tier: string;
   maxUnboostedCp: number;
   maxBoostedCp: number;
+  possibleShiny: boolean;
 }
 
 export interface RaidBossCpCacheData {
