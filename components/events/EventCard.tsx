@@ -1,4 +1,7 @@
-import type { PokemonGoEventSummary } from "../../lib/events";
+import {
+  getEventDestination,
+  type PokemonGoEventSummary,
+} from "../../lib/events";
 
 interface EventCardProps {
   event: PokemonGoEventSummary;
@@ -50,7 +53,8 @@ function formatEventRange(start: string, end: string): string {
 
 export default function EventCard({ event }: EventCardProps) {
   const tags = event.tags ?? [];
-  const linkLabel = event.campfireUrl
+  const eventLink = getEventDestination(event);
+  const linkLabel = event.campfireUrl?.trim()
     ? "View meetup on Campfire"
     : "View event details";
 
@@ -84,9 +88,9 @@ export default function EventCard({ event }: EventCardProps) {
           </div>
         )}
 
-        {event.link && (
+        {eventLink && (
           <a
-            href={event.link}
+            href={eventLink}
             target="_blank"
             rel="noopener noreferrer"
             className="event-link"
