@@ -1,0 +1,351 @@
+name: Finalize scrollable tickers
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./validation.db
+      NEXTAUTH_SECRET: validation-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Apply scrollable ticker implementation
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-scrollable-tickers.yml').read_text(encoding='utf-8')
+          start_marker = "          python <<'PY'\n"
+          end_marker = "          PY\n\n      - name: Install dependencies"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          script = workflow[start:end]
+          script = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in script.splitlines()
+          )
+
+          tolerant_helpers = r'''
+          import re
+
+          def flexible_pattern(value):
+              return ''.join(
+                  r'\s+' if part.isspace() else re.escape(part)
+                  for part in re.split(r'(\s+)', value)
+                  if part
+              )
+
+          def replace_once(path, old, new):
+              text = read(path)
+              if old in text:
+                  write(path, text.replace(old, new, 1))
+                  return
+
+              updated, count = re.subn(
+                  flexible_pattern(old),
+                  lambda _match: new,
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              if count != 1:
+                  raise RuntimeError(f"Expected text not found in {path}: {old[:120]!r}")
+              write(path, updated)
+
+          def replace_between(path, start_marker, end_marker, replacement):
+              text = read(path)
+              start_match = re.search(flexible_pattern(start_marker), text, flags=re.MULTILINE)
+              if start_match is None:
+                  raise RuntimeError(f"Start marker not found in {path}: {start_marker!r}")
+
+              remaining = text[start_match.end():]
+              end_match = re.search(flexible_pattern(end_marker), remaining, flags=re.MULTILINE)
+              if end_match is None:
+                  raise RuntimeError(f"End marker not found in {path}: {end_marker!r}")
+
+              end = start_match.end() + end_match.start()
+              write(path, text[:start_match.start()] + replacement + text[end:])
+          '''
+          tolerant_helpers = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in tolerant_helpers.splitlines()
+          )
+          script = script.replace(
+              "hook = '''import {",
+              tolerant_helpers + "\nhook = '''import {",
+              1,
+          )
+          Path('/tmp/apply-scrollable-tickers.py').write_text(
+              script + '\n',
+              encoding='utf-8',
+          )
+          PY
+          python /tmp/apply-scrollable-tickers.py
+
+      - name: Clean generated ticker sources
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_required(path, old, new):
+              file_path = Path(path)
+              text = file_path.read_text(encoding='utf-8')
+              if old not in text:
+                  raise RuntimeError(
+                      f'Expected generated block not found in {path}: {old[:100]!r}'
+                  )
+              file_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          ticker_specs = (
+              ('components/events/EventTicker.tsx', 'ticker', 'TickerItems', 'items'),
+              ('components/events/RaidBossTicker.tsx', 'raid', 'RaidItems', 'items'),
+              ('components/events/DittoDisguiseTicker.tsx', 'ditto', 'DittoItems', 'disguises'),
+          )
+
+          for path, label, item_component, item_prop in ticker_specs:
+              if label in ('ticker', 'raid'):
+                  replace_required(path, 'return (    <section', 'return (\n    <section')
+                  replace_required(
+                      path,
+                      f'    <div className="{label}-label">\n    >\n      <div className="{label}-label">',
+                      f'      <div className="{label}-label">',
+                  )
+
+              condition = 'items.length' if item_prop == 'items' else 'disguises.length'
+              replace_required(
+                  path,
+                  f'{{{condition} > 0 ? (          <div className="{label}-track">',
+                  f'{{{condition} > 0 ? (\n          <div className="{label}-track">',
+              )
+
+              old_items = (
+                  f'          <div className="{label}-track">\n'
+                  f'          <{item_component} {item_prop}={{{item_prop}}} duplicate />\n'
+                  f'          <{item_component} {item_prop}={{{item_prop}}} />\n'
+                  f'          >'
+              )
+              text = Path(path).read_text(encoding='utf-8')
+              start = text.find(old_items)
+              if start < 0:
+                  raise RuntimeError(f'Generated item block start not found in {path}')
+              end = text.find('          </div>', start)
+              if end < 0:
+                  raise RuntimeError(f'Generated item block end not found in {path}')
+              end += len('          </div>')
+              replacement = (
+                  f'          <div className="{label}-track">\n'
+                  f'            <{item_component} {item_prop}={{{item_prop}}} duplicate />\n'
+                  f'            <{item_component} {item_prop}={{{item_prop}}} />\n'
+                  f'            <{item_component} {item_prop}={{{item_prop}}} duplicate />\n'
+                  f'          </div>'
+              )
+              text = text[:start] + replacement + text[end:]
+              text = text.replace(
+                  '}, []);  const animationDurationSeconds',
+                  '}, []);\n\n  const animationDurationSeconds',
+                  1,
+              )
+              text = re.sub(
+                  r'\s*@media \(max-width: 620px\) \{\s*@media \(max-width: 620px\) \{',
+                  '\n\n        @media (max-width: 620px) {',
+                  text,
+                  count=1,
+              )
+              Path(path).write_text(text, encoding='utf-8')
+
+          gym_path = Path('components/gyms/NewGymTicker.tsx')
+          gym_text = gym_path.read_text(encoding='utf-8')
+          gym_text = gym_text.replace(
+              ') : (          <div className="new-gym-track">',
+              ') : (\n          <div className="new-gym-track">',
+              1,
+          )
+          duplicate_style = (
+              '    <style jsx>{`\n'
+              '          >\n'
+              '            <div className="new-gym-copy">{items}</div>\n'
+              '            <div className="new-gym-copy" aria-hidden="true">{items}</div>\n'
+              '          </div>\n'
+              '        )}\n'
+              '      </div>\n\n'
+              '      <style jsx>{`'
+          )
+          if duplicate_style not in gym_text:
+              raise RuntimeError('Generated duplicate new-gym block not found')
+          gym_text = gym_text.replace(duplicate_style, '      <style jsx>{`', 1)
+          gym_path.write_text(gym_text, encoding='utf-8')
+
+          tickers_css_path = Path('styles/tickers.css')
+          tickers_css = tickers_css_path.read_text(encoding='utf-8')
+          tickers_css = re.sub(
+              r'\s*@media \(max-width: 620px\) \{\s*@media \(max-width: 620px\) \{',
+              '\n\n@media (max-width: 620px) {',
+              tickers_css,
+              count=1,
+          )
+          tickers_css_path.write_text(tickers_css, encoding='utf-8')
+          PY
+
+      - name: Update ticker regression tests
+        run: |
+          cat > __tests__/components/tickers.test.js <<'TEST'
+          const fs = require("fs");
+          const path = require("path");
+
+          function readSource(relativePath) {
+            return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8");
+          }
+
+          describe("ticker regression wiring", () => {
+            const app = readSource("pages/_app.js");
+            const eventTicker = readSource("components/events/EventTicker.tsx");
+            const raidTicker = readSource("components/events/RaidBossTicker.tsx");
+            const raidApi = readSource("pages/api/events/raids.ts");
+            const raidCpCache = readSource("lib/raidBossCpCache.js");
+            const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
+            const dittoApi = readSource("pages/api/ditto-disguises.ts");
+            const newGymTicker = readSource("components/gyms/NewGymTicker.tsx");
+            const scrollableTicker = readSource("components/tickers/useScrollableTicker.ts");
+
+            it("uses a Campfire URL as the primary event link with an Events-page fallback", () => {
+              expect(eventTicker).toMatch(
+                /item\.eventUrl \? \([\s\S]*?<a[\s\S]*?href=\{item\.eventUrl\}[\s\S]*?target="_blank"[\s\S]*?>[\s\S]*?\{primaryContent\}[\s\S]*?<\/a>[\s\S]*?\) : \([\s\S]*?<Link[\s\S]*?pathname: "\/events"[\s\S]*?event: item\.eventID/,
+              );
+              expect(eventTicker).toContain("{item.eventUrl && item.eventUrlLabel && (");
+              expect(eventTicker).toContain("{item.eventUrlLabel} ↗");
+              expect(eventTicker).toContain("{item.guideSlug && item.guideTitle && (");
+            });
+
+            it("keeps the raid ticker on a duplicated manually scrollable loop", () => {
+              expect(raidTicker).toContain("<RaidItems items={items} />");
+              expect(
+                (raidTicker.match(/<RaidItems items=\{items\} duplicate \/>/g) || []).length,
+              ).toBe(2);
+              expect(raidTicker).toContain("aria-hidden={duplicate || undefined}");
+              expect(raidTicker).toContain("tabIndex={duplicate ? -1 : undefined}");
+              expect(raidTicker).toContain('className="raid-track"');
+              expect(raidTicker).toContain("...viewportHandlers");
+              expect(raidTicker).toContain("animation: none;");
+              expect(raidTicker).toContain("transform: none;");
+              expect(raidTicker).toContain(".raid-group-duplicate");
+            });
+
+            it("shows perfect catch CP values from the cached PoGoAPI raid data", () => {
+              expect(raidApi).toContain("getRaidBossCpData");
+              expect(raidApi).toContain("attachRaidBossCp");
+              expect(raidApi).toContain(
+                "Failed to enrich current raid bosses with PoGoAPI catch CP data",
+              );
+              expect(raidTicker).toContain("formatCatchCp(item.catchCp)");
+              expect(raidTicker).toContain("100% CP");
+              expect(raidTicker).toContain("WB");
+              expect(raidTicker).toContain("unboosted level 20");
+              expect(raidTicker).toContain("weather-boosted level 25");
+            });
+
+            it("shows an accessible sparkle for PoGoAPI shiny-capable raid bosses", () => {
+              expect(raidCpCache).toContain("value.possible_shiny === true");
+              expect(raidCpCache).toContain("possibleShiny: boss.possibleShiny");
+              expect(raidTicker).toContain("entry.possibleShiny");
+              expect(raidTicker).toContain('className="raid-shiny-sparkle"');
+              expect(raidTicker).toContain("✨");
+              expect(raidTicker).toContain("Shiny available:");
+              expect(raidTicker).toContain("raid-shiny-twinkle");
+            });
+
+            it("keeps the Ditto ticker public, daily cached and between raids and new gyms", () => {
+              expect(dittoTicker).toContain('fetch("/api/ditto-disguises"');
+              expect(dittoTicker).not.toContain("useSession");
+              expect(dittoTicker).not.toContain('cache: "no-store"');
+              expect(dittoTicker).toContain("const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;");
+              expect(dittoApi).toContain("max-age=86400");
+              expect(dittoApi).toContain("s-maxage=86400");
+              expect(dittoTicker).toContain("<DittoItems disguises={disguises} />");
+              expect(
+                (dittoTicker.match(/<DittoItems disguises=\{disguises\} duplicate \/>/g) || []).length,
+              ).toBe(2);
+
+              const raidPosition = app.indexOf("<RaidBossTicker />");
+              const dittoPosition = app.indexOf("<DittoDisguiseTicker />");
+              const gymPosition = app.indexOf("<NewGymTicker />");
+
+              expect(raidPosition).toBeGreaterThan(-1);
+              expect(dittoPosition).toBeGreaterThan(raidPosition);
+              expect(gymPosition).toBeGreaterThan(dittoPosition);
+            });
+
+            it("shares matching automatic speed and manual interaction behaviour", () => {
+              expect(eventTicker).toContain("Math.max(32, items.length * 10)");
+              expect(raidTicker).toContain("Math.max(32, items.length * 10)");
+
+              for (const source of [eventTicker, raidTicker, dittoTicker, newGymTicker]) {
+                expect(source).toContain("useScrollableTicker");
+                expect(source).toContain("...viewportHandlers");
+              }
+
+              for (const handler of [
+                "onPointerDown: handlePointerDown",
+                "onPointerMove: handlePointerMove",
+                "onPointerUp: finishPointerInteraction",
+                "onPointerCancel: finishPointerInteraction",
+                "onClickCapture: handleClickCapture",
+                "onFocusCapture: handleFocus",
+                "onBlurCapture: handleBlur",
+                "onWheel: handleWheel",
+              ]) {
+                expect(scrollableTicker).toContain(handler);
+              }
+
+              expect(scrollableTicker).toContain("const AUTO_RESUME_DELAY_MS = 3000;");
+              expect(scrollableTicker).toContain("const DRAG_THRESHOLD_PX = 5;");
+              expect(scrollableTicker).toContain("viewport.scrollLeft +=");
+              expect(scrollableTicker).toContain("normaliseScrollPosition");
+              expect(scrollableTicker).toContain("scheduleResume");
+            });
+          });
+          TEST
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Remove temporary workflows
+        run: |
+          rm -f \
+            .github/workflows/temporary-inspect-tickers.yml \
+            .github/workflows/apply-scrollable-tickers.yml \
+            .github/workflows/debug-scrollable-tickers.yml \
+            .github/workflows/finalize-scrollable-tickers.yml
+
+      - name: Commit validated implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components styles __tests__ .github/workflows
+          git commit -m "Make tickers manually scrollable"
+          git push origin HEAD:develop
