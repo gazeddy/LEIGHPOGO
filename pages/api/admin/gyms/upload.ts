@@ -4,6 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { parse } from "csv-parse/sync";
+import { backupGymState } from "../../../../lib/gym-backups";
 import { isCommunityGym } from "../../../../lib/communityGyms";
 import {
   approvedRemovalGymIds,
@@ -344,6 +345,7 @@ export default async function handler(
     ).length;
     const sourceFile = await archiveCsv(buffer, importedAtDate);
 
+    await backupGymState(previous, "before-import", importedAtDate);
     await writeGymState({
       version: 1,
       importedAt,
