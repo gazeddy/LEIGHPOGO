@@ -94,7 +94,7 @@
 /*
  * Mouse hover previously left the desktop tickers paused whenever the pointer
  * rested over the ticker stack. Keep animations moving for fine pointers while
- * preserving keyboard focus pauses and the reduced-motion rules in each ticker.
+ * preserving keyboard focus pauses.
  */
 @media (hover: hover) and (pointer: fine) {
   .event-ticker.paused:not(:focus-within) .ticker-track,
@@ -102,6 +102,72 @@
   .ditto-ticker:hover:not(:focus-within) .ditto-track,
   .new-gym-ticker:hover:not(:focus-within) .new-gym-track {
     animation-play-state: running !important;
+  }
+}
+
+/*
+ * Windows can expose reduced-motion preferences to Chrome even when the user
+ * expects these information tickers to move. The component-level fallback sets
+ * animation:none and exposes a horizontal scrollbar, so restore the continuous
+ * ticker only for desktop fine-pointer devices. Touch-device reduced-motion
+ * behaviour remains unchanged.
+ */
+@keyframes desktop-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
+  .event-ticker .ticker-viewport,
+  .raid-ticker .raid-viewport,
+  .ditto-ticker .ditto-viewport,
+  .new-gym-ticker .new-gym-viewport {
+    overflow: hidden !important;
+  }
+
+  .raid-ticker .raid-viewport,
+  .ditto-ticker .ditto-viewport {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 18px,
+      black calc(100% - 18px),
+      transparent
+    ) !important;
+  }
+
+  .event-ticker .ticker-track {
+    animation: desktop-ticker-scroll var(--ticker-duration) linear infinite !important;
+  }
+
+  .raid-ticker .raid-track {
+    animation: desktop-ticker-scroll var(--raid-ticker-duration) linear infinite !important;
+  }
+
+  .ditto-ticker .ditto-track {
+    animation: desktop-ticker-scroll var(--ditto-ticker-duration) linear infinite !important;
+  }
+
+  .new-gym-ticker .new-gym-track {
+    animation: desktop-ticker-scroll 32s linear infinite !important;
+  }
+
+  .ticker-group-duplicate,
+  .raid-group-duplicate,
+  .ditto-group-duplicate {
+    display: flex !important;
+  }
+
+  .event-ticker.paused:focus-within .ticker-track,
+  .raid-ticker.paused:focus-within .raid-track,
+  .ditto-ticker:focus-within .ditto-track,
+  .new-gym-ticker:focus-within .new-gym-track {
+    animation-play-state: paused !important;
   }
 }
 
