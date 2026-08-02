@@ -73,6 +73,20 @@ function formatCatchCp(catchCp: RaidBossCatchCp[] | undefined): string | null {
     .join(" · ")}`;
 }
 
+function shinyBossNames(catchCp: RaidBossCatchCp[] | undefined): string[] {
+  if (!catchCp) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      catchCp
+        .filter((entry) => entry.possibleShiny)
+        .map((entry) => entry.boss),
+    ),
+  );
+}
+
 function RaidItem({
   item,
   duplicate = false,
@@ -81,12 +95,27 @@ function RaidItem({
   duplicate?: boolean;
 }) {
   const catchCp = formatCatchCp(item.catchCp);
+  const shinyBosses = shinyBossNames(item.catchCp);
+  const shinyLabel =
+    shinyBosses.length === 1
+      ? `Shiny ${shinyBosses[0]} is available`
+      : `Shiny available: ${shinyBosses.join(", ")}`;
   const content = (
     <>
       <span className={`raid-category raid-category-${item.category}`}>
         {item.label}
       </span>
       <span className="raid-boss">{item.boss}</span>
+      {shinyBosses.length > 0 && (
+        <span
+          className="raid-shiny-sparkle"
+          role="img"
+          aria-label={shinyLabel}
+          title={shinyLabel}
+        >
+          ✨
+        </span>
+      )}
       {catchCp && (
         <span
           className="raid-cp"
@@ -514,6 +543,28 @@ export default function RaidBossTicker() {
           font-weight: 800;
         }
 
+        .raid-shiny-sparkle {
+          display: inline-block;
+          color: #f2cc60;
+          filter: drop-shadow(0 0 4px rgba(242, 204, 96, 0.75));
+          font-size: 0.9em;
+          line-height: 1;
+          transform-origin: center;
+          animation: raid-shiny-twinkle 1.8s ease-in-out infinite;
+        }
+
+        @keyframes raid-shiny-twinkle {
+          0%,
+          100% {
+            opacity: 0.72;
+            transform: scale(0.86) rotate(-8deg);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.18) rotate(8deg);
+          }
+        }
+
         .raid-cp {
           color: #a5d6ff;
           font-size: 0.76rem;
@@ -528,6 +579,10 @@ export default function RaidBossTicker() {
         @media (prefers-reduced-motion: reduce) {
           .raid-group-duplicate {
             display: none;
+          }
+
+          .raid-shiny-sparkle {
+            animation: none;
           }
         }
       `}</style>
