@@ -18,6 +18,7 @@ export default function EditTradeListingPage({ listing }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const initialValue = {
+    friendshipRequirement: listing.friendshipRequirement || "ANY",
     location: listing.location || "",
     notes: listing.notes || "",
     offeredItems: listing.items.filter((item) => item.direction === "OFFER"),

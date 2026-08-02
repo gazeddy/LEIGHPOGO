@@ -54,17 +54,18 @@ model PokedexEntry {
 }
 
 model TradeListing {
-  id            Int                 @id @default(autoincrement())
-  ownerId       Int
-  owner         User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  location      String?
-  notes         String?
-  status        String              @default("ACTIVE")
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  expiresAt     DateTime
-  items         TradeListingItem[]
-  notifications TradeNotification[]
+  id                    Int                 @id @default(autoincrement())
+  ownerId               Int
+  owner                 User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  friendshipRequirement String              @default("ANY")
+  location              String?
+  notes                 String?
+  status                String              @default("ACTIVE")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  expiresAt             DateTime
+  items                 TradeListingItem[]
+  notifications         TradeNotification[]
 
   @@index([status, expiresAt])
   @@index([ownerId, createdAt])

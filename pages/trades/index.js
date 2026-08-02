@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { useState } from "react"
 import { useRouter } from "next/router"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../api/auth/[...nextauth]"
@@ -8,7 +9,11 @@ import {
   purgeExpiredTradeListings,
   tradeListingInclude,
 } from "../../lib/tradeServer"
-import { serializeTradeListing } from "../../lib/tradeUtils"
+import {
+  serializeTradeListing,
+  TRADE_FRIENDSHIP_REQUIREMENTS,
+  tradeFriendshipRequirementLabel,
+} from "../../lib/tradeUtils"
 
 const itemNames = (listing, direction) =>
   listing.items
@@ -42,6 +47,9 @@ function ListingCard({ listing, mine = false, onClose }) {
         </div>
       </div>
 
+      <p className="muted">
+        Friendship requirement: {tradeFriendshipRequirementLabel(listing.friendshipRequirement)}
+      </p>
       {listing.location && <p className="muted">Location: {listing.location}</p>}
       <p className="muted">
         Expires {new Date(listing.expiresAt).toLocaleDateString("en-GB")}
@@ -68,6 +76,12 @@ function ListingCard({ listing, mine = false, onClose }) {
 
 export default function TradesPage({ listings, myListings }) {
   const router = useRouter()
+  const [friendshipFilter, setFriendshipFilter] = useState("ALL")
+  const visibleListings = friendshipFilter === "ALL"
+    ? listings
+    : listings.filter(
+        (listing) => listing.friendshipRequirement === friendshipFilter,
+      )
 
   const closeListing = async (listingId) => {
     if (!window.confirm("Close this listing? It will no longer appear in active trades.")) {
@@ -108,14 +122,35 @@ export default function TradesPage({ listings, myListings }) {
         </div>
       </div>
 
+      <div className="card">
+        <label>
+          Filter active listings by friendship requirement
+          <select
+            value={friendshipFilter}
+            onChange={(event) => setFriendshipFilter(event.target.value)}
+          >
+            <option value="ALL">All friendship requirements</option>
+            {TRADE_FRIENDSHIP_REQUIREMENTS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <section>
         <h2 className="trade-page-heading">Active listings</h2>
-        {listings.length === 0 ? (
+        {visibleListings.length === 0 ? (
           <div className="card">
-            <p className="muted">There are no active trade listings yet.</p>
+            <p className="muted">
+              {listings.length === 0
+                ? "There are no active trade listings yet."
+                : "No active listings match that friendship requirement."}
+            </p>
           </div>
         ) : (
-          listings.map((listing) => (
+          visibleListings.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
           ))
         )}

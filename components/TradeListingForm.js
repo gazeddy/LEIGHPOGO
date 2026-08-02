@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { TRADE_FRIENDSHIP_REQUIREMENTS } from "../lib/tradeUtils"
 
 const emptyItem = () => ({
   pokemonName: "",
@@ -143,6 +144,9 @@ export default function TradeListingForm({
   submitLabel = "Save listing",
   isSubmitting = false,
 }) {
+  const [friendshipRequirement, setFriendshipRequirement] = useState(
+    initialValue?.friendshipRequirement || "ANY",
+  )
   const [location, setLocation] = useState(initialValue?.location || "")
   const [notes, setNotes] = useState(initialValue?.notes || "")
   const [offeredItems, setOfferedItems] = useState(
@@ -154,7 +158,13 @@ export default function TradeListingForm({
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    await onSubmit({ location, notes, offeredItems, wantedItems })
+    await onSubmit({
+      friendshipRequirement,
+      location,
+      notes,
+      offeredItems,
+      wantedItems,
+    })
   }
 
   return (
@@ -174,6 +184,24 @@ export default function TradeListingForm({
       <section className="trade-form-section">
         <h2>Trade details</h2>
         <div className="stack trade-details-fields">
+          <label>
+            Friendship requirement
+            <select
+              value={friendshipRequirement}
+              onChange={(event) => setFriendshipRequirement(event.target.value)}
+            >
+              {TRADE_FRIENDSHIP_REQUIREMENTS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted">
+            Choose the minimum friendship level you are willing to trade at, or restrict
+            the listing to Lucky Friends only.
+          </p>
+
           <label>
             General location
             <input
