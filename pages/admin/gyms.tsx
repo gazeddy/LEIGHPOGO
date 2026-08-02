@@ -4,15 +4,22 @@ import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { useMemo, useState, type ChangeEvent } from "react";
+import {
+  latestGymStateBackup,
+  type GymStateBackupInfo,
+} from "../../lib/gym-backups";
 import { readGymState, sortGyms, type GymRecord } from "../../lib/gyms";
 import { authOptions } from "../api/auth/[...nextauth]";
 
 const MAX_CSV_SIZE = 5 * 1024 * 1024;
 
+type MaintenanceAction = "clear-new" | "rollback";
+
 interface GymAdminProps {
   initialGyms: GymRecord[];
   importedAt: string | null;
   sourceFile: string | null;
+  latestBackup: GymStateBackupInfo | null;
 }
 
 interface ImportResponse {
@@ -26,6 +33,16 @@ interface ImportResponse {
     unchanged: number;
     sourceFile: string;
   };
+}
+
+interface MaintenanceResponse {
+  error?: string;
+  message?: string;
+  total?: number;
+  importedAt?: string | null;
+  sourceFile?: string | null;
+  backupFile?: string | null;
+  restoredFile?: string;
 }
 
 function fileAsDataUrl(file: File): Promise<string> {
@@ -55,13 +72,17 @@ export const getServerSideProps: GetServerSideProps<GymAdminProps> = async (
     };
   }
 
-  const state = await readGymState();
+  const [state, latestBackup] = await Promise.all([
+    readGymState(),
+    latestGymStateBackup(),
+  ]);
 
   return {
     props: {
       initialGyms: sortGyms(state.gyms),
       importedAt: state.importedAt,
       sourceFile: state.sourceFile,
+      latestBackup,
     },
   };
 };
@@ -70,10 +91,13 @@ export default function GymAdminPage({
   initialGyms,
   importedAt,
   sourceFile,
+  latestBackup,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
   const [gyms, setGyms] = useState(initialGyms);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [maintenanceAction, setMaintenanceAction] =
+    useState<MaintenanceAction | null>(null);
   const [search, setSearch] = useState("");
   const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
   const [savingAlias, setSavingAlias] = useState<string | null>(null);
@@ -151,6 +175,45 @@ export default function GymAdminPage({
     }
   }
 
+  async function runMaintenance(action: MaintenanceAction) {
+    const confirmation =
+      action === "clear-new"
+        ? "Clear the new-gym status from every gym? This does not delete gyms or aliases, and a recovery backup will be created first."
+        : `Restore the latest gym-state backup${latestBackup ? ` (${latestBackup.fileName})` : ""}? The current state will also be backed up so this rollback can be undone.`;
+
+    if (!window.confirm(confirmation)) {
+      return;
+    }
+
+    setMessage(null);
+    setError(null);
+    setMaintenanceAction(action);
+
+    try {
+      const response = await fetch("/api/admin/gyms/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payload = (await response.json()) as MaintenanceResponse;
+
+      if (!response.ok || !payload.message) {
+        throw new Error(payload.error || "The gym maintenance action failed.");
+      }
+
+      setMessage(payload.message);
+      window.setTimeout(() => window.location.reload(), 1200);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The gym maintenance action failed.",
+      );
+    } finally {
+      setMaintenanceAction(null);
+    }
+  }
+
   async function saveAlias(gym: GymRecord) {
     setMessage(null);
     setError(null);
@@ -217,7 +280,8 @@ export default function GymAdminPage({
             </p>
             <p className="muted">
               The first upload is treated as the baseline. Later uploads preserve aliases
-              and mark previously unseen gym IDs as new for seven days.
+              and mark previously unseen gym IDs as new for seven days. The complete gym
+              state is backed up before every import.
             </p>
           </div>
           <div className="upload-controls">
@@ -230,6 +294,51 @@ export default function GymAdminPage({
             <div><dt>Current gyms</dt><dd>{gyms.length}</dd></div>
             <div><dt>Last upload</dt><dd>{importedAt ? new Date(importedAt).toLocaleString("en-GB") : "None"}</dd></div>
             <div><dt>Archive file</dt><dd>{sourceFile || "None"}</dd></div>
+          </dl>
+        </section>
+
+        <section className="gym-admin-card uploader-card">
+          <div>
+            <h2>Recovery tools</h2>
+            <p>
+              Clear all new-gym indicators without deleting gym records, or restore the
+              complete gym state from the latest recovery point.
+            </p>
+            <p className="muted">
+              Rollback includes official gyms, community-added gyms, aliases and removal
+              reports. The state being replaced is backed up first, so a rollback can be
+              reversed by running rollback again.
+            </p>
+          </div>
+          <div className="upload-controls">
+            <button
+              type="button"
+              disabled={maintenanceAction !== null}
+              onClick={() => runMaintenance("clear-new")}
+            >
+              {maintenanceAction === "clear-new" ? "Clearing…" : "Clear all new flags"}
+            </button>
+            <button
+              type="button"
+              disabled={maintenanceAction !== null || !latestBackup}
+              onClick={() => runMaintenance("rollback")}
+            >
+              {maintenanceAction === "rollback" ? "Restoring…" : "Roll back previous update"}
+            </button>
+          </div>
+          <dl className="import-status">
+            <div>
+              <dt>Latest recovery point</dt>
+              <dd>{latestBackup?.fileName || "None yet"}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>
+                {latestBackup
+                  ? new Date(latestBackup.createdAt).toLocaleString("en-GB")
+                  : "A backup is created before the next import or clear action"}
+              </dd>
+            </div>
           </dl>
         </section>
 
