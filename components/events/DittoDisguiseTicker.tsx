@@ -127,10 +127,14 @@ export default function DittoDisguiseTicker() {
       <div ref={viewportRef} className="ditto-viewport" {...viewportHandlers}>
         {disguises.length > 0 ? (
           <div className="ditto-track">
-            <DittoItems disguises={disguises} duplicate />
-            <DittoItems disguises={disguises} />
-            <DittoItems disguises={disguises} duplicate />
-          </div>
+      <DittoItems disguises={disguises} duplicate />
+      <DittoItems disguises={disguises} duplicate />
+      <DittoItems disguises={disguises} duplicate />
+      <DittoItems disguises={disguises} />
+      <DittoItems disguises={disguises} duplicate />
+      <DittoItems disguises={disguises} duplicate />
+      <DittoItems disguises={disguises} duplicate />
+    </div>
         ) : (
           <p className="ditto-message" role="status">
             {message}

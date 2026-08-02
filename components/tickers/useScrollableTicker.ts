@@ -25,6 +25,8 @@ export function useScrollableTicker({
 }: ScrollableTickerOptions) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const copyWidthRef = useRef(0);
+  const copyCountRef = useRef(0);
+  const scrollableRef = useRef(false);
   const durationSecondsRef = useRef(durationSeconds);
   const pausedRef = useRef(false);
   const autoScrollAllowedRef = useRef(true);
@@ -67,19 +69,46 @@ export function useScrollableTicker({
   }, [clearResumeTimer, setPaused]);
 
   const normaliseScrollPosition = useCallback(() => {
-    const viewport = viewportRef.current;
-    const copyWidth = copyWidthRef.current;
+  const viewport = viewportRef.current;
+  const track = viewport?.firstElementChild as HTMLElement | null;
+  const copyWidth = copyWidthRef.current;
+  const copyCount = copyCountRef.current;
 
-    if (!viewport || copyWidth <= viewport.clientWidth) {
-      return;
-    }
+  if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
+    return;
+  }
 
-    if (viewport.scrollLeft <= 0) {
-      viewport.scrollLeft += copyWidth;
-    } else if (viewport.scrollLeft >= copyWidth * 2) {
-      viewport.scrollLeft -= copyWidth;
-    }
-  }, []);
+  const maxScrollLeft = Math.max(
+    0,
+    track.scrollWidth - viewport.clientWidth,
+  );
+  if (maxScrollLeft <= 0) {
+    return;
+  }
+
+  const middleCopyIndex = Math.floor(copyCount / 2);
+  const centreScrollLeft = Math.min(
+    copyWidth * middleCopyIndex,
+    maxScrollLeft,
+  );
+  const lowerBoundary = Math.max(0, centreScrollLeft - copyWidth);
+  const upperBoundary = Math.min(
+    maxScrollLeft,
+    centreScrollLeft + copyWidth,
+  );
+
+  if (
+    viewport.scrollLeft <= lowerBoundary &&
+    viewport.scrollLeft + copyWidth <= maxScrollLeft
+  ) {
+    viewport.scrollLeft += copyWidth;
+  } else if (
+    viewport.scrollLeft >= upperBoundary &&
+    viewport.scrollLeft - copyWidth >= 0
+  ) {
+    viewport.scrollLeft -= copyWidth;
+  }
+}, []);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -114,22 +143,35 @@ export function useScrollableTicker({
     let initialised = false;
     let frameId = 0;
     const measure = () => {
-      const track = viewport.firstElementChild as HTMLElement | null;
-      const firstCopy = track?.firstElementChild as HTMLElement | null;
-      const copyWidth = firstCopy?.getBoundingClientRect().width ?? 0;
+    const track = viewport.firstElementChild as HTMLElement | null;
+    const firstCopy = track?.firstElementChild as HTMLElement | null;
+    const copyWidth = firstCopy?.getBoundingClientRect().width ?? 0;
+    const copyCount = track?.childElementCount ?? 0;
+    const maxScrollLeft = Math.max(
+      0,
+      (track?.scrollWidth ?? 0) - viewport.clientWidth,
+    );
 
-      copyWidthRef.current = copyWidth;
+    copyWidthRef.current = copyWidth;
+    copyCountRef.current = copyCount;
+    scrollableRef.current = copyWidth > 0 && maxScrollLeft > 0;
 
-      if (copyWidth > viewport.clientWidth) {
-        if (!initialised || viewport.scrollLeft <= 0) {
-viewport.scrollLeft = copyWidth;
-        }
-      } else {
-        viewport.scrollLeft = 0;
+    if (scrollableRef.current) {
+      const middleCopyIndex = Math.floor(copyCount / 2);
+      const initialScrollLeft = Math.min(
+        copyWidth * middleCopyIndex,
+        maxScrollLeft,
+      );
+
+      if (!initialised || viewport.scrollLeft <= 0) {
+        viewport.scrollLeft = initialScrollLeft;
       }
+    } else {
+      viewport.scrollLeft = 0;
+    }
 
-      initialised = true;
-    };
+    initialised = true;
+  };
 
     frameId = window.requestAnimationFrame(measure);
     const observer = new ResizeObserver(measure);
@@ -163,7 +205,7 @@ viewport.scrollLeft = copyWidth;
 
       if (
         viewport &&
-        copyWidth > viewport.clientWidth &&
+        scrollableRef.current &&
         !pausedRef.current &&
         autoScrollAllowedRef.current
       ) {
@@ -192,10 +234,7 @@ viewport.scrollLeft = copyWidth;
     }
 
     const viewport = viewportRef.current;
-    if (
-      !viewport ||
-      copyWidthRef.current <= viewport.clientWidth
-    ) {
+    if (!viewport || !scrollableRef.current) {
       return;
     }
 

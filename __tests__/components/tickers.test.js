@@ -72,7 +72,7 @@ describe("ticker regression wiring", () => {
     expect(dittoTicker).toContain("<DittoItems disguises={disguises} />");
     expect(
       (dittoTicker.match(/<DittoItems disguises=\{disguises\} duplicate \/>/g) || []).length,
-    ).toBe(2);
+    ).toBe(6);
 
     const raidPosition = app.indexOf("<RaidBossTicker />");
     const dittoPosition = app.indexOf("<DittoDisguiseTicker />");
@@ -109,6 +109,7 @@ describe("ticker regression wiring", () => {
     expect(scrollableTicker).toContain("const DRAG_THRESHOLD_PX = 5;");
     expect(scrollableTicker).toContain("viewport.scrollLeft +=");
     expect(scrollableTicker).toContain("normaliseScrollPosition");
+    expect(scrollableTicker).toContain("scrollableRef.current");
     expect(scrollableTicker).toContain("scheduleResume");
   });
 });
