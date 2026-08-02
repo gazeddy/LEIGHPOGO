@@ -1,5 +1,6 @@
 import { getSession } from "next-auth/react";
 import prisma from "../../../lib/prisma";
+import { canonicalFriendCode } from "../../../lib/friendCode";
 
 export default async function handler(req, res) {
   const session = await getSession({ req });
@@ -27,15 +28,26 @@ export default async function handler(req, res) {
     }
 
     const { trainerName, friendCode } = req.body;
+    const normalizedTrainerName = String(trainerName || "").trim();
+    const normalizedFriendCode = canonicalFriendCode(friendCode);
 
-    if (!trainerName || !friendCode) {
+    if (!normalizedTrainerName || !friendCode) {
       return res.status(400).json({ error: "Missing fields" });
+    }
+
+    if (!normalizedFriendCode) {
+      return res.status(400).json({
+        error: "Friend code must contain exactly 12 digits.",
+      });
     }
 
     try {
       const updatedEntry = await prisma.entry.update({
         where: { id: entryId },
-        data: { trainerName, code: friendCode },
+        data: {
+          trainerName: normalizedTrainerName,
+          code: normalizedFriendCode,
+        },
       });
       res.status(200).json(updatedEntry);
     } catch (err) {
