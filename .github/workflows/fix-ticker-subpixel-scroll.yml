@@ -1,0 +1,247 @@
+name: Fix ticker subpixel scrolling
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - .github/workflows/fix-ticker-subpixel-scroll.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./validation.db
+      NEXTAUTH_SECRET: validation-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Preserve fractional ticker movement
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(
+                      f"Expected exactly one match in {path}, found {count}: {old[:100]!r}"
+                  )
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          def replace_between(path: str, start: str, end: str, replacement: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              start_index = text.find(start)
+              if start_index < 0:
+                  raise RuntimeError(f"Start marker not found in {path}: {start!r}")
+              end_index = text.find(end, start_index)
+              if end_index < 0:
+                  raise RuntimeError(f"End marker not found in {path}: {end!r}")
+              file_path.write_text(
+                  text[:start_index] + replacement + text[end_index:],
+                  encoding="utf-8",
+              )
+
+          hook = "components/tickers/useScrollableTicker.ts"
+
+          replace_once(
+              hook,
+              "  const scrollableRef = useRef(false);\n  const durationSecondsRef = useRef(durationSeconds);\n",
+              "  const scrollableRef = useRef(false);\n"
+              "  const virtualScrollLeftRef = useRef(0);\n"
+              "  const durationSecondsRef = useRef(durationSeconds);\n",
+          )
+
+          replace_once(
+              hook,
+              "    if (!scrollable) {\n      viewport.scrollLeft = 0;\n      return false;\n    }\n",
+              "    if (!scrollable) {\n"
+              "      virtualScrollLeftRef.current = 0;\n"
+              "      viewport.scrollLeft = 0;\n"
+              "      return false;\n"
+              "    }\n",
+          )
+
+          replace_once(
+              hook,
+              '''      viewport.scrollLeft = Math.min(
+                Math.max(preferredPosition, minimumSafePosition),
+                maximumSafePosition,
+              );
+            }
+          ''',
+              '''      const nextScrollLeft = Math.min(
+                Math.max(preferredPosition, minimumSafePosition),
+                maximumSafePosition,
+              );
+              virtualScrollLeftRef.current = nextScrollLeft;
+              viewport.scrollLeft = nextScrollLeft;
+            } else if (
+              Math.abs(viewport.scrollLeft - virtualScrollLeftRef.current) > 1
+            ) {
+              virtualScrollLeftRef.current = viewport.scrollLeft;
+            }
+          ''',
+          )
+
+          replace_between(
+              hook,
+              "  const normaliseScrollPosition = useCallback(() => {",
+              "\n\n  useEffect(() => {\n    const reducedMotion",
+              '''  const normaliseScrollPosition = useCallback(() => {
+            const viewport = viewportRef.current;
+            const track = viewport?.firstElementChild as HTMLElement | null;
+            const copyWidth = copyWidthRef.current;
+            const copyCount = copyCountRef.current;
+
+            if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
+              return;
+            }
+
+            const maxScrollLeft = Math.max(
+              0,
+              track.scrollWidth - viewport.clientWidth,
+            );
+            if (maxScrollLeft <= 0) {
+              return;
+            }
+
+            const edgeBuffer = Math.min(copyWidth / 2, maxScrollLeft / 4);
+            let nextScrollLeft = virtualScrollLeftRef.current;
+
+            if (
+              nextScrollLeft <= edgeBuffer &&
+              nextScrollLeft + copyWidth <= maxScrollLeft
+            ) {
+              nextScrollLeft += copyWidth;
+            } else if (
+              nextScrollLeft >= maxScrollLeft - edgeBuffer &&
+              nextScrollLeft - copyWidth >= 0
+            ) {
+              nextScrollLeft -= copyWidth;
+            }
+
+            if (nextScrollLeft !== virtualScrollLeftRef.current) {
+              virtualScrollLeftRef.current = nextScrollLeft;
+              viewport.scrollLeft = nextScrollLeft;
+            }
+          }, []);
+          ''',
+          )
+
+          replace_once(
+              hook,
+              '''        const seconds = Math.max(durationSecondsRef.current, 1);
+                viewport.scrollLeft += (copyWidth / seconds) * elapsedSeconds;
+                normaliseScrollPosition();
+          ''',
+              '''        const seconds = Math.max(durationSecondsRef.current, 1);
+                virtualScrollLeftRef.current +=
+                  (copyWidth / seconds) * elapsedSeconds;
+                viewport.scrollLeft = virtualScrollLeftRef.current;
+                normaliseScrollPosition();
+          ''',
+          )
+
+          replace_once(
+              hook,
+              '''    pauseTicker();
+              dragRef.current = {
+          ''',
+              '''    pauseTicker();
+              virtualScrollLeftRef.current = viewport.scrollLeft;
+              dragRef.current = {
+          ''',
+          )
+
+          replace_once(
+              hook,
+              "    viewport.scrollLeft = nextScrollLeft;\n  }\n\n  function finishPointerInteraction",
+              "    virtualScrollLeftRef.current = nextScrollLeft;\n"
+              "    viewport.scrollLeft = nextScrollLeft;\n"
+              "  }\n\n"
+              "  function finishPointerInteraction",
+          )
+
+          replace_once(
+              hook,
+              '''  function handleWheel(_event: WheelEvent<HTMLDivElement>) {
+            pauseTicker();
+            window.requestAnimationFrame(normaliseScrollPosition);
+            scheduleResume();
+          }
+          ''',
+              '''  function handleWheel(_event: WheelEvent<HTMLDivElement>) {
+            pauseTicker();
+            window.requestAnimationFrame(() => {
+              const viewport = viewportRef.current;
+              if (viewport) {
+                virtualScrollLeftRef.current = viewport.scrollLeft;
+              }
+              normaliseScrollPosition();
+            });
+            scheduleResume();
+          }
+          ''',
+          )
+
+          tests = "__tests__/components/tickers.test.js"
+          replace_once(
+              tests,
+              '''    expect(scrollableTicker).toContain("viewport.scrollLeft +=");
+              expect(scrollableTicker).toContain("normaliseScrollPosition");
+              expect(scrollableTicker).toContain("scrollableRef.current");
+          ''',
+              '''    expect(scrollableTicker).toContain("virtualScrollLeftRef.current +=");
+              expect(scrollableTicker).toContain(
+                "viewport.scrollLeft = virtualScrollLeftRef.current",
+              );
+              expect(scrollableTicker).toContain("normaliseScrollPosition");
+              expect(scrollableTicker).toContain("scrollableRef.current");
+          ''',
+          )
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/fix-ticker-subpixel-scroll.yml
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/tickers/useScrollableTicker.ts \
+            __tests__/components/tickers.test.js \
+            .github/workflows/fix-ticker-subpixel-scroll.yml
+          git commit -m "Preserve subpixel ticker auto-scroll movement"
+          git push origin develop
