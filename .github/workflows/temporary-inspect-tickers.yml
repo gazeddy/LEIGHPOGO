@@ -1,0 +1,21 @@
+name: Temporary inspect tickers
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locate ticker components
+        run: |
+          echo '--- component files ---'
+          find components -type f -maxdepth 4 | sort
+          echo '--- ticker references ---'
+          grep -R -n -E 'ticker-track|raid-track|ditto-track|new-gym-track|ticker-viewport|raid-viewport|ditto-viewport|new-gym-viewport' components styles || true
