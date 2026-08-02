@@ -154,7 +154,7 @@
   }
 
   .new-gym-ticker .new-gym-track {
-    animation: desktop-ticker-scroll 32s linear infinite !important;
+    animation: desktop-ticker-scroll var(--new-gym-ticker-duration, 32s) linear infinite !important;
   }
 
   .ticker-group-duplicate,
