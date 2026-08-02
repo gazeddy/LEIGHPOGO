@@ -11,4 +11,5 @@ node_modules
 /data/event-type-rules.json*
 /data/gyms.json*
 /data/gym-imports/*.csv
+/data/gym-state-backups/*.json
 /public/uploads/guides/*
