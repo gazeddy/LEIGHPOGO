@@ -37,6 +37,12 @@ export interface EventTickerItem {
   eventUrlLabel: string | null;
 }
 
+export interface RaidBossCatchCp {
+  boss: string;
+  maxUnboostedCp: number;
+  maxBoostedCp: number;
+}
+
 export interface RaidBossTickerItem {
   eventID: string;
   category: "five-star" | "shadow" | "mega";
@@ -44,4 +50,5 @@ export interface RaidBossTickerItem {
   boss: string;
   end: string;
   link: string | null;
+  catchCp?: RaidBossCatchCp[];
 }
