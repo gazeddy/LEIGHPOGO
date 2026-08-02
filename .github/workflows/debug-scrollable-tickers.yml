@@ -85,16 +85,98 @@ jobs:
           PY
           python /tmp/apply-scrollable-tickers.py
 
-      - name: Show generated ticker sections
+      - name: Clean generated JSX overlaps
         run: |
-          echo '--- EventTicker 170-230 ---'
-          nl -ba components/events/EventTicker.tsx | sed -n '170,230p'
-          echo '--- RaidBossTicker 225-285 ---'
-          nl -ba components/events/RaidBossTicker.tsx | sed -n '225,285p'
-          echo '--- DittoDisguiseTicker 110-155 ---'
-          nl -ba components/events/DittoDisguiseTicker.tsx | sed -n '110,155p'
-          echo '--- NewGymTicker 135-190 ---'
-          nl -ba components/gyms/NewGymTicker.tsx | sed -n '135,190p'
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_required(path, old, new):
+              file_path = Path(path)
+              text = file_path.read_text(encoding='utf-8')
+              if old not in text:
+                  raise RuntimeError(f'Expected generated block not found in {path}: {old[:100]!r}')
+              file_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          for path, label, item_component, item_prop in (
+              ('components/events/EventTicker.tsx', 'ticker', 'TickerItems', 'items'),
+              ('components/events/RaidBossTicker.tsx', 'raid', 'RaidItems', 'items'),
+              ('components/events/DittoDisguiseTicker.tsx', 'ditto', 'DittoItems', 'disguises'),
+          ):
+              component_name = {
+                  'ticker': 'event-ticker',
+                  'raid': 'raid-ticker',
+                  'ditto': 'ditto-ticker',
+              }[label]
+              if label in ('ticker', 'raid'):
+                  replace_required(path, 'return (    <section', 'return (\n    <section')
+                  replace_required(
+                      path,
+                      f'    <div className="{label}-label">\n    >\n      <div className="{label}-label">',
+                      f'      <div className="{label}-label">',
+                  )
+
+              condition = 'items.length' if item_prop == 'items' else 'disguises.length'
+              replace_required(
+                  path,
+                  f'{{{condition} > 0 ? (          <div className="{label}-track">',
+                  f'{{{condition} > 0 ? (\n          <div className="{label}-track">',
+              )
+
+              old_items = (
+                  f'          <div className="{label}-track">\n'
+                  f'          <{item_component} {item_prop}={{{item_prop}}} duplicate />\n'
+                  f'          <{item_component} {item_prop}={{{item_prop}}} />\n'
+                  f'          >'
+              )
+              start = Path(path).read_text(encoding='utf-8').find(old_items)
+              if start < 0:
+                  raise RuntimeError(f'Generated item block start not found in {path}')
+              text = Path(path).read_text(encoding='utf-8')
+              end = text.find('          </div>', start)
+              if end < 0:
+                  raise RuntimeError(f'Generated item block end not found in {path}')
+              end += len('          </div>')
+              replacement = (
+                  f'          <div className="{label}-track">\n'
+                  f'            <{item_component} {item_prop}={{{item_prop}}} duplicate />\n'
+                  f'            <{item_component} {item_prop}={{{item_prop}}} />\n'
+                  f'            <{item_component} {item_prop}={{{item_prop}}} duplicate />\n'
+                  f'          </div>'
+              )
+              Path(path).write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+
+          gym_path = Path('components/gyms/NewGymTicker.tsx')
+          gym_text = gym_path.read_text(encoding='utf-8')
+          gym_text = gym_text.replace(
+              ') : (          <div className="new-gym-track">',
+              ') : (\n          <div className="new-gym-track">',
+              1,
+          )
+          duplicate_style = '''    <style jsx>{`
+          >
+            <div className="new-gym-copy">{items}</div>
+            <div className="new-gym-copy" aria-hidden="true">{items}</div>
+          </div>
+        )}
+      </div>
+
+      <style jsx>{`'''
+          if duplicate_style not in gym_text:
+              raise RuntimeError('Generated duplicate new-gym block not found')
+          gym_text = gym_text.replace(duplicate_style, '      <style jsx>{`', 1)
+          gym_path.write_text(gym_text, encoding='utf-8')
+          PY
+
+      - name: Show cleaned ticker sections
+        run: |
+          echo '--- EventTicker 185-215 ---'
+          nl -ba components/events/EventTicker.tsx | sed -n '185,215p'
+          echo '--- RaidBossTicker 238-268 ---'
+          nl -ba components/events/RaidBossTicker.tsx | sed -n '238,268p'
+          echo '--- DittoDisguiseTicker 120-145 ---'
+          nl -ba components/events/DittoDisguiseTicker.tsx | sed -n '120,145p'
+          echo '--- NewGymTicker 140-175 ---'
+          nl -ba components/gyms/NewGymTicker.tsx | sed -n '140,175p'
 
       - name: Install dependencies
         run: npm ci
