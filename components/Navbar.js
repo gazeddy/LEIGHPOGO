@@ -109,20 +109,20 @@ export default function Navbar() {
           id="primary-navigation"
           className={`nav-links ${open ? "open" : ""}`}
         >
-          <Link href="/" className="nav-item">Home</Link>
-          <Link href="/events" className="nav-item">Events</Link>
-          <Link href="/guides" className="nav-item">Guides</Link>
+          <Link href="/" className="nav-item nav-main-item">Home</Link>
+          <Link href="/events" className="nav-item nav-main-item">Events</Link>
+          <Link href="/guides" className="nav-item nav-main-item">Guides</Link>
 
           <div className={`nav-group ${toolsOpen ? "open" : ""}`}>
             <button
               type="button"
-              className="nav-item nav-group-toggle"
+              className="nav-item nav-main-item nav-group-toggle"
               aria-expanded={toolsOpen}
               aria-controls="tools-navigation"
               onClick={toggleTools}
             >
               <span>Tools</span>
-              <span className="nav-caret" aria-hidden="true">⌄</span>
+              <span className="nav-caret" aria-hidden="true" />
             </button>
             <div id="tools-navigation" className="nav-submenu">
               <Link href="/search-strings" className="nav-item nav-subitem">
@@ -149,8 +149,8 @@ export default function Navbar() {
 
           {session && (
             <>
-              <Link href="/account" className="nav-item">Account</Link>
-              <Link href="/notifications" className="nav-item nav-notifications">
+              <Link href="/account" className="nav-item nav-main-item">Account</Link>
+              <Link href="/notifications" className="nav-item nav-main-item nav-notifications">
                 <span>Notifications</span>
                 {unreadNotifications > 0 && (
                   <span className="nav-notification-count" aria-label={`${unreadNotifications} unread notifications`}>
@@ -163,13 +163,13 @@ export default function Navbar() {
                 <div className={`nav-group nav-group-admin ${adminOpen ? "open" : ""}`}>
                   <button
                     type="button"
-                    className="nav-item nav-group-toggle"
+                    className="nav-item nav-main-item nav-group-toggle"
                     aria-expanded={adminOpen}
                     aria-controls="admin-navigation"
                     onClick={toggleAdmin}
                   >
                     <span>Admin</span>
-                    <span className="nav-caret" aria-hidden="true">⌄</span>
+                    <span className="nav-caret" aria-hidden="true" />
                   </button>
                   <div id="admin-navigation" className="nav-submenu">
                     <Link href="/admin" className="nav-item nav-subitem">
@@ -201,7 +201,7 @@ export default function Navbar() {
           )}
 
           {!session && (
-            <Link href="/login" className="nav-item">Login</Link>
+            <Link href="/login" className="nav-item nav-main-item">Login</Link>
           )}
         </div>
       </div>
