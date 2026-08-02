@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useScrollableTicker } from "../tickers/useScrollableTicker";
+import { useEffect, useMemo, useState } from "react";
 
 interface NewGymItem {
   id: string;
@@ -22,6 +18,30 @@ interface NewGymPayload {
 type FetchState = "loading" | "ready" | "error";
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+function NewGymItems({
+  gyms,
+  duplicate = false,
+}: {
+  gyms: NewGymItem[];
+  duplicate?: boolean;
+}) {
+  return (
+    <div className="new-gym-copy" aria-hidden={duplicate || undefined}>
+      {gyms.map((gym) => (
+        <Link
+          key={`${duplicate ? "duplicate-" : ""}${gym.id}`}
+          href={`/gyms?gym=${encodeURIComponent(gym.id)}`}
+          className="new-gym-item"
+          tabIndex={duplicate ? -1 : undefined}
+        >
+          <strong>{gym.displayName}</strong>
+          {gym.alias && <span className="official-name">({gym.name})</span>}
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default function NewGymTicker() {
   const { status } = useSession();
@@ -93,21 +113,20 @@ export default function NewGymTicker() {
     };
   }, [status]);
 
-  const animationDuration = useMemo(
-    () => `${Math.max(32, gyms.length * 10)}s`,
+  const animationDurationSeconds = useMemo(
+    () => Math.max(32, gyms.length * 10),
     [gyms.length],
   );
+  const { viewportRef, paused, dragging, viewportHandlers } =
+    useScrollableTicker({
+      durationSeconds: animationDurationSeconds,
+      contentKey: gyms.length,
+      enabled: status === "authenticated" && gyms.length > 0,
+    });
 
   if (status !== "authenticated") {
     return null;
   }
-
-  const items = gyms.map((gym) => (
-    <Link key={gym.id} href={`/gyms?gym=${encodeURIComponent(gym.id)}`} className="new-gym-item">
-      <strong>{gym.displayName}</strong>
-      {gym.alias && <span className="official-name">({gym.name})</span>}
-    </Link>
-  ));
 
   const statusMessage =
     fetchState === "loading"
@@ -119,31 +138,24 @@ export default function NewGymTicker() {
           : null;
 
   return (
-    <aside className="new-gym-ticker" aria-label="Newly added gyms">
+    <aside className={`new-gym-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`} aria-label="Newly added gyms">
       <Link href="/gyms" className="new-gym-label">
         <span aria-hidden="true">✨</span>
         <strong>New gyms</strong>
       </Link>
-      <div className="new-gym-viewport" aria-live="polite">
+      <div ref={viewportRef} className="new-gym-viewport" aria-live="polite" {...viewportHandlers}>
         {statusMessage ? (
           <p className="new-gym-status-message" title={statusMessage}>
             {statusMessage}
           </p>
         ) : (
-          <div
-            className="new-gym-track"
-            style={
-              {
-                "--new-gym-ticker-duration": animationDuration,
-                animationDuration,
-              } as CSSProperties
-            }
-          >
-            <div className="new-gym-copy">{items}</div>
-            <div className="new-gym-copy" aria-hidden="true">{items}</div>
-          </div>
-        )}
-      </div>
+          <div className="new-gym-track">
+          <NewGymItems gyms={gyms} duplicate />
+          <NewGymItems gyms={gyms} />
+          <NewGymItems gyms={gyms} duplicate />
+        </div>
+      )}
+    </div>
 
       <style jsx>{`
         .new-gym-status-message {

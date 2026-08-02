@@ -1,12 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type FocusEvent,
-  type PointerEvent,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   RaidBossCatchCp,
   RaidBossTickerItem,
@@ -15,15 +7,13 @@ import {
   EVENT_VISIBILITY_CHANGED_EVENT,
   EVENT_VISIBILITY_POLL_INTERVAL_MS,
 } from "../../lib/event-visibility-client";
+import { useScrollableTicker } from "../tickers/useScrollableTicker";
 
 interface RaidTickerPayload {
   items?: RaidBossTickerItem[];
 }
 
 type RaidTickerStatus = "loading" | "ready" | "error";
-
-const AUTO_RESUME_DELAY_MS = 3000;
-const TAP_MAX_DURATION_MS = 450;
 
 function dateForDisplay(value: string): {
   date: Date;
@@ -173,11 +163,6 @@ function RaidItems({
 export default function RaidBossTicker() {
   const [items, setItems] = useState<RaidBossTickerItem[]>([]);
   const [status, setStatus] = useState<RaidTickerStatus>("loading");
-  const [paused, setPaused] = useState(false);
-  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pointerStartedAtRef = useRef<number | null>(null);
-  const pointerWasPausedRef = useRef(false);
-  const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let controller: AbortController | null = null;
@@ -236,117 +221,18 @@ export default function RaidBossTicker() {
     };
   }, []);
 
-  useEffect(
-    () => () => {
-      if (resumeTimerRef.current !== null) {
-        clearTimeout(resumeTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  const animationDuration = useMemo(
-    () => `${Math.max(32, items.length * 10)}s`,
+  const animationDurationSeconds = useMemo(
+    () => Math.max(32, items.length * 10),
     [items.length],
   );
+  const { viewportRef, paused, dragging, viewportHandlers } =
+    useScrollableTicker({
+      durationSeconds: animationDurationSeconds,
+      contentKey: items.length,
+      enabled: items.length > 0,
+    });
 
-  function clearResumeTimer() {
-    if (resumeTimerRef.current !== null) {
-      clearTimeout(resumeTimerRef.current);
-      resumeTimerRef.current = null;
-    }
-  }
 
-  function pauseTicker() {
-    clearResumeTimer();
-    setPaused(true);
-  }
-
-  function resumeTicker() {
-    clearResumeTimer();
-    setPaused(false);
-  }
-
-  function scheduleResume() {
-    clearResumeTimer();
-    resumeTimerRef.current = setTimeout(() => {
-      resumeTimerRef.current = null;
-      setPaused(false);
-    }, AUTO_RESUME_DELAY_MS);
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    clearResumeTimer();
-    pointerStartedAtRef.current = performance.now();
-    pointerWasPausedRef.current = paused;
-    activePointerIdRef.current = event.pointerId;
-    setPaused(true);
-  }
-
-  function handlePointerUp(event: PointerEvent<HTMLElement>) {
-    if (activePointerIdRef.current !== event.pointerId) {
-      return;
-    }
-
-    const startedAt = pointerStartedAtRef.current;
-    const wasPaused = pointerWasPausedRef.current;
-    const pressDuration =
-      startedAt === null ? TAP_MAX_DURATION_MS + 1 : performance.now() - startedAt;
-    const target = event.target as HTMLElement;
-    const usedActionLink = target.closest("a") !== null;
-
-    activePointerIdRef.current = null;
-    pointerStartedAtRef.current = null;
-
-    if (!usedActionLink && wasPaused && pressDuration <= TAP_MAX_DURATION_MS) {
-      resumeTicker();
-      return;
-    }
-
-    scheduleResume();
-  }
-
-  function handlePointerCancel(event: PointerEvent<HTMLElement>) {
-    if (activePointerIdRef.current !== event.pointerId) {
-      return;
-    }
-
-    activePointerIdRef.current = null;
-    pointerStartedAtRef.current = null;
-    scheduleResume();
-  }
-
-  function handlePointerEnter(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse") {
-      pauseTicker();
-    }
-  }
-
-  function handlePointerLeave(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" && activePointerIdRef.current === null) {
-      scheduleResume();
-    }
-  }
-
-  function handleFocus(event: FocusEvent<HTMLElement>) {
-    const target = event.target as HTMLElement;
-
-    if (target.matches(":focus-visible")) {
-      pauseTicker();
-    }
-  }
-
-  function handleBlur(event: FocusEvent<HTMLElement>) {
-    const nextTarget = event.relatedTarget as Node | null;
-
-    if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
-      scheduleResume();
-    }
-  }
 
   const message =
     status === "loading"
@@ -357,31 +243,18 @@ export default function RaidBossTicker() {
 
   return (
     <section
-      className={`raid-ticker${paused ? " paused" : ""}`}
-      aria-label="Current raid bosses"
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-      onFocusCapture={handleFocus}
-      onBlurCapture={handleBlur}
-    >
+    className={`raid-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
+    aria-label="Current raid bosses"
+  >
       <div className="raid-label">
         <span aria-hidden="true">●</span>
         Current raids
       </div>
 
-      <div className="raid-viewport">
+      <div ref={viewportRef} className="raid-viewport" {...viewportHandlers}>
         {items.length > 0 ? (
-          <div
-            className="raid-track"
-            style={
-              {
-                "--raid-ticker-duration": animationDuration,
-              } as CSSProperties
-            }
-          >
+          <div className="raid-track">
+            <RaidItems items={items} duplicate />
             <RaidItems items={items} />
             <RaidItems items={items} duplicate />
           </div>
@@ -428,7 +301,13 @@ export default function RaidBossTicker() {
         .raid-viewport {
           min-width: 0;
           flex: 1;
-          overflow: hidden;
+          overflow-x: auto;
+          overflow-y: hidden;
+          cursor: grab;
+          overscroll-behavior-x: contain;
+          scrollbar-width: none;
+          touch-action: pan-y;
+          -ms-overflow-style: none;
           mask-image: linear-gradient(
             to right,
             transparent,
@@ -438,16 +317,20 @@ export default function RaidBossTicker() {
           );
         }
 
+        .raid-viewport::-webkit-scrollbar {
+          display: none;
+        }
+
+        .raid-ticker.dragging .raid-viewport {
+          cursor: grabbing;
+        }
+
         .raid-track {
           display: flex;
           width: max-content;
           min-width: 100%;
-          animation: raid-ticker-scroll var(--raid-ticker-duration) linear infinite;
-          will-change: transform;
-        }
-
-        .raid-ticker.paused .raid-track {
-          animation-play-state: paused;
+          animation: none;
+          transform: none;
         }
 
         .raid-message {
@@ -459,15 +342,6 @@ export default function RaidBossTicker() {
           white-space: nowrap;
         }
 
-        @keyframes raid-ticker-scroll {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
-
         @media (max-width: 620px) {
           .raid-label {
             padding: 0 10px;
@@ -477,12 +351,7 @@ export default function RaidBossTicker() {
 
         @media (prefers-reduced-motion: reduce) {
           .raid-viewport {
-            overflow-x: auto;
             mask-image: none;
-          }
-
-          .raid-track {
-            animation: none;
           }
         }
       `}</style>
@@ -577,10 +446,6 @@ export default function RaidBossTicker() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .raid-group-duplicate {
-            display: none;
-          }
-
           .raid-shiny-sparkle {
             animation: none;
           }

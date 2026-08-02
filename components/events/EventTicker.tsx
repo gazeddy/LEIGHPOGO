@@ -1,27 +1,17 @@
 import Link from "next/link";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type FocusEvent,
-  type PointerEvent,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EventTickerItem } from "../../lib/events";
 import {
   EVENT_VISIBILITY_CHANGED_EVENT,
   EVENT_VISIBILITY_POLL_INTERVAL_MS,
 } from "../../lib/event-visibility-client";
+import { useScrollableTicker } from "../tickers/useScrollableTicker";
 
 interface TickerPayload {
   items?: EventTickerItem[];
 }
 
 type TickerStatus = "loading" | "ready" | "error";
-
-const AUTO_RESUME_DELAY_MS = 3000;
-const TAP_MAX_DURATION_MS = 450;
 
 function dateForDisplay(value: string): {
   date: Date;
@@ -120,11 +110,6 @@ function TickerItems({
 export default function EventTicker() {
   const [items, setItems] = useState<EventTickerItem[]>([]);
   const [status, setStatus] = useState<TickerStatus>("loading");
-  const [paused, setPaused] = useState(false);
-  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pointerStartedAtRef = useRef<number | null>(null);
-  const pointerWasPausedRef = useRef(false);
-  const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let controller: AbortController | null = null;
@@ -183,117 +168,18 @@ export default function EventTicker() {
     };
   }, []);
 
-  useEffect(
-    () => () => {
-      if (resumeTimerRef.current !== null) {
-        clearTimeout(resumeTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  const animationDuration = useMemo(
-    () => `${Math.max(32, items.length * 10)}s`,
+  const animationDurationSeconds = useMemo(
+    () => Math.max(32, items.length * 10),
     [items.length],
   );
+  const { viewportRef, paused, dragging, viewportHandlers } =
+    useScrollableTicker({
+      durationSeconds: animationDurationSeconds,
+      contentKey: items.length,
+      enabled: items.length > 0,
+    });
 
-  function clearResumeTimer() {
-    if (resumeTimerRef.current !== null) {
-      clearTimeout(resumeTimerRef.current);
-      resumeTimerRef.current = null;
-    }
-  }
 
-  function pauseTicker() {
-    clearResumeTimer();
-    setPaused(true);
-  }
-
-  function resumeTicker() {
-    clearResumeTimer();
-    setPaused(false);
-  }
-
-  function scheduleResume() {
-    clearResumeTimer();
-    resumeTimerRef.current = setTimeout(() => {
-      resumeTimerRef.current = null;
-      setPaused(false);
-    }, AUTO_RESUME_DELAY_MS);
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    clearResumeTimer();
-    pointerStartedAtRef.current = performance.now();
-    pointerWasPausedRef.current = paused;
-    activePointerIdRef.current = event.pointerId;
-    setPaused(true);
-  }
-
-  function handlePointerUp(event: PointerEvent<HTMLElement>) {
-    if (activePointerIdRef.current !== event.pointerId) {
-      return;
-    }
-
-    const startedAt = pointerStartedAtRef.current;
-    const wasPaused = pointerWasPausedRef.current;
-    const pressDuration =
-      startedAt === null ? TAP_MAX_DURATION_MS + 1 : performance.now() - startedAt;
-    const target = event.target as HTMLElement;
-    const usedActionLink = target.closest("a") !== null;
-
-    activePointerIdRef.current = null;
-    pointerStartedAtRef.current = null;
-
-    if (!usedActionLink && wasPaused && pressDuration <= TAP_MAX_DURATION_MS) {
-      resumeTicker();
-      return;
-    }
-
-    scheduleResume();
-  }
-
-  function handlePointerCancel(event: PointerEvent<HTMLElement>) {
-    if (activePointerIdRef.current !== event.pointerId) {
-      return;
-    }
-
-    activePointerIdRef.current = null;
-    pointerStartedAtRef.current = null;
-    scheduleResume();
-  }
-
-  function handlePointerEnter(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse") {
-      pauseTicker();
-    }
-  }
-
-  function handlePointerLeave(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" && activePointerIdRef.current === null) {
-      scheduleResume();
-    }
-  }
-
-  function handleFocus(event: FocusEvent<HTMLElement>) {
-    const target = event.target as HTMLElement;
-
-    if (target.matches(":focus-visible")) {
-      pauseTicker();
-    }
-  }
-
-  function handleBlur(event: FocusEvent<HTMLElement>) {
-    const nextTarget = event.relatedTarget as Node | null;
-
-    if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
-      scheduleResume();
-    }
-  }
 
   const message =
     status === "loading"
@@ -304,31 +190,18 @@ export default function EventTicker() {
 
   return (
     <section
-      className={`event-ticker${paused ? " paused" : ""}`}
-      aria-label="Upcoming events"
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-      onFocusCapture={handleFocus}
-      onBlurCapture={handleBlur}
-    >
+    className={`event-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
+    aria-label="Upcoming events"
+  >
       <div className="ticker-label">
         <span aria-hidden="true">●</span>
         Upcoming
       </div>
 
-      <div className="ticker-viewport">
+      <div ref={viewportRef} className="ticker-viewport" {...viewportHandlers}>
         {items.length > 0 ? (
-          <div
-            className="ticker-track"
-            style={
-              {
-                "--ticker-duration": animationDuration,
-              } as CSSProperties
-            }
-          >
+          <div className="ticker-track">
+            <TickerItems items={items} duplicate />
             <TickerItems items={items} />
             <TickerItems items={items} duplicate />
           </div>
@@ -375,7 +248,13 @@ export default function EventTicker() {
         .ticker-viewport {
           min-width: 0;
           flex: 1;
-          overflow: hidden;
+          overflow-x: auto;
+          overflow-y: hidden;
+          cursor: grab;
+          overscroll-behavior-x: contain;
+          scrollbar-width: none;
+          touch-action: pan-y;
+          -ms-overflow-style: none;
           mask-image: linear-gradient(
             to right,
             transparent,
@@ -385,16 +264,20 @@ export default function EventTicker() {
           );
         }
 
+        .ticker-viewport::-webkit-scrollbar {
+          display: none;
+        }
+
+        .event-ticker.dragging .ticker-viewport {
+          cursor: grabbing;
+        }
+
         .ticker-track {
           display: flex;
           width: max-content;
           min-width: 100%;
-          animation: ticker-scroll var(--ticker-duration) linear infinite;
-          will-change: transform;
-        }
-
-        .event-ticker.paused .ticker-track {
-          animation-play-state: paused;
+          animation: none;
+          transform: none;
         }
 
         .ticker-message {
@@ -406,15 +289,6 @@ export default function EventTicker() {
           white-space: nowrap;
         }
 
-        @keyframes ticker-scroll {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
-
         @media (max-width: 620px) {
           .ticker-label {
             padding: 0 10px;
@@ -424,12 +298,7 @@ export default function EventTicker() {
 
         @media (prefers-reduced-motion: reduce) {
           .ticker-viewport {
-            overflow-x: auto;
             mask-image: none;
-          }
-
-          .ticker-track {
-            animation: none;
           }
         }
       `}</style>
@@ -520,11 +389,6 @@ export default function EventTicker() {
           color: #3fb950;
         }
 
-        @media (prefers-reduced-motion: reduce) {
-          .ticker-group-duplicate {
-            display: none;
-          }
-        }
       `}</style>
     </section>
   );

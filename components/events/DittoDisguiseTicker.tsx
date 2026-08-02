@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   DittoDisguise,
   DittoDisguisePayload,
   DittoSeason,
 } from "../../lib/ditto-disguises";
+import { useScrollableTicker } from "../tickers/useScrollableTicker";
 
 type DittoTickerStatus = "loading" | "ready" | "error";
 
@@ -91,10 +92,16 @@ export default function DittoDisguiseTicker() {
     };
   }, []);
 
-  const animationDuration = useMemo(
-    () => `${Math.max(32, disguises.length * 8)}s`,
+  const animationDurationSeconds = useMemo(
+    () => Math.max(32, disguises.length * 8),
     [disguises.length],
   );
+  const { viewportRef, paused, dragging, viewportHandlers } =
+    useScrollableTicker({
+      durationSeconds: animationDurationSeconds,
+      contentKey: disguises.length,
+      enabled: disguises.length > 0,
+    });
   const message =
     status === "loading"
       ? "Loading current Ditto disguises…"
@@ -104,7 +111,7 @@ export default function DittoDisguiseTicker() {
 
   return (
     <section
-      className="ditto-ticker"
+      className={`ditto-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
       aria-label={
         season
           ? `Current Ditto disguises during ${season.name}`
@@ -117,16 +124,10 @@ export default function DittoDisguiseTicker() {
         Ditto disguises
       </div>
 
-      <div className="ditto-viewport">
+      <div ref={viewportRef} className="ditto-viewport" {...viewportHandlers}>
         {disguises.length > 0 ? (
-          <div
-            className="ditto-track"
-            style={
-              {
-                "--ditto-ticker-duration": animationDuration,
-              } as CSSProperties
-            }
-          >
+          <div className="ditto-track">
+            <DittoItems disguises={disguises} duplicate />
             <DittoItems disguises={disguises} />
             <DittoItems disguises={disguises} duplicate />
           </div>
@@ -173,7 +174,13 @@ export default function DittoDisguiseTicker() {
         .ditto-viewport {
           min-width: 0;
           flex: 1;
-          overflow: hidden;
+          overflow-x: auto;
+          overflow-y: hidden;
+          cursor: grab;
+          overscroll-behavior-x: contain;
+          scrollbar-width: none;
+          touch-action: pan-y;
+          -ms-overflow-style: none;
           mask-image: linear-gradient(
             to right,
             transparent,
@@ -183,17 +190,20 @@ export default function DittoDisguiseTicker() {
           );
         }
 
+        .ditto-viewport::-webkit-scrollbar {
+          display: none;
+        }
+
+        .ditto-ticker.dragging .ditto-viewport {
+          cursor: grabbing;
+        }
+
         .ditto-track {
           display: flex;
           width: max-content;
           min-width: 100%;
-          animation: ditto-ticker-scroll var(--ditto-ticker-duration) linear infinite;
-          will-change: transform;
-        }
-
-        .ditto-ticker:hover .ditto-track,
-        .ditto-ticker:focus-within .ditto-track {
-          animation-play-state: paused;
+          animation: none;
+          transform: none;
         }
 
         .ditto-message {
@@ -205,15 +215,6 @@ export default function DittoDisguiseTicker() {
           white-space: nowrap;
         }
 
-        @keyframes ditto-ticker-scroll {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
-
         @media (max-width: 620px) {
           .ditto-label {
             padding: 0 10px;
@@ -223,12 +224,7 @@ export default function DittoDisguiseTicker() {
 
         @media (prefers-reduced-motion: reduce) {
           .ditto-viewport {
-            overflow-x: auto;
             mask-image: none;
-          }
-
-          .ditto-track {
-            animation: none;
           }
         }
       `}</style>
@@ -263,11 +259,6 @@ export default function DittoDisguiseTicker() {
           font-size: 0.9rem;
         }
 
-        @media (prefers-reduced-motion: reduce) {
-          .ditto-group-duplicate {
-            display: none;
-          }
-        }
       `}</style>
     </section>
   );

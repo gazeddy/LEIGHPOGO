@@ -13,6 +13,8 @@ describe("ticker regression wiring", () => {
   const raidCpCache = readSource("lib/raidBossCpCache.js");
   const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
   const dittoApi = readSource("pages/api/ditto-disguises.ts");
+  const newGymTicker = readSource("components/gyms/NewGymTicker.tsx");
+  const scrollableTicker = readSource("components/tickers/useScrollableTicker.ts");
 
   it("uses a Campfire URL as the primary event link with an Events-page fallback", () => {
     expect(eventTicker).toMatch(
@@ -23,16 +25,18 @@ describe("ticker regression wiring", () => {
     expect(eventTicker).toContain("{item.guideSlug && item.guideTitle && (");
   });
 
-  it("keeps the raid ticker on a duplicated continuous scrolling track", () => {
+  it("keeps the raid ticker on a duplicated manually scrollable loop", () => {
     expect(raidTicker).toContain("<RaidItems items={items} />");
-    expect(raidTicker).toContain("<RaidItems items={items} duplicate />");
+    expect(
+      (raidTicker.match(/<RaidItems items=\{items\} duplicate \/>/g) || []).length,
+    ).toBe(2);
     expect(raidTicker).toContain("aria-hidden={duplicate || undefined}");
     expect(raidTicker).toContain("tabIndex={duplicate ? -1 : undefined}");
-    expect(raidTicker).toContain("animation: raid-ticker-scroll var(--raid-ticker-duration) linear infinite;");
-    expect(raidTicker).toContain("transform: translateX(-50%);");
-    expect(raidTicker).toContain("animation-play-state: paused;");
-    expect(raidTicker).toContain(".raid-group-duplicate");
-    expect(raidTicker).toContain("display: none;");
+    expect(raidTicker).toContain('className="raid-track"');
+    expect(raidTicker).toContain("...viewportHandlers");
+    expect(raidTicker).toContain("animation: none;");
+    expect(raidTicker).toContain("transform: none;");
+    expect(raidTicker).toContain("raid-group-duplicate");
   });
 
   it("shows perfect catch CP values from the cached PoGoAPI raid data", () => {
@@ -56,7 +60,6 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("✨");
     expect(raidTicker).toContain("Shiny available:");
     expect(raidTicker).toContain("raid-shiny-twinkle");
-    expect(raidTicker).toContain("animation: none;");
   });
 
   it("keeps the Ditto ticker public, daily cached and between raids and new gyms", () => {
@@ -67,7 +70,9 @@ describe("ticker regression wiring", () => {
     expect(dittoApi).toContain("max-age=86400");
     expect(dittoApi).toContain("s-maxage=86400");
     expect(dittoTicker).toContain("<DittoItems disguises={disguises} />");
-    expect(dittoTicker).toContain("<DittoItems disguises={disguises} duplicate />");
+    expect(
+      (dittoTicker.match(/<DittoItems disguises=\{disguises\} duplicate \/>/g) || []).length,
+    ).toBe(2);
 
     const raidPosition = app.indexOf("<RaidBossTicker />");
     const dittoPosition = app.indexOf("<DittoDisguiseTicker />");
@@ -78,26 +83,32 @@ describe("ticker regression wiring", () => {
     expect(gymPosition).toBeGreaterThan(dittoPosition);
   });
 
-  it("retains matching speed and interaction behaviour", () => {
+  it("shares matching automatic speed and manual interaction behaviour", () => {
     expect(eventTicker).toContain("Math.max(32, items.length * 10)");
     expect(raidTicker).toContain("Math.max(32, items.length * 10)");
 
-    for (const handler of [
-      "onPointerDown={handlePointerDown}",
-      "onPointerUp={handlePointerUp}",
-      "onPointerCancel={handlePointerCancel}",
-      "onPointerEnter={handlePointerEnter}",
-      "onPointerLeave={handlePointerLeave}",
-      "onFocusCapture={handleFocus}",
-      "onBlurCapture={handleBlur}",
-    ]) {
-      expect(eventTicker).toContain(handler);
-      expect(raidTicker).toContain(handler);
+    for (const source of [eventTicker, raidTicker, dittoTicker, newGymTicker]) {
+      expect(source).toContain("useScrollableTicker");
+      expect(source).toContain("...viewportHandlers");
     }
 
-    expect(eventTicker).toContain("const AUTO_RESUME_DELAY_MS = 3000;");
-    expect(raidTicker).toContain("const AUTO_RESUME_DELAY_MS = 3000;");
-    expect(eventTicker).toContain("const TAP_MAX_DURATION_MS = 450;");
-    expect(raidTicker).toContain("const TAP_MAX_DURATION_MS = 450;");
+    for (const handler of [
+      "onPointerDown: handlePointerDown",
+      "onPointerMove: handlePointerMove",
+      "onPointerUp: finishPointerInteraction",
+      "onPointerCancel: finishPointerInteraction",
+      "onClickCapture: handleClickCapture",
+      "onFocusCapture: handleFocus",
+      "onBlurCapture: handleBlur",
+      "onWheel: handleWheel",
+    ]) {
+      expect(scrollableTicker).toContain(handler);
+    }
+
+    expect(scrollableTicker).toContain("const AUTO_RESUME_DELAY_MS = 3000;");
+    expect(scrollableTicker).toContain("const DRAG_THRESHOLD_PX = 5;");
+    expect(scrollableTicker).toContain("viewport.scrollLeft +=");
+    expect(scrollableTicker).toContain("normaliseScrollPosition");
+    expect(scrollableTicker).toContain("scheduleResume");
   });
 });

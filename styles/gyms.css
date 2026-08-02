@@ -312,19 +312,29 @@
 }
 
 .new-gym-viewport {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  cursor: grab;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  -ms-overflow-style: none;
+}
+
+.new-gym-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.new-gym-ticker.dragging .new-gym-viewport {
+  cursor: grabbing;
 }
 
 .new-gym-track {
   display: flex;
   width: max-content;
   min-width: 100%;
-  animation: new-gym-scroll 32s linear infinite;
-}
-
-.new-gym-ticker:hover .new-gym-track,
-.new-gym-ticker:focus-within .new-gym-track {
-  animation-play-state: paused;
+  animation: none;
+  transform: none;
 }
 
 .new-gym-copy {
@@ -354,11 +364,6 @@
 .new-gym-item .official-name {
   color: #8b949e;
   font-size: 0.9rem;
-}
-
-@keyframes new-gym-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
 }
 
 .gym-admin-header .header-links a {
