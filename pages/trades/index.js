@@ -15,11 +15,13 @@ import {
   tradeFriendshipRequirementLabel,
 } from "../../lib/tradeUtils"
 
-const itemNames = (listing, direction) =>
-  listing.items
+const itemNames = (listing, direction) => {
+  const names = listing.items
     .filter((item) => item.direction === direction)
     .map((item) => item.pokemonName)
-    .join(", ")
+
+  return names.length > 0 ? names.join(", ") : "None specified"
+}
 
 function ListingCard({ listing, mine = false, onClose }) {
   return (

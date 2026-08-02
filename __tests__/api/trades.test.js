@@ -115,6 +115,19 @@ const createUser = async ({ withFriendCode = true } = {}) => {
   return user
 }
 
+const blankItem = () => ({
+  pokemonName: "",
+  shiny: false,
+  lucky: false,
+  xxl: false,
+  xxs: false,
+  costume: false,
+  background: false,
+  dynamax: false,
+  gigantamax: false,
+  notes: "",
+})
+
 beforeAll(async () => {
   await ensureSchema()
 })
@@ -201,6 +214,78 @@ describe("POST /api/trades", () => {
     const expiresAt = new Date(payload.expiresAt)
     expect(expiresAt.getTime()).toBeGreaterThan(createdAt.getTime() + 27 * 86400000)
     expect(expiresAt.getTime()).toBeLessThan(createdAt.getTime() + 32 * 86400000)
+  })
+
+  it("creates an offer-only listing and ignores the blank wanted row", async () => {
+    const user = await createUser()
+    getServerSession.mockResolvedValueOnce({
+      user: { id: user.id, ign: user.ign, role: user.role },
+    })
+
+    const { req, res } = createMocks({
+      method: "POST",
+      body: {
+        offeredItems: [{ pokemonName: "Pikachu" }],
+        wantedItems: [blankItem()],
+      },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(201)
+    const payload = JSON.parse(res._getData())
+    expect(payload.items).toHaveLength(1)
+    expect(payload.items[0]).toMatchObject({
+      direction: "OFFER",
+      pokemonName: "Pikachu",
+    })
+  })
+
+  it("creates a wanted-only listing and ignores the blank offered row", async () => {
+    const user = await createUser()
+    getServerSession.mockResolvedValueOnce({
+      user: { id: user.id, ign: user.ign, role: user.role },
+    })
+
+    const { req, res } = createMocks({
+      method: "POST",
+      body: {
+        offeredItems: [blankItem()],
+        wantedItems: [{ pokemonName: "Eevee" }],
+      },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(201)
+    const payload = JSON.parse(res._getData())
+    expect(payload.items).toHaveLength(1)
+    expect(payload.items[0]).toMatchObject({
+      direction: "WANT",
+      pokemonName: "Eevee",
+    })
+  })
+
+  it("rejects a listing when both sides are blank", async () => {
+    const user = await createUser()
+    getServerSession.mockResolvedValueOnce({
+      user: { id: user.id, ign: user.ign, role: user.role },
+    })
+
+    const { req, res } = createMocks({
+      method: "POST",
+      body: {
+        offeredItems: [blankItem()],
+        wantedItems: [blankItem()],
+      },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(400)
+    expect(JSON.parse(res._getData()).error).toContain(
+      "at least one Pokémon you are offering or want",
+    )
   })
 
   it("defaults a missing friendship requirement to any level", async () => {

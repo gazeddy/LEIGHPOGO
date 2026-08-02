@@ -29,27 +29,31 @@ function TradeItemList({ title, items }) {
   return (
     <section className="card">
       <h2>{title}</h2>
-      <div className="trade-items">
-        {items.map((item) => {
-          const attributes = attributeLabels(item)
+      {items.length === 0 ? (
+        <p className="muted">None specified.</p>
+      ) : (
+        <div className="trade-items">
+          {items.map((item) => {
+            const attributes = attributeLabels(item)
 
-          return (
-            <div className="trade-item" key={item.id}>
-              <strong>{item.pokemonName}</strong>
-              {attributes.length > 0 && (
-                <div className="trade-attributes">
-                  {attributes.map((attribute) => (
-                    <span className="trade-attribute" key={attribute}>
-                      {attribute}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {item.notes && <p className="muted">{item.notes}</p>}
-            </div>
-          )
-        })}
-      </div>
+            return (
+              <div className="trade-item" key={item.id}>
+                <strong>{item.pokemonName}</strong>
+                {attributes.length > 0 && (
+                  <div className="trade-attributes">
+                    {attributes.map((attribute) => (
+                      <span className="trade-attribute" key={attribute}>
+                        {attribute}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {item.notes && <p className="muted">{item.notes}</p>}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }
