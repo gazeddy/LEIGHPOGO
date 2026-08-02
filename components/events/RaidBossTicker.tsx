@@ -7,7 +7,10 @@ import {
   type FocusEvent,
   type PointerEvent,
 } from "react";
-import type { RaidBossTickerItem } from "../../lib/events";
+import type {
+  RaidBossCatchCp,
+  RaidBossTickerItem,
+} from "../../lib/events";
 import {
   EVENT_VISIBILITY_CHANGED_EVENT,
   EVENT_VISIBILITY_POLL_INTERVAL_MS,
@@ -45,6 +48,31 @@ function formatEndDate(value: string): string {
   }).format(date);
 }
 
+function formatCp(value: number): string {
+  return new Intl.NumberFormat("en-GB").format(value);
+}
+
+function formatCatchCp(catchCp: RaidBossCatchCp[] | undefined): string | null {
+  if (!catchCp || catchCp.length === 0) {
+    return null;
+  }
+
+  if (catchCp.length === 1) {
+    return `100% CP ${formatCp(catchCp[0].maxUnboostedCp)} · WB ${formatCp(
+      catchCp[0].maxBoostedCp,
+    )}`;
+  }
+
+  return `100% CP ${catchCp
+    .map(
+      (entry) =>
+        `${entry.boss} ${formatCp(entry.maxUnboostedCp)} / WB ${formatCp(
+          entry.maxBoostedCp,
+        )}`,
+    )
+    .join(" · ")}`;
+}
+
 function RaidItem({
   item,
   duplicate = false,
@@ -52,12 +80,21 @@ function RaidItem({
   item: RaidBossTickerItem;
   duplicate?: boolean;
 }) {
+  const catchCp = formatCatchCp(item.catchCp);
   const content = (
     <>
       <span className={`raid-category raid-category-${item.category}`}>
         {item.label}
       </span>
       <span className="raid-boss">{item.boss}</span>
+      {catchCp && (
+        <span
+          className="raid-cp"
+          title="Perfect-IV catch CP: unboosted level 20 and weather-boosted level 25"
+        >
+          {catchCp}
+        </span>
+      )}
       <span className="raid-until">until {formatEndDate(item.end)}</span>
     </>
   );
@@ -475,6 +512,12 @@ export default function RaidBossTicker() {
 
         .raid-boss {
           font-weight: 800;
+        }
+
+        .raid-cp {
+          color: #a5d6ff;
+          font-size: 0.76rem;
+          font-variant-numeric: tabular-nums;
         }
 
         .raid-until {
