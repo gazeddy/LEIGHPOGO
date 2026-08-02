@@ -175,6 +175,9 @@ export default function Navbar() {
                     <Link href="/admin" className="nav-item nav-subitem">
                       Admin Panel
                     </Link>
+                    <Link href="/admin/pokedex" className="nav-item nav-subitem">
+                      Pokédex Availability
+                    </Link>
                     <Link href="/admin/events" className="nav-item nav-subitem">
                       Event Feed
                     </Link>
