@@ -112,15 +112,18 @@ model WantedTrade {
 }
 
 model TradeNotification {
-  id              Int          @id @default(autoincrement())
-  ownerId         Int
-  owner           User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  listingId       Int
-  listing         TradeListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  pokemonName     String
-  modifierSummary String?
-  createdAt       DateTime     @default(now())
-  readAt          DateTime?
+  id                    Int          @id @default(autoincrement())
+  ownerId               Int
+  owner                 User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  listingId             Int
+  listing               TradeListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  type                   String       @default("WISHLIST_MATCH")
+  pokemonName            String
+  modifierSummary        String?
+  matchedTrainerSummary  String?
+  matchedTrainerCount    Int          @default(0)
+  createdAt              DateTime     @default(now())
+  readAt                 DateTime?
 
   @@unique([ownerId, listingId, pokemonName])
   @@index([ownerId, readAt, createdAt])
