@@ -28,8 +28,8 @@ export default function GuideCard({ guide }: GuideCardProps) {
   const tags = guide.tags ?? [];
 
   return (
-    <Link href={`/guides/${guide.slug}`} className="guide-card">
-      <article>
+    <Link href={`/guides/${guide.slug}`} className="guide-card-link">
+      <article className="guide-card">
         <div className="guide-card__heading">
           <h2>{guide.title}</h2>
           <span aria-hidden="true">→</span>
@@ -46,25 +46,27 @@ export default function GuideCard({ guide }: GuideCardProps) {
       </article>
 
       <style jsx>{`
-        .guide-card {
+        :global(.guide-card-link) {
           display: block;
-          color: inherit;
+          height: 100%;
+          color: #f0f6fc;
           text-decoration: none;
         }
 
-        article {
+        .guide-card {
           height: 100%;
           padding: 20px;
           border: 1px solid #30363d;
           border-radius: 10px;
           background: #161b22;
+          color: #f0f6fc;
           transition:
             border-color 0.15s ease,
             transform 0.15s ease;
         }
 
-        .guide-card:hover article,
-        .guide-card:focus-visible article {
+        :global(.guide-card-link:hover) .guide-card,
+        :global(.guide-card-link:focus-visible) .guide-card {
           border-color: #58a6ff;
           transform: translateY(-2px);
         }
@@ -78,6 +80,7 @@ export default function GuideCard({ guide }: GuideCardProps) {
 
         h2 {
           margin: 0;
+          color: #f0f6fc;
           font-size: 1.25rem;
         }
 
