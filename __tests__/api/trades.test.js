@@ -60,6 +60,7 @@ const ensureSchema = async () => {
     CREATE TABLE "TradeListing" (
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
       "ownerId" INTEGER NOT NULL,
+      "friendshipRequirement" TEXT NOT NULL DEFAULT 'ANY',
       "location" TEXT,
       "notes" TEXT,
       "status" TEXT NOT NULL DEFAULT 'ACTIVE',
@@ -154,7 +155,7 @@ describe("POST /api/trades", () => {
     expect(JSON.parse(res._getData()).code).toBe("FRIEND_CODE_REQUIRED")
   })
 
-  it("creates a listing with complete modifiers and triggers match notifications", async () => {
+  it("creates a listing with friendship requirement, modifiers and notifications", async () => {
     const user = await createUser()
     getServerSession.mockResolvedValueOnce({
       user: { id: user.id, ign: user.ign, role: user.role },
@@ -163,6 +164,7 @@ describe("POST /api/trades", () => {
     const { req, res } = createMocks({
       method: "POST",
       body: {
+        friendshipRequirement: "BEST",
         location: "Leigh town centre",
         notes: "Available evenings",
         offeredItems: [{
@@ -179,6 +181,7 @@ describe("POST /api/trades", () => {
 
     expect(res._getStatusCode()).toBe(201)
     const payload = JSON.parse(res._getData())
+    expect(payload.friendshipRequirement).toBe("BEST")
     expect(payload.items).toHaveLength(2)
     expect(payload.items[0]).toMatchObject({
       pokemonName: "Mewtwo",
@@ -189,10 +192,54 @@ describe("POST /api/trades", () => {
     })
     expect(syncWantedTradeNotificationsForListing).toHaveBeenCalledTimes(1)
 
+    const storedListing = await prisma.tradeListing.findUnique({
+      where: { id: payload.id },
+    })
+    expect(storedListing.friendshipRequirement).toBe("BEST")
+
     const createdAt = new Date(payload.createdAt)
     const expiresAt = new Date(payload.expiresAt)
     expect(expiresAt.getTime()).toBeGreaterThan(createdAt.getTime() + 27 * 86400000)
     expect(expiresAt.getTime()).toBeLessThan(createdAt.getTime() + 32 * 86400000)
+  })
+
+  it("defaults a missing friendship requirement to any level", async () => {
+    const user = await createUser()
+    getServerSession.mockResolvedValueOnce({
+      user: { id: user.id, ign: user.ign, role: user.role },
+    })
+    const { req, res } = createMocks({
+      method: "POST",
+      body: {
+        offeredItems: [{ pokemonName: "Pikachu" }],
+        wantedItems: [{ pokemonName: "Eevee" }],
+      },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(201)
+    expect(JSON.parse(res._getData()).friendshipRequirement).toBe("ANY")
+  })
+
+  it("rejects an invalid friendship requirement", async () => {
+    const user = await createUser()
+    getServerSession.mockResolvedValueOnce({
+      user: { id: user.id, ign: user.ign, role: user.role },
+    })
+    const { req, res } = createMocks({
+      method: "POST",
+      body: {
+        friendshipRequirement: "ULTRA_BEST",
+        offeredItems: [{ pokemonName: "Pikachu" }],
+        wantedItems: [{ pokemonName: "Eevee" }],
+      },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(400)
+    expect(JSON.parse(res._getData()).error).toContain("friendship requirement")
   })
 
   it("rejects a Pokémon marked as both XXL and XXS", async () => {
