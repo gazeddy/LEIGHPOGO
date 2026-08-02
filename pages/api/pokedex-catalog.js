@@ -1,5 +1,8 @@
 import { getServerSession } from "next-auth/next"
+import prisma from "../../lib/prisma"
 import { authOptions } from "./auth/[...nextauth]"
+
+const { applyPokemonAvailabilityOverrides } = require("../../lib/pokemonAvailability")
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -19,30 +22,41 @@ export default async function handler(req, res) {
     const { getReleasedPokemonData } = require("../../lib/releasedPokemonCache")
     const catalog = await getPokedexCatalogData()
 
+    let pogoApiReleasedDexNumbers = []
     let releasedDexNumbers = []
     let releaseDataStale = false
     let availabilityKnown = true
 
     try {
-      const releasedPokemon = await getReleasedPokemonData()
-      releasedDexNumbers = releasedPokemon.dexNumbers
+      const [releasedPokemon, overrides] = await Promise.all([
+        getReleasedPokemonData(),
+        prisma.pokemonAvailabilityOverride.findMany({
+          select: { dexNumber: true, released: true },
+        }),
+      ])
+      pogoApiReleasedDexNumbers = releasedPokemon.dexNumbers
+      releasedDexNumbers = applyPokemonAvailabilityOverrides(
+        pogoApiReleasedDexNumbers,
+        overrides
+      )
       releaseDataStale = releasedPokemon.stale
     } catch (error) {
       availabilityKnown = false
-      console.error("Unable to load POGOAPI release status for the Pokédex", error)
+      console.error("Unable to load Pokémon release status for the Pokédex", error)
     }
 
-    res.setHeader("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
+    res.setHeader("Cache-Control", "private, no-store")
     res.status(200).json({
       ...catalog.data,
+      pogoApiReleasedDexNumbers,
       releasedDexNumbers,
       availabilityKnown,
       stale: catalog.stale || releaseDataStale,
       checkedAt: catalog.checkedAt,
-      source: "POGOAPI",
+      source: "POGOAPI + PvPoke + admin overrides",
     })
   } catch (error) {
-    console.error("Unable to load the POGOAPI Pokédex catalog", error)
+    console.error("Unable to load the Pokédex catalog", error)
     res.status(502).json({
       error: "The Pokédex data is temporarily unavailable. Please try again shortly.",
     })
