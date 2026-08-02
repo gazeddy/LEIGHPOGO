@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../../auth/[...nextauth]"
 import prisma from "../../../../lib/prisma"
-import { getEligibleTradeUser } from "../../../../lib/tradeServer"
+import { getAuthenticatedUser } from "../../../../lib/tradeServer"
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions)
@@ -10,13 +10,10 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "You must be logged in." })
   }
 
-  const tradeUser = await getEligibleTradeUser(session)
+  const currentUser = await getAuthenticatedUser(session)
 
-  if (!tradeUser) {
-    return res.status(403).json({
-      error: "Add a valid 12-digit friend code to your account before using trades.",
-      code: "FRIEND_CODE_REQUIRED",
-    })
+  if (!currentUser) {
+    return res.status(401).json({ error: "Your account could not be found." })
   }
 
   if (req.method !== "DELETE") {
@@ -39,7 +36,7 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Wanted trade not found." })
   }
 
-  if (entry.ownerId !== tradeUser.id && tradeUser.role !== "admin") {
+  if (entry.ownerId !== currentUser.id && currentUser.role !== "admin") {
     return res.status(403).json({ error: "You can only remove your own wanted trades." })
   }
 
