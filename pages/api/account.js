@@ -41,7 +41,10 @@ export default async function handler(req, res) {
         ? await prisma.entry.update({
             where: { id: latestEntry.id },
             data: {
-              code: normalizedFriendCode || latestEntry.code,
+              code:
+                normalizedFriendCode ||
+                canonicalFriendCode(latestEntry.code) ||
+                "",
               team: normalizedTeam,
             },
           })
