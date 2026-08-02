@@ -32,6 +32,7 @@ interface CsvGymRow {
   lon?: unknown;
   __typename?: unknown;
   ex_raid_eligible?: unknown;
+  first_seen?: unknown;
 }
 
 type UploadResponse =
@@ -66,6 +67,33 @@ function booleanValue(value: unknown): boolean {
   }
 
   return ["true", "1", "yes"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+function optionalDate(value: unknown): string | null {
+  const text = typeof value === "string" ? value.trim() : String(value ?? "").trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const numeric = Number(text);
+  let date: Date;
+
+  if (Number.isFinite(numeric)) {
+    let milliseconds = numeric;
+
+    if (Math.abs(milliseconds) < 100_000_000_000) {
+      milliseconds *= 1000;
+    } else if (Math.abs(milliseconds) >= 100_000_000_000_000) {
+      milliseconds /= 1000;
+    }
+
+    date = new Date(milliseconds);
+  } else {
+    date = new Date(text);
+  }
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function optionalUrl(value: unknown): string | null {
@@ -107,7 +135,7 @@ function decodeCsv(body: UploadBody): Buffer {
   return buffer;
 }
 
-function parseGyms(buffer: Buffer): Omit<GymRecord, "alias" | "firstSeenAt">[] {
+function parseGyms(buffer: Buffer): Omit<GymRecord, "alias">[] {
   let rows: CsvGymRow[];
 
   try {
@@ -144,6 +172,7 @@ function parseGyms(buffer: Buffer): Omit<GymRecord, "alias" | "firstSeenAt">[] {
       lat: coordinate(row.lat, "lat", index + 2),
       lon: coordinate(row.lon, "lon", index + 2),
       exRaidEligible: booleanValue(row.ex_raid_eligible),
+      firstSeenAt: optionalDate(row.first_seen),
     }));
 
   if (gyms.length === 0) {
@@ -209,7 +238,7 @@ async function archiveCsv(buffer: Buffer, uploadedAt: Date): Promise<string> {
   }
 }
 
-function sourceFieldsMatch(left: GymRecord, right: Omit<GymRecord, "alias" | "firstSeenAt">): boolean {
+function sourceFieldsMatch(left: GymRecord, right: Omit<GymRecord, "alias">): boolean {
   return (
     left.name === right.name &&
     left.url === right.url &&
@@ -217,6 +246,28 @@ function sourceFieldsMatch(left: GymRecord, right: Omit<GymRecord, "alias" | "fi
     left.lon === right.lon &&
     left.exRaidEligible === right.exRaidEligible
   );
+}
+
+function earliestDate(
+  existingValue: string | null,
+  importedValue: string | null,
+): string | null {
+  const existingTime = existingValue ? Date.parse(existingValue) : Number.NaN;
+  const importedTime = importedValue ? Date.parse(importedValue) : Number.NaN;
+
+  if (Number.isFinite(existingTime) && Number.isFinite(importedTime)) {
+    return existingTime <= importedTime ? existingValue : importedValue;
+  }
+
+  if (Number.isFinite(existingTime)) {
+    return existingValue;
+  }
+
+  if (Number.isFinite(importedTime)) {
+    return importedValue;
+  }
+
+  return null;
 }
 
 export const config = {
@@ -266,7 +317,7 @@ export default async function handler(
         return {
           ...gym,
           alias: null,
-          firstSeenAt: initialImport ? null : importedAt,
+          firstSeenAt: gym.firstSeenAt ?? (initialImport ? null : importedAt),
         };
       }
 
@@ -279,7 +330,7 @@ export default async function handler(
       return {
         ...gym,
         alias: existing.alias,
-        firstSeenAt: existing.firstSeenAt,
+        firstSeenAt: earliestDate(existing.firstSeenAt, gym.firstSeenAt),
       };
     });
 
