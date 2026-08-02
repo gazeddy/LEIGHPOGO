@@ -16,6 +16,7 @@ interface ScrollableTickerOptions {
 }
 
 const AUTO_RESUME_DELAY_MS = 3000;
+const LAYOUT_RETRY_INTERVAL_MS = 500;
 const DRAG_THRESHOLD_PX = 5;
 
 export function useScrollableTicker({
@@ -68,58 +69,97 @@ export function useScrollableTicker({
     }, AUTO_RESUME_DELAY_MS);
   }, [clearResumeTimer, setPaused]);
 
+  const measureTicker = useCallback((resetPosition = false) => {
+    const viewport = viewportRef.current;
+    const track = viewport?.firstElementChild as HTMLElement | null;
+    const firstCopy = track?.firstElementChild as HTMLElement | null;
+
+    if (!viewport || !track || !firstCopy) {
+      copyWidthRef.current = 0;
+      copyCountRef.current = 0;
+      scrollableRef.current = false;
+      return false;
+    }
+
+    const copyWidth = Math.max(
+      firstCopy.getBoundingClientRect().width,
+      firstCopy.scrollWidth,
+    );
+    const copyCount = track.childElementCount;
+    const maxScrollLeft = Math.max(
+      0,
+      track.scrollWidth - viewport.clientWidth,
+    );
+    const scrollable = copyWidth > 0.5 && maxScrollLeft > 0.5;
+
+    copyWidthRef.current = copyWidth;
+    copyCountRef.current = copyCount;
+    scrollableRef.current = scrollable;
+
+    if (!scrollable) {
+      viewport.scrollLeft = 0;
+      return false;
+    }
+
+    if (resetPosition || viewport.scrollLeft <= 0.5) {
+      const preferredPosition = copyWidth * Math.floor(copyCount / 2);
+      const minimumSafePosition = Math.min(copyWidth, maxScrollLeft);
+      const maximumSafePosition = Math.max(
+        minimumSafePosition,
+        maxScrollLeft - copyWidth,
+      );
+
+      viewport.scrollLeft = Math.min(
+        Math.max(preferredPosition, minimumSafePosition),
+        maximumSafePosition,
+      );
+    }
+
+    return true;
+  }, []);
+
   const normaliseScrollPosition = useCallback(() => {
-  const viewport = viewportRef.current;
-  const track = viewport?.firstElementChild as HTMLElement | null;
-  const copyWidth = copyWidthRef.current;
-  const copyCount = copyCountRef.current;
+    const viewport = viewportRef.current;
+    const track = viewport?.firstElementChild as HTMLElement | null;
+    const copyWidth = copyWidthRef.current;
+    const copyCount = copyCountRef.current;
 
-  if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
-    return;
-  }
+    if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
+      return;
+    }
 
-  const maxScrollLeft = Math.max(
-    0,
-    track.scrollWidth - viewport.clientWidth,
-  );
-  if (maxScrollLeft <= 0) {
-    return;
-  }
+    const maxScrollLeft = Math.max(
+      0,
+      track.scrollWidth - viewport.clientWidth,
+    );
+    if (maxScrollLeft <= 0) {
+      return;
+    }
 
-  const middleCopyIndex = Math.floor(copyCount / 2);
-  const centreScrollLeft = Math.min(
-    copyWidth * middleCopyIndex,
-    maxScrollLeft,
-  );
-  const lowerBoundary = Math.max(0, centreScrollLeft - copyWidth);
-  const upperBoundary = Math.min(
-    maxScrollLeft,
-    centreScrollLeft + copyWidth,
-  );
+    const edgeBuffer = Math.min(copyWidth / 2, maxScrollLeft / 4);
 
-  if (
-    viewport.scrollLeft <= lowerBoundary &&
-    viewport.scrollLeft + copyWidth <= maxScrollLeft
-  ) {
-    viewport.scrollLeft += copyWidth;
-  } else if (
-    viewport.scrollLeft >= upperBoundary &&
-    viewport.scrollLeft - copyWidth >= 0
-  ) {
-    viewport.scrollLeft -= copyWidth;
-  }
-}, []);
+    if (
+      viewport.scrollLeft <= edgeBuffer &&
+      viewport.scrollLeft + copyWidth <= maxScrollLeft
+    ) {
+      viewport.scrollLeft += copyWidth;
+    } else if (
+      viewport.scrollLeft >= maxScrollLeft - edgeBuffer &&
+      viewport.scrollLeft - copyWidth >= 0
+    ) {
+      viewport.scrollLeft -= copyWidth;
+    }
+  }, []);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const desktopFinePointer = window.matchMedia(
-      "(hover: hover) and (pointer: fine)",
+      "(any-hover: hover) and (any-pointer: fine)",
     );
 
     const updateMotionPreference = () => {
-      autoScrollAllowedRef.current = !(
-        reducedMotion.matches && !desktopFinePointer.matches
-      );
+      autoScrollAllowedRef.current =
+        !reducedMotion.matches || desktopFinePointer.matches;
     };
 
     updateMotionPreference();
@@ -137,57 +177,50 @@ export function useScrollableTicker({
 
     if (!viewport || !enabled) {
       copyWidthRef.current = 0;
+      copyCountRef.current = 0;
+      scrollableRef.current = false;
       return;
     }
 
-    let initialised = false;
-    let frameId = 0;
+    let cancelled = false;
     const measure = () => {
-    const track = viewport.firstElementChild as HTMLElement | null;
-    const firstCopy = track?.firstElementChild as HTMLElement | null;
-    const copyWidth = firstCopy?.getBoundingClientRect().width ?? 0;
-    const copyCount = track?.childElementCount ?? 0;
-    const maxScrollLeft = Math.max(
-      0,
-      (track?.scrollWidth ?? 0) - viewport.clientWidth,
-    );
-
-    copyWidthRef.current = copyWidth;
-    copyCountRef.current = copyCount;
-    scrollableRef.current = copyWidth > 0 && maxScrollLeft > 0;
-
-    if (scrollableRef.current) {
-      const middleCopyIndex = Math.floor(copyCount / 2);
-      const initialScrollLeft = Math.min(
-        copyWidth * middleCopyIndex,
-        maxScrollLeft,
-      );
-
-      if (!initialised || viewport.scrollLeft <= 0) {
-        viewport.scrollLeft = initialScrollLeft;
+      if (!cancelled) {
+        measureTicker(false);
       }
-    } else {
-      viewport.scrollLeft = 0;
-    }
+    };
 
-    initialised = true;
-  };
-
-    frameId = window.requestAnimationFrame(measure);
+    const initialFrameId = window.requestAnimationFrame(() => {
+      if (!cancelled) {
+        measureTicker(true);
+      }
+    });
+    const retryTimer = window.setInterval(
+      measure,
+      LAYOUT_RETRY_INTERVAL_MS,
+    );
     const observer = new ResizeObserver(measure);
-    observer.observe(viewport);
-
     const track = viewport.firstElementChild as HTMLElement | null;
     const firstCopy = track?.firstElementChild as HTMLElement | null;
+
+    observer.observe(viewport);
+    if (track) {
+      observer.observe(track);
+    }
     if (firstCopy) {
       observer.observe(firstCopy);
     }
 
+    window.addEventListener("load", measure);
+    void document.fonts?.ready.then(measure);
+
     return () => {
-      window.cancelAnimationFrame(frameId);
+      cancelled = true;
+      window.cancelAnimationFrame(initialFrameId);
+      window.clearInterval(retryTimer);
+      window.removeEventListener("load", measure);
       observer.disconnect();
     };
-  }, [contentKey, enabled]);
+  }, [contentKey, enabled, measureTicker]);
 
   useEffect(() => {
     if (!enabled) {
