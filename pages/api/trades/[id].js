@@ -79,9 +79,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid listing status" })
     }
 
-    const hasListingContent = ["location", "notes", "offeredItems", "wantedItems"].some(
-      (key) => Object.prototype.hasOwnProperty.call(req.body || {}, key)
-    )
+    const hasListingContent = [
+      "friendshipRequirement",
+      "location",
+      "notes",
+      "offeredItems",
+      "wantedItems",
+    ].some((key) => Object.prototype.hasOwnProperty.call(req.body || {}, key))
 
     let data = { status: requestedStatus }
 
@@ -94,6 +98,7 @@ export default async function handler(req, res) {
 
       data = {
         ...data,
+        friendshipRequirement: validated.value.friendshipRequirement,
         location: validated.value.location,
         notes: validated.value.notes,
         items: {
