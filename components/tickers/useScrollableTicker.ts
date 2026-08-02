@@ -104,69 +104,69 @@ export function useScrollableTicker({
     }
 
     if (resetPosition || viewport.scrollLeft <= 0.5) {
-    const preferredPosition = copyWidth * Math.floor(copyCount / 2);
-    const minimumSafePosition = Math.min(copyWidth, maxScrollLeft);
-    const maximumSafePosition = Math.max(
-      minimumSafePosition,
-      maxScrollLeft - copyWidth,
-    );
-    const nextScrollLeft = Math.min(
-      Math.max(preferredPosition, minimumSafePosition),
-      maximumSafePosition,
-    );
+      const preferredPosition = copyWidth * Math.floor(copyCount / 2);
+      const minimumSafePosition = Math.min(copyWidth, maxScrollLeft);
+      const maximumSafePosition = Math.max(
+        minimumSafePosition,
+        maxScrollLeft - copyWidth,
+      );
+      const nextScrollLeft = Math.min(
+        Math.max(preferredPosition, minimumSafePosition),
+        maximumSafePosition,
+      );
 
-    virtualScrollLeftRef.current = nextScrollLeft;
-    viewport.scrollLeft = nextScrollLeft;
-  } else if (
-    Math.abs(viewport.scrollLeft - virtualScrollLeftRef.current) > 1
-  ) {
-    virtualScrollLeftRef.current = viewport.scrollLeft;
-  }
+      virtualScrollLeftRef.current = nextScrollLeft;
+      viewport.scrollLeft = nextScrollLeft;
+    } else if (
+      Math.abs(viewport.scrollLeft - virtualScrollLeftRef.current) > 1
+    ) {
+      virtualScrollLeftRef.current = viewport.scrollLeft;
+    }
 
-  return true;
+    return true;
   }, []);
 
   const normaliseScrollPosition = useCallback(() => {
-  const viewport = viewportRef.current;
-  const track = viewport?.firstElementChild as HTMLElement | null;
-  const copyWidth = copyWidthRef.current;
-  const copyCount = copyCountRef.current;
+    const viewport = viewportRef.current;
+    const track = viewport?.firstElementChild as HTMLElement | null;
+    const copyWidth = copyWidthRef.current;
+    const copyCount = copyCountRef.current;
 
-  if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
-    return;
-  }
+    if (!viewport || !track || copyWidth <= 0 || copyCount < 3) {
+      return;
+    }
 
-  const maxScrollLeft = Math.max(
-    0,
-    track.scrollWidth - viewport.clientWidth,
-  );
-  if (maxScrollLeft <= 0) {
-    return;
-  }
+    const maxScrollLeft = Math.max(
+      0,
+      track.scrollWidth - viewport.clientWidth,
+    );
+    if (maxScrollLeft <= 0) {
+      return;
+    }
 
-  const edgeBuffer = Math.min(copyWidth / 2, maxScrollLeft / 4);
-  let nextScrollLeft = virtualScrollLeftRef.current;
+    const edgeBuffer = Math.min(copyWidth / 2, maxScrollLeft / 4);
+    let nextScrollLeft = virtualScrollLeftRef.current;
 
-  if (
-    nextScrollLeft <= edgeBuffer &&
-    nextScrollLeft + copyWidth <= maxScrollLeft
-  ) {
-    nextScrollLeft += copyWidth;
-  } else if (
-    nextScrollLeft >= maxScrollLeft - edgeBuffer &&
-    nextScrollLeft - copyWidth >= 0
-  ) {
-    nextScrollLeft -= copyWidth;
-  }
+    if (
+      nextScrollLeft <= edgeBuffer &&
+      nextScrollLeft + copyWidth <= maxScrollLeft
+    ) {
+      nextScrollLeft += copyWidth;
+    } else if (
+      nextScrollLeft >= maxScrollLeft - edgeBuffer &&
+      nextScrollLeft - copyWidth >= 0
+    ) {
+      nextScrollLeft -= copyWidth;
+    }
 
-  if (nextScrollLeft !== virtualScrollLeftRef.current) {
-    virtualScrollLeftRef.current = nextScrollLeft;
-    viewport.scrollLeft = nextScrollLeft;
-  }
-}, []);
+    if (nextScrollLeft !== virtualScrollLeftRef.current) {
+      virtualScrollLeftRef.current = nextScrollLeft;
+      viewport.scrollLeft = nextScrollLeft;
+    }
+  }, []);
 
-useEffect(() => {
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const desktopFinePointer = window.matchMedia(
       "(any-hover: hover) and (any-pointer: fine)",
     );
@@ -295,7 +295,6 @@ useEffect(() => {
       startScrollLeft: viewport.scrollLeft,
       dragged: false,
     };
-    viewport.setPointerCapture(event.pointerId);
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
@@ -309,6 +308,10 @@ useEffect(() => {
     const deltaX = event.clientX - drag.startX;
     if (!drag.dragged && Math.abs(deltaX) < DRAG_THRESHOLD_PX) {
       return;
+    }
+
+    if (!viewport.hasPointerCapture(event.pointerId)) {
+      viewport.setPointerCapture(event.pointerId);
     }
 
     drag.dragged = true;
@@ -378,16 +381,16 @@ useEffect(() => {
   }
 
   function handleWheel(_event: WheelEvent<HTMLDivElement>) {
-  pauseTicker();
-  window.requestAnimationFrame(() => {
-    const viewport = viewportRef.current;
-    if (viewport) {
-      virtualScrollLeftRef.current = viewport.scrollLeft;
-    }
-    normaliseScrollPosition();
-  });
-  scheduleResume();
-}
+    pauseTicker();
+    window.requestAnimationFrame(() => {
+      const viewport = viewportRef.current;
+      if (viewport) {
+        virtualScrollLeftRef.current = viewport.scrollLeft;
+      }
+      normaliseScrollPosition();
+    });
+    scheduleResume();
+  }
 
   return {
     viewportRef,
