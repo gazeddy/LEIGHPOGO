@@ -3,7 +3,7 @@ const {
   regionForDexNumber,
 } = require("../../lib/pokedexCatalog");
 
-describe("POGOAPI Pokédex catalog", () => {
+describe("Pokédex catalog", () => {
   const names = Object.fromEntries(
     Array.from({ length: 135 }, (_, index) => {
       const id = index + 1;
@@ -66,8 +66,38 @@ describe("POGOAPI Pokédex catalog", () => {
     },
   ];
 
+  const buddyDistances = {
+    3: [
+      { pokemon_id: 1, pokemon_name: "Bulbasaur", form: "Normal", distance: 3 },
+      { pokemon_id: 1, pokemon_name: "Bulbasaur", form: "Shadow", distance: 5 },
+      { pokemon_id: 2, pokemon_name: "Ivysaur", form: "Normal", distance: 3 },
+    ],
+    5: [
+      { pokemon_id: 3, pokemon_name: "Venusaur", form: "Mega", distance: 5 },
+      { pokemon_id: 68, pokemon_name: "Machamp", form: "Normal", distance: 5 },
+    ],
+  };
+
+  const pvpokePokemon = [
+    { dex: 1, speciesName: "Bulbasaur", speciesId: "bulbasaur", thirdMoveCost: 10000 },
+    { dex: 1, speciesName: "Bulbasaur (Shadow)", speciesId: "bulbasaur_shadow", tags: ["shadow"], thirdMoveCost: 100000 },
+    { dex: 2, speciesName: "Ivysaur", speciesId: "ivysaur", thirdMoveCost: 50000 },
+    { dex: 3, speciesName: "Venusaur", speciesId: "venusaur", thirdMoveCost: 75000 },
+    { dex: 3, speciesName: "Venusaur (Mega)", speciesId: "venusaur_mega", tags: ["mega"], thirdMoveCost: 10000 },
+    { dex: 68, speciesName: "Machamp", speciesId: "machamp", thirdMoveCost: 100000 },
+  ];
+
+  const buildCatalog = () =>
+    buildPokedexCatalog(
+      names,
+      types,
+      evolutions,
+      buddyDistances,
+      pvpokePokemon
+    );
+
   test("creates previous and next links by evolution stage", () => {
-    const catalog = buildPokedexCatalog(names, types, evolutions);
+    const catalog = buildCatalog();
 
     expect(catalog.pokemon[1].previous).toEqual([]);
     expect(catalog.pokemon[1].next).toEqual([
@@ -88,7 +118,7 @@ describe("POGOAPI Pokédex catalog", () => {
   });
 
   test("keeps every branch of a branching evolution", () => {
-    const catalog = buildPokedexCatalog(names, types, evolutions);
+    const catalog = buildCatalog();
     expect(catalog.pokemon[133].next).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ pokemonId: 134, candyRequired: 25 }),
@@ -98,7 +128,7 @@ describe("POGOAPI Pokédex catalog", () => {
   });
 
   test("keeps the zero Candy after trade flag in both directions", () => {
-    const catalog = buildPokedexCatalog(names, types, evolutions);
+    const catalog = buildCatalog();
 
     expect(catalog.pokemon[67].next).toEqual([
       expect.objectContaining({
@@ -116,9 +146,20 @@ describe("POGOAPI Pokédex catalog", () => {
     ]);
   });
 
-  test("uses the normal form typing for a National Dex card", () => {
-    const catalog = buildPokedexCatalog(names, types, evolutions);
+  test("uses normal-form typing and buddy distance", () => {
+    const catalog = buildCatalog();
     expect(catalog.pokemon[3].types).toEqual(["Grass", "Poison"]);
+    expect(catalog.pokemon[1].buddyDistance).toBe(3);
+    expect(catalog.pokemon[3].buddyDistance).toBe(5);
+  });
+
+  test("maps all standard second charged-move cost tiers", () => {
+    const catalog = buildCatalog();
+
+    expect(catalog.pokemon[1].secondMoveCost).toEqual({ stardust: 10000, candy: 25 });
+    expect(catalog.pokemon[2].secondMoveCost).toEqual({ stardust: 50000, candy: 50 });
+    expect(catalog.pokemon[3].secondMoveCost).toEqual({ stardust: 75000, candy: 75 });
+    expect(catalog.pokemon[68].secondMoveCost).toEqual({ stardust: 100000, candy: 100 });
   });
 
   test("keeps the existing regional ordering rules", () => {
