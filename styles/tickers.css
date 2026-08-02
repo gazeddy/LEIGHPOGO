@@ -91,6 +91,20 @@
   font-size: 0.99rem !important;
 }
 
+/*
+ * Mouse hover previously left the desktop tickers paused whenever the pointer
+ * rested over the ticker stack. Keep animations moving for fine pointers while
+ * preserving keyboard focus pauses and the reduced-motion rules in each ticker.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .event-ticker.paused:not(:focus-within) .ticker-track,
+  .raid-ticker.paused:not(:focus-within) .raid-track,
+  .ditto-ticker:hover:not(:focus-within) .ditto-track,
+  .new-gym-ticker:hover:not(:focus-within) .new-gym-track {
+    animation-play-state: running !important;
+  }
+}
+
 @media (max-width: 620px) {
   .event-ticker .ticker-label {
     padding: 0 13px !important;
