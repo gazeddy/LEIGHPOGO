@@ -7,8 +7,10 @@ function readSource(relativePath) {
 
 describe("ticker regression wiring", () => {
   const app = readSource("pages/_app.js");
+  const eventCard = readSource("components/events/EventCard.tsx");
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
+  const eventSelection = readSource("lib/event-selection.ts");
   const raidApi = readSource("pages/api/events/raids.ts");
   const raidCpCache = readSource("lib/raidBossCpCache.js");
   const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
@@ -23,6 +25,13 @@ describe("ticker regression wiring", () => {
     expect(eventTicker).toContain("{item.eventUrl && item.eventUrlLabel && (");
     expect(eventTicker).toContain("{item.eventUrlLabel} ↗");
     expect(eventTicker).toContain("{item.guideSlug && item.guideTitle && (");
+  });
+
+  it("uses the shared Campfire-first destination for cards and raid links", () => {
+    expect(eventCard).toContain("const eventLink = getEventDestination(event);");
+    expect(eventCard).toContain("href={eventLink}");
+    expect(eventSelection).toContain("const link = getEventDestination(event);");
+    expect(eventSelection).toContain("link,");
   });
 
   it("keeps the raid ticker on a duplicated manually scrollable loop", () => {
