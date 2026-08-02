@@ -85,6 +85,17 @@ jobs:
           PY
           python /tmp/apply-scrollable-tickers.py
 
+      - name: Show generated ticker sections
+        run: |
+          echo '--- EventTicker 170-230 ---'
+          nl -ba components/events/EventTicker.tsx | sed -n '170,230p'
+          echo '--- RaidBossTicker 225-285 ---'
+          nl -ba components/events/RaidBossTicker.tsx | sed -n '225,285p'
+          echo '--- DittoDisguiseTicker 110-155 ---'
+          nl -ba components/events/DittoDisguiseTicker.tsx | sed -n '110,155p'
+          echo '--- NewGymTicker 135-190 ---'
+          nl -ba components/gyms/NewGymTicker.tsx | sed -n '135,190p'
+
       - name: Install dependencies
         run: npm ci
 
