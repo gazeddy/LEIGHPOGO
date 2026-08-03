@@ -1,0 +1,1 @@
+Validates the Pokédex mobile hover-state fix from develop.
