@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      DATABASE_URL: file:./regional-validation.db
+      DATABASE_URL: file:./validation.db
       NEXTAUTH_SECRET: validation-only-secret
       NEXTAUTH_URL: http://localhost:3000
     steps:
@@ -40,6 +40,8 @@ jobs:
 
       - name: Deploy migrations to clean database
         run: npm run db:deploy
+        env:
+          DATABASE_URL: file:./regional-migration-validation.db
 
       - name: Lint
         run: npm run lint
