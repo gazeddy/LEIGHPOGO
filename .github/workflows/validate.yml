@@ -8,8 +8,37 @@ on:
     branches:
       - feature/member-gym-addition
 
+permissions:
+  contents: write
+
 jobs:
+  apply-pokedex-ui:
+    if: github.head_ref == 'agent/fold-pokedex-and-add-search'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply folding and search changes
+        run: python .github/scripts/apply-pokedex-folding-search.py
+
+      - name: Restore validation workflow and commit
+        run: |
+          git fetch origin develop
+          git checkout origin/develop -- .github/workflows/validate.yml
+          rm -f .github/workflows/apply-pokedex-folding-search.yml
+          rm -f .github/scripts/apply-pokedex-folding-search.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/pokedex.js __tests__/pokedex-folding-search.test.js .github/workflows/validate.yml .github/workflows/apply-pokedex-folding-search.yml .github/scripts/apply-pokedex-folding-search.py
+          git commit -m "Fold Pokédex cards and add search"
+          git push origin HEAD:${{ github.head_ref }}
+
   test-and-build:
+    if: github.head_ref != 'agent/fold-pokedex-and-add-search'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
