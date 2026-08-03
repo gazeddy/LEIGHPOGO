@@ -1,4 +1,4 @@
-name: Cleanup validation branch
+name: Cleanup validation branches
 
 on:
   push:
@@ -9,8 +9,25 @@ permissions:
   contents: write
 
 jobs:
-  cleanup-validation-branch:
+  cleanup-branches:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete temporary validation branch
-        run: git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git --delete agent/validate-pokedex-hover-fix
+      - name: Check out develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Delete branches except main and develop
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          while IFS= read -r ref; do
+            branch="${ref#origin/}"
+            case "$branch" in
+              HEAD|main|develop)
+                continue
+                ;;
+            esac
+            echo "Deleting $branch"
+            git push origin --delete "$branch"
+          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin)
