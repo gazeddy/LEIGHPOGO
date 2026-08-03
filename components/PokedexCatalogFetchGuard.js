@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect } from "react"
 
-const POKEDEX_CATALOG_CLIENT_VERSION = 4
+const POKEDEX_CATALOG_CLIENT_VERSION = 5
 const useClientLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect
 

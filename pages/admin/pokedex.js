@@ -5,7 +5,7 @@ import { authOptions } from "../api/auth/[...nextauth]"
 
 const { applyPokemonAvailabilityOverrides, sortPokemonAvailabilityRows } = require("../../lib/pokemonAvailability")
 
-const POKEDEX_CATALOG_CLIENT_VERSION = 4
+const POKEDEX_CATALOG_CLIENT_VERSION = 5
 const buildCatalogRequestUrl = () =>
   `/api/pokedex-catalog?v=${POKEDEX_CATALOG_CLIENT_VERSION}&request=${Date.now()}`
 

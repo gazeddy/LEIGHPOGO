@@ -43,11 +43,17 @@ function PokedexStyles() {
     .pokemon-caught-toggle input { width: 20px; height: 20px; padding: 0; accent-color: #2ea043; }
     .pokemon-caught-toggle input:disabled { cursor: not-allowed; opacity: 0.45; }
     .pokemon-unavailable-note { margin: 0; padding: 8px 10px; border: 1px solid #6e7681; border-radius: 8px; background: rgba(110, 118, 129, 0.12); color: #c9d1d9; font-size: 0.84rem; font-weight: 700; text-align: center; }
-    .pokemon-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .pokemon-resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
     .pokemon-resource-card { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid #30363d; border-radius: 8px; background: #161b22; }
     .pokemon-resource-card > span { color: #8b949e; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
     .pokemon-resource-card strong { color: #f0c36b; font-size: 0.9rem; }
     .pokemon-resource-card small { color: #c9d1d9; font-size: 0.72rem; }
+    .pokemon-mega-card { grid-column: 1 / -1; }
+    .pokemon-mega-list { display: grid; gap: 7px; margin-top: 2px; }
+    .pokemon-mega-entry { display: grid; gap: 2px; padding-top: 7px; border-top: 1px solid #30363d; }
+    .pokemon-mega-entry:first-child { padding-top: 0; border-top: 0; }
+    .pokemon-mega-entry strong { color: #d2a8ff; }
+    .pokemon-mega-entry small { display: block; }
     .pokemon-evolution-sections { display: grid; gap: 12px; padding-top: 10px; border-top: 1px solid #21262d; }
     .pokemon-evolution-section { display: grid; gap: 7px; }
     .pokemon-evolution-section h4 { margin: 0; color: #c9d1d9; font-size: 0.84rem; }
@@ -107,6 +113,9 @@ function formatNumber(value) {
 function PokemonResourceDetails({ details }) {
   const secondMoveCost = details?.secondMoveCost
   const buddyDistance = Number(details?.buddyDistance)
+  const megaEvolutions = Array.isArray(details?.megaEvolutions)
+    ? details.megaEvolutions
+    : []
 
   return (
     <div className="pokemon-resource-grid">
@@ -136,6 +145,27 @@ function PokemonResourceDetails({ details }) {
           <strong>Distance unavailable</strong>
         )}
       </div>
+      {megaEvolutions.length > 0 && (
+        <div className="pokemon-resource-card pokemon-mega-card">
+          <span>Mega Evolution</span>
+          <div className="pokemon-mega-list">
+            {megaEvolutions.map((megaEvolution, index) => (
+              <div
+                className="pokemon-mega-entry"
+                key={`${megaEvolution.megaName}-${megaEvolution.form || index}`}
+              >
+                <strong>{megaEvolution.megaName}</strong>
+                <small>
+                  First: {formatNumber(megaEvolution.firstTimeEnergy)} Mega Energy
+                </small>
+                <small>
+                  Repeat: {formatNumber(megaEvolution.repeatEnergy)} Mega Energy
+                </small>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -508,7 +538,7 @@ export default function PokedexPage() {
         <div>
           <h1>Pokédex</h1>
           <p className="muted">
-            Full National Dex grouped by region, with typing, evolution costs, second charged-move costs and Buddy Candy distances.
+            Full National Dex grouped by region, with typing, evolution costs, Mega Energy costs, second charged-move costs and Buddy Candy distances.
           </p>
           <p className="muted">
             Progress: {caughtCount} / {trackableCount} released Pokémon ({caughtPercentage}%)
