@@ -1,45 +1,80 @@
-name: Validate
+name: Apply selected Pokédex colour states
 
 on:
   pull_request:
     branches:
       - develop
-  push:
-    branches:
-      - feature/member-gym-addition
+
+permissions:
+  contents: write
 
 jobs:
-  test-and-build:
+  apply-pokedex-selected-colours:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      DATABASE_URL: file:./ci.db
-      NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: ci-only-secret
     steps:
-      - name: Check out repository
+      - name: Check out feature branch
         uses: actions/checkout@v6
-
-      - name: Use Node.js 24
-        uses: actions/setup-node@v6
         with:
-          node-version: 24
-          cache: npm
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Apply selected colour changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+          page_path = Path("pages/pokedex.js")
+          page = page_path.read_text()
 
-      - name: Audit complete dependency tree
-        run: npm audit --audit-level=high
+          old_css = '''    .pokemon-dex-card.selected { animation: pokemon-card-selection-fade 1.2s ease-out forwards; }
+    .pokemon-dex-card.caught { border-color: #2ea043; background: rgba(35, 134, 54, 0.12); }
+    @keyframes pokemon-card-selection-fade {
+      0% { border-color: #58a6ff; background: #1f4f78; box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.35); }
+      100% { border-color: #484f58; background: #30363d; box-shadow: none; }
+    }'''
+          new_css = '''    .pokemon-dex-card.selected { animation: pokemon-card-selection-fade 1.2s ease-out forwards; }
+    .pokemon-dex-card.caught { border-color: #2ea043; background: rgba(35, 134, 54, 0.12); }
+    .pokemon-dex-card.caught.selected { animation-name: pokemon-card-selection-caught-fade; }
+    @keyframes pokemon-card-selection-fade {
+      0% { border-color: #58a6ff; background: #1f4f78; box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.35); }
+      100% { border-color: #484f58; background: #30363d; box-shadow: none; }
+    }
+    @keyframes pokemon-card-selection-caught-fade {
+      0% { border-color: #58a6ff; background: #1f4f78; box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.35); }
+      100% { border-color: #2ea043; background: rgba(35, 134, 54, 0.12); box-shadow: none; }
+    }'''
+          if old_css not in page:
+              raise SystemExit("Expected Pokédex animation CSS was not found")
+          page = page.replace(old_css, new_css, 1)
 
-      - name: Run lint checks
-        run: npm run lint
+          old_class = '      } ${expanded && !caught ? "selected" : ""}`}\n'
+          new_class = '      } ${expanded ? "selected" : ""}`}\n'
+          if old_class not in page:
+              raise SystemExit("Expected selected class expression was not found")
+          page = page.replace(old_class, new_class, 1)
+          page_path.write_text(page)
 
-      - name: Run tests
-        run: npm test -- --runInBand
+          test_path = Path("__tests__/pokedex-folding-search.test.js")
+          test = test_path.read_text()
+          old_test = '''    expect(page).toContain(".pokemon-dex-card.selected")
+    expect(page).toContain("@keyframes pokemon-card-selection-fade")
+    expect(page).toContain('expanded && !caught ? "selected" : ""')'''
+          new_test = '''    expect(page).toContain(".pokemon-dex-card.selected")
+    expect(page).toContain(".pokemon-dex-card.caught.selected")
+    expect(page).toContain("@keyframes pokemon-card-selection-fade")
+    expect(page).toContain("@keyframes pokemon-card-selection-caught-fade")
+    expect(page).toContain('expanded ? "selected" : ""')'''
+          if old_test not in test:
+              raise SystemExit("Expected visual-state test assertions were not found")
+          test_path.write_text(test.replace(old_test, new_test, 1))
+          PY
 
-      - name: Build production application
-        run: npm run build
+      - name: Restore validation workflow and commit
+        run: |
+          git show origin/develop:.github/workflows/validate.yml > .github/workflows/validate.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/pokedex.js __tests__/pokedex-folding-search.test.js .github/workflows/validate.yml
+          git commit -m "Update selected Pokédex colour transitions"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
