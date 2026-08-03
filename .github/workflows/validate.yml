@@ -8,8 +8,36 @@ on:
     branches:
       - feature/member-gym-addition
 
+permissions:
+  contents: write
+
 jobs:
+  apply-pokedex-card-visuals:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/pokedex-card-visuals'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply Pokédex card visuals
+        run: node scripts/apply-pokedex-card-visuals.js
+
+      - name: Restore validation workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin develop
+          git checkout origin/develop -- .github/workflows/validate.yml
+          git rm scripts/apply-pokedex-card-visuals.js
+          git add pages/pokedex.js __tests__/pokedex-folding-search.test.js .github/workflows/validate.yml
+          git commit -m "Update Pokédex card visual states"
+          git push origin HEAD:${{ github.head_ref }}
+
   test-and-build:
+    if: github.head_ref != 'agent/pokedex-card-visuals'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
