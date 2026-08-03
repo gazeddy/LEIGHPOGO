@@ -1,3 +1,12 @@
+.pokedex-page button.pokemon-card-summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pokedex-page button.pokemon-card-summary:hover,
+.pokedex-page button.pokemon-card-summary:active {
+  background: transparent;
+}
+
 .pokedex-page .pokemon-dex-card.caught:has(.pokemon-card-summary[aria-expanded="true"]) {
   animation: pokemon-card-selection-caught-fade 1.2s ease-out forwards;
 }
