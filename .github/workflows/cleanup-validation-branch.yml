@@ -1,0 +1,16 @@
+name: Cleanup validation branch
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-validation-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete temporary validation branch
+        run: git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git --delete agent/validate-pokedex-hover-fix
