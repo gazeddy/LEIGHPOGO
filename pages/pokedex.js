@@ -32,7 +32,17 @@ function PokedexStyles() {
     .pokemon-dex-card { display: grid; align-content: start; gap: 12px; padding: 14px; border: 1px solid #30363d; border-radius: 10px; background: #0d1117; scroll-margin-top: 88px; }
     .pokemon-dex-card.caught { border-color: #2ea043; background: rgba(35, 134, 54, 0.12); }
     .pokemon-dex-card.unavailable { border-style: dashed; border-color: #6e7681; }
-    .pokemon-card-heading { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 12px; }
+    .pokemon-card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
+    .pokemon-card-summary { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+    .pokemon-card-summary:hover .pokemon-card-name h3 { color: #58a6ff; }
+    .pokemon-card-summary:focus-visible { outline: 2px solid #58a6ff; outline-offset: 4px; border-radius: 8px; }
+    .pokemon-card-chevron { color: #8b949e; font-size: 1rem; transition: transform 0.18s ease; }
+    .pokemon-card-chevron.open { transform: rotate(180deg); }
+    .pokemon-card-details { display: grid; gap: 12px; }
+    .pokedex-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+    .pokedex-search label { display: grid; gap: 6px; font-weight: 700; }
+    .pokedex-search input { min-width: 0; }
+    .pokedex-search-summary { margin: 8px 0 0; }
     .pokemon-card-sprite { width: 72px; height: 72px; object-fit: contain; padding: 6px; border: 1px solid #21262d; border-radius: 10px; background: #070b10; }
     .pokemon-card-name { display: grid; justify-items: start; gap: 4px; min-width: 0; }
     .pokemon-card-name h3 { margin: 0; overflow-wrap: anywhere; }
@@ -75,10 +85,11 @@ function PokedexStyles() {
       .pokemon-evolution-cost { grid-column: 2 / -1; justify-items: start; text-align: left; }
     }
     @media (max-width: 430px) {
-      .pokemon-card-heading { grid-template-columns: 62px 1fr; }
+      .pokemon-card-summary { grid-template-columns: 62px minmax(0, 1fr); }
       .pokemon-card-sprite { width: 62px; height: 62px; }
-      .pokemon-caught-toggle { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; align-items: center; }
+      .pokemon-caught-toggle span { display: none; }
       .pokemon-resource-grid { grid-template-columns: 1fr; }
+      .pokedex-search { grid-template-columns: 1fr; }
       .region-meta p { display: none; }
     }
   `}</style>
@@ -260,6 +271,8 @@ function PokemonCard({
   availabilityKnown,
   onToggle,
   onNavigate,
+  expanded,
+  onExpand,
 }) {
   const unavailable = availabilityKnown && !released
 
@@ -271,25 +284,33 @@ function PokemonCard({
       }`}
     >
       <div className="pokemon-card-heading">
-        <img
-          src={buildSpriteUrl(pokemon.dexNumber)}
-          alt={pokemon.name}
-          className="pokemon-card-sprite"
-          loading="lazy"
-        />
-        <div className="pokemon-card-name">
-          <span className="dex-number">
-            #{String(pokemon.dexNumber).padStart(3, "0")}
-          </span>
-          <h3>{pokemon.name}</h3>
-          <div className="pokemon-type-list">
-            {details?.types?.length ? (
-              details.types.map((type) => <TypeBadge key={type} type={type} />)
-            ) : (
-              <span className="muted pokemon-type-missing">Typing unavailable</span>
-            )}
+        <button
+          type="button"
+          className="pokemon-card-summary"
+          onClick={() => onExpand(pokemon.dexNumber)}
+          aria-expanded={expanded}
+          aria-controls={`pokemon-details-${pokemon.dexNumber}`}
+        >
+          <img
+            src={buildSpriteUrl(pokemon.dexNumber)}
+            alt={pokemon.name}
+            className="pokemon-card-sprite"
+            loading="lazy"
+          />
+          <div className="pokemon-card-name">
+            <span className="dex-number">
+              #{String(pokemon.dexNumber).padStart(3, "0")}
+            </span>
+            <h3>{pokemon.name}</h3>
+            <div className="pokemon-type-list">
+              {details?.types?.length ? (
+                details.types.map((type) => <TypeBadge key={type} type={type} />)
+              ) : (
+                <span className="muted pokemon-type-missing">Typing unavailable</span>
+              )}
+            </div>
           </div>
-        </div>
+        </button>
         <label className="pokemon-caught-toggle">
           <input
             type="checkbox"
@@ -299,16 +320,29 @@ function PokemonCard({
           />
           <span>{caught ? "Caught" : "Missing"}</span>
         </label>
+        <span
+          className={`pokemon-card-chevron ${expanded ? "open" : ""}`}
+          aria-hidden="true"
+        >
+          ▾
+        </span>
       </div>
 
-      {unavailable && (
-        <p className="pokemon-unavailable-note">
-          Not available in Pokémon GO yet
-        </p>
-      )}
+      {expanded && (
+        <div
+          id={`pokemon-details-${pokemon.dexNumber}`}
+          className="pokemon-card-details"
+        >
+          {unavailable && (
+            <p className="pokemon-unavailable-note">
+              Not available in Pokémon GO yet
+            </p>
+          )}
 
-      <PokemonResourceDetails details={details} />
-      <EvolutionStageLinks details={details} onNavigate={onNavigate} />
+          <PokemonResourceDetails details={details} />
+          <EvolutionStageLinks details={details} onNavigate={onNavigate} />
+        </div>
+      )}
     </article>
   )
 }
@@ -322,17 +356,21 @@ function PokedexRegion({
   onToggle,
   onNavigate,
   focusedDex,
+  expandedDex,
+  onExpand,
+  forceOpen,
 }) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     if (
-      focusedDex &&
-      region.pokemon.some((pokemon) => pokemon.dexNumber === focusedDex)
+      forceOpen ||
+      (focusedDex &&
+        region.pokemon.some((pokemon) => pokemon.dexNumber === focusedDex))
     ) {
       setIsOpen(true)
     }
-  }, [focusedDex, region.pokemon])
+  }, [focusedDex, forceOpen, region.pokemon])
 
   const releasedPokemon = availabilityKnown
     ? region.pokemon.filter((pokemon) => releasedSet.has(pokemon.dexNumber))
@@ -382,6 +420,8 @@ function PokedexRegion({
                 availabilityKnown={availabilityKnown}
                 onToggle={onToggle}
                 onNavigate={onNavigate}
+                expanded={expandedDex === pokemon.dexNumber}
+                onExpand={onExpand}
               />
             )
           })}
@@ -402,6 +442,8 @@ export default function PokedexPage() {
   const [statusMessage, setStatusMessage] = useState("")
   const [lastSaved, setLastSaved] = useState(null)
   const [focusedDex, setFocusedDex] = useState(null)
+  const [expandedDex, setExpandedDex] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -456,6 +498,38 @@ export default function PokedexPage() {
     [catalog]
   )
 
+  const filteredRegions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return catalog?.regions || []
+
+    const dexQuery = query.replace(/^#/, "")
+    const numericSearch = /^\d+$/.test(dexQuery)
+    const normalisedDexQuery = numericSearch ? String(Number(dexQuery)) : ""
+    const paddedDexQuery = numericSearch ? dexQuery.padStart(3, "0") : ""
+
+    return (catalog?.regions || [])
+      .map((region) => ({
+        ...region,
+        pokemon: region.pokemon.filter((pokemon) => {
+          const nameMatches = pokemon.name.toLowerCase().includes(query)
+          if (!numericSearch) return nameMatches
+
+          const dexNumber = String(pokemon.dexNumber)
+          return (
+            nameMatches ||
+            dexNumber === normalisedDexQuery ||
+            dexNumber.padStart(3, "0") === paddedDexQuery
+          )
+        }),
+      }))
+      .filter((region) => region.pokemon.length > 0)
+  }, [catalog, searchQuery])
+
+  const searchResultCount = filteredRegions.reduce(
+    (total, region) => total + region.pokemon.length,
+    0
+  )
+
   const trackableSet = catalog?.availabilityKnown ? releasedSet : allDexNumbers
   const caughtCount = Array.from(caughtSet).filter((dexNumber) =>
     trackableSet.has(dexNumber)
@@ -500,7 +574,14 @@ export default function PokedexPage() {
     }
   }
 
+  const togglePokemonDetails = (dexNumber) => {
+    setFocusedDex(dexNumber)
+    setExpandedDex((current) => (current === dexNumber ? null : dexNumber))
+  }
+
   const navigateToPokemon = (dexNumber) => {
+    setSearchQuery("")
+    setExpandedDex(dexNumber)
     setFocusedDex(dexNumber)
     window.setTimeout(() => {
       document
@@ -565,9 +646,40 @@ export default function PokedexPage() {
         </div>
       </div>
 
+      <div className="card">
+        <div className="pokedex-search">
+          <label htmlFor="pokedex-search">
+            Search Pokémon
+            <input
+              id="pokedex-search"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Name or National Dex number"
+            />
+          </label>
+          {searchQuery && (
+            <button type="button" onClick={() => setSearchQuery("")}>
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="muted pokedex-search-summary">
+          {searchQuery.trim()
+            ? `${searchResultCount} matching Pokémon`
+            : "Regions and Pokémon details are collapsed by default."}
+        </p>
+      </div>
+
       {isLoadingCaught && <p className="muted">Loading your saved Pokédex progress…</p>}
 
-      {catalog?.regions?.map((region) => (
+      {searchQuery.trim() && searchResultCount === 0 && (
+        <div className="card">
+          <p className="muted">No Pokémon match that search.</p>
+        </div>
+      )}
+
+      {filteredRegions.map((region) => (
         <PokedexRegion
           key={region.region}
           region={region}
@@ -578,6 +690,9 @@ export default function PokedexPage() {
           onToggle={toggleCaught}
           onNavigate={navigateToPokemon}
           focusedDex={focusedDex}
+          expandedDex={expandedDex}
+          onExpand={togglePokemonDetails}
+          forceOpen={Boolean(searchQuery.trim())}
         />
       ))}
       <PokedexStyles />
