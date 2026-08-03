@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST='{"pages/gyms.tsx -> ../components/gyms/GymMap":{"id":3611,"files":["static/chunks/25f4ac2a.94dfb1d07775f13d.js","static/chunks/611.16756e28b6a925be.js"]}}';
+self.__REACT_LOADABLE_MANIFEST="{}";
