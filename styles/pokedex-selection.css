@@ -1,0 +1,17 @@
+.pokedex-page .pokemon-dex-card.caught:has(.pokemon-card-summary[aria-expanded="true"]) {
+  animation: pokemon-card-selection-caught-fade 1.2s ease-out forwards;
+}
+
+@keyframes pokemon-card-selection-caught-fade {
+  0% {
+    border-color: #58a6ff;
+    background: #1f4f78;
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.35);
+  }
+
+  100% {
+    border-color: #2ea043;
+    background: rgba(35, 134, 54, 0.12);
+    box-shadow: none;
+  }
+}
