@@ -10,6 +10,7 @@ import "../styles/wanted-trades.css"
 import "../styles/notifications.css"
 import "../styles/pokedex-selection.css"
 import Navbar from "../components/Navbar"
+import PokemonRegionalAdmin from "../components/admin/PokemonRegionalAdmin"
 import DittoDisguiseTicker from "../components/events/DittoDisguiseTicker"
 import EventTicker from "../components/events/EventTicker"
 import RaidBossTicker from "../components/events/RaidBossTicker"
@@ -19,6 +20,7 @@ import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
   const showEventTicker = !router.pathname.startsWith("/events")
+  const showPokemonRegionalAdmin = router.pathname === "/admin/pokedex"
 
   return (
     <SessionProvider session={session}>
@@ -29,6 +31,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       <DittoDisguiseTicker />
       <NewGymTicker />
       <Component {...pageProps} />
+      {showPokemonRegionalAdmin && <PokemonRegionalAdmin />}
     </SessionProvider>
   )
 }
