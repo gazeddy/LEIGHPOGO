@@ -26,4 +26,12 @@ describe("Pokédex folding and search", () => {
     expect(page).toContain('setSearchQuery("")')
     expect(page).toContain("setExpandedDex(dexNumber)")
   })
+
+  test("matches navbar grey and fades selection unless caught", () => {
+    expect(page).toContain("border: 1px solid #484f58")
+    expect(page).toContain("background: #30363d")
+    expect(page).toContain(".pokemon-dex-card.selected")
+    expect(page).toContain("@keyframes pokemon-card-selection-fade")
+    expect(page).toContain('expanded && !caught ? "selected" : ""')
+  })
 })

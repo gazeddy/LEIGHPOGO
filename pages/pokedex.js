@@ -29,8 +29,13 @@ function PokedexStyles() {
   return <style jsx global>{`
     .pokedex-page { max-width: 1200px; }
     .pokemon-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 18px; }
-    .pokemon-dex-card { display: grid; align-content: start; gap: 12px; padding: 14px; border: 1px solid #30363d; border-radius: 10px; background: #0d1117; scroll-margin-top: 88px; }
+    .pokemon-dex-card { display: grid; align-content: start; gap: 12px; padding: 14px; border: 1px solid #484f58; border-radius: 10px; background: #30363d; scroll-margin-top: 88px; }
+    .pokemon-dex-card.selected { animation: pokemon-card-selection-fade 1.2s ease-out forwards; }
     .pokemon-dex-card.caught { border-color: #2ea043; background: rgba(35, 134, 54, 0.12); }
+    @keyframes pokemon-card-selection-fade {
+      0% { border-color: #58a6ff; background: #1f4f78; box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.35); }
+      100% { border-color: #484f58; background: #30363d; box-shadow: none; }
+    }
     .pokemon-dex-card.unavailable { border-style: dashed; border-color: #6e7681; }
     .pokemon-card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
     .pokemon-card-summary { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
@@ -281,7 +286,7 @@ function PokemonCard({
       id={`pokemon-${pokemon.dexNumber}`}
       className={`pokemon-dex-card ${caught ? "caught" : ""} ${
         unavailable ? "unavailable" : ""
-      }`}
+      } ${expanded && !caught ? "selected" : ""}`}
     >
       <div className="pokemon-card-heading">
         <button
