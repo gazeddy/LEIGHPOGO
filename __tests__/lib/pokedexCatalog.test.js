@@ -78,6 +78,36 @@ describe("Pokédex catalog", () => {
     ],
   };
 
+  const megaPokemon = [
+    {
+      pokemon_id: 3,
+      pokemon_name: "Venusaur",
+      mega_name: "Mega Venusaur",
+      form: "Normal",
+      first_time_mega_energy_required: 200,
+      mega_energy_required: 40,
+      type: ["Grass", "Poison"],
+    },
+    {
+      pokemon_id: 6,
+      pokemon_name: "Charizard",
+      mega_name: "Mega Charizard X",
+      form: "X",
+      first_time_mega_energy_required: 200,
+      mega_energy_required: 40,
+      type: ["Fire", "Dragon"],
+    },
+    {
+      pokemon_id: 6,
+      pokemon_name: "Charizard",
+      mega_name: "Mega Charizard Y",
+      form: "Y",
+      first_time_mega_energy_required: 200,
+      mega_energy_required: 40,
+      type: ["Fire", "Flying"],
+    },
+  ];
+
   const pvpokePokemon = [
     { dex: 1, speciesName: "Bulbasaur", speciesId: "bulbasaur", buddyDistance: 5, thirdMoveCost: 10000 },
     { dex: 1, speciesName: "Bulbasaur (Shadow)", speciesId: "bulbasaur_shadow", tags: ["shadow"], thirdMoveCost: 100000 },
@@ -93,7 +123,8 @@ describe("Pokédex catalog", () => {
       types,
       evolutions,
       buddyDistances,
-      pvpokePokemon
+      pvpokePokemon,
+      megaPokemon
     );
 
   test("creates previous and next links by evolution stage", () => {
@@ -152,6 +183,35 @@ describe("Pokédex catalog", () => {
     expect(catalog.pokemon[1].buddyDistance).toBe(5);
     expect(catalog.pokemon[3].buddyDistance).toBe(3);
     expect(catalog.pokemon[68].buddyDistance).toBe(5);
+  });
+
+  test("adds first-time and repeat Mega Energy costs by form", () => {
+    const catalog = buildCatalog();
+
+    expect(catalog.pokemon[1].megaEvolutions).toEqual([]);
+    expect(catalog.pokemon[3].megaEvolutions).toEqual([
+      {
+        megaName: "Mega Venusaur",
+        form: null,
+        firstTimeEnergy: 200,
+        repeatEnergy: 40,
+        types: ["Grass", "Poison"],
+      },
+    ]);
+    expect(catalog.pokemon[6].megaEvolutions).toEqual([
+      expect.objectContaining({
+        megaName: "Mega Charizard X",
+        form: "X",
+        firstTimeEnergy: 200,
+        repeatEnergy: 40,
+      }),
+      expect.objectContaining({
+        megaName: "Mega Charizard Y",
+        form: "Y",
+        firstTimeEnergy: 200,
+        repeatEnergy: 40,
+      }),
+    ]);
   });
 
   test("maps all standard second charged-move cost tiers", () => {

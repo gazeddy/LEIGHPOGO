@@ -31,13 +31,13 @@ describe("Pokédex catalog client caching", () => {
 
   test("installs a versioned no-store guard before page content", () => {
     expect(app).toContain("<PokedexCatalogFetchGuard />");
-    expect(guard).toContain("POKEDEX_CATALOG_CLIENT_VERSION = 4");
+    expect(guard).toContain("POKEDEX_CATALOG_CLIENT_VERSION = 5");
     expect(guard).toContain('cache: "no-store"');
     expect(guard).toContain('url.searchParams.set("request", String(Date.now()))');
   });
 
   test("uses a no-store request on the admin page", () => {
-    expect(adminPage).toContain("POKEDEX_CATALOG_CLIENT_VERSION = 4");
+    expect(adminPage).toContain("POKEDEX_CATALOG_CLIENT_VERSION = 5");
     expect(adminPage).toContain('cache: "no-store"');
     expect(adminPage).toContain(
       "/api/admin/pokemon-availability-overrides?request=${Date.now()}"

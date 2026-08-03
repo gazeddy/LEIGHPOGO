@@ -52,6 +52,14 @@
       "namedRegex": "^/api/entries/(?<nxtPid>[^/]+?)(?:/)?$"
     },
     {
+      "page": "/api/notifications/[id]",
+      "regex": "^/api/notifications/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/notifications/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/search-strings/[id]",
       "regex": "^/api/search\\-strings/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -60,12 +68,60 @@
       "namedRegex": "^/api/search\\-strings/(?<nxtPid>[^/]+?)(?:/)?$"
     },
     {
+      "page": "/api/trades/wanted/[id]",
+      "regex": "^/api/trades/wanted/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/trades/wanted/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/trades/[id]",
+      "regex": "^/api/trades/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/trades/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/entries/[id]",
       "regex": "^/entries/([^/]+?)(?:/)?$",
       "routeKeys": {
         "nxtPid": "nxtPid"
       },
       "namedRegex": "^/entries/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/guides/series/[series]",
+      "regex": "^/guides/series/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPseries": "nxtPseries"
+      },
+      "namedRegex": "^/guides/series/(?<nxtPseries>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/guides/[slug]",
+      "regex": "^/guides/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/guides/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/trades/[id]",
+      "regex": "^/trades/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/trades/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/trades/[id]/edit",
+      "regex": "^/trades/([^/]+?)/edit(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/trades/(?<nxtPid>[^/]+?)/edit(?:/)?$"
     }
   ],
   "staticRoutes": [
@@ -88,6 +144,54 @@
       "namedRegex": "^/admin(?:/)?$"
     },
     {
+      "page": "/admin/content",
+      "regex": "^/admin/content(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/content(?:/)?$"
+    },
+    {
+      "page": "/admin/event-types",
+      "regex": "^/admin/event\\-types(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/event\\-types(?:/)?$"
+    },
+    {
+      "page": "/admin/events",
+      "regex": "^/admin/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/events(?:/)?$"
+    },
+    {
+      "page": "/admin/guide-images",
+      "regex": "^/admin/guide\\-images(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/guide\\-images(?:/)?$"
+    },
+    {
+      "page": "/admin/guide-links",
+      "regex": "^/admin/guide\\-links(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/guide\\-links(?:/)?$"
+    },
+    {
+      "page": "/admin/gym-removals",
+      "regex": "^/admin/gym\\-removals(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/gym\\-removals(?:/)?$"
+    },
+    {
+      "page": "/admin/gyms",
+      "regex": "^/admin/gyms(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/gyms(?:/)?$"
+    },
+    {
+      "page": "/admin/pokedex",
+      "regex": "^/admin/pokedex(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/pokedex(?:/)?$"
+    },
+    {
       "page": "/entries",
       "regex": "^/entries(?:/)?$",
       "routeKeys": {},
@@ -100,10 +204,40 @@
       "namedRegex": "^/entries/add(?:/)?$"
     },
     {
+      "page": "/events",
+      "regex": "^/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/events(?:/)?$"
+    },
+    {
+      "page": "/friend-codes",
+      "regex": "^/friend\\-codes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/friend\\-codes(?:/)?$"
+    },
+    {
+      "page": "/guides",
+      "regex": "^/guides(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/guides(?:/)?$"
+    },
+    {
+      "page": "/gyms",
+      "regex": "^/gyms(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/gyms(?:/)?$"
+    },
+    {
       "page": "/login",
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/notifications",
+      "regex": "^/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/notifications(?:/)?$"
     },
     {
       "page": "/pokedex",
@@ -122,36 +256,150 @@
       "regex": "^/search\\-strings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/search\\-strings(?:/)?$"
+    },
+    {
+      "page": "/trades",
+      "regex": "^/trades(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/trades(?:/)?$"
+    },
+    {
+      "page": "/trades/new",
+      "regex": "^/trades/new(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/trades/new(?:/)?$"
+    },
+    {
+      "page": "/trades/wanted",
+      "regex": "^/trades/wanted(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/trades/wanted(?:/)?$"
     }
   ],
   "dataRoutes": [
     {
       "page": "/",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/index\\.json$"
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/index\\.json$"
     },
     {
       "page": "/account",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/account\\.json$"
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/account\\.json$"
     },
     {
       "page": "/admin",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/admin\\.json$"
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin\\.json$"
+    },
+    {
+      "page": "/admin/content",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/content\\.json$"
+    },
+    {
+      "page": "/admin/event-types",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/event-types\\.json$"
+    },
+    {
+      "page": "/admin/events",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/events\\.json$"
+    },
+    {
+      "page": "/admin/guide-images",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/guide-images\\.json$"
+    },
+    {
+      "page": "/admin/guide-links",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/guide-links\\.json$"
+    },
+    {
+      "page": "/admin/gym-removals",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/gym-removals\\.json$"
+    },
+    {
+      "page": "/admin/gyms",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/gyms\\.json$"
+    },
+    {
+      "page": "/admin/pokedex",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/admin/pokedex\\.json$"
     },
     {
       "page": "/entries/[id]",
       "routeKeys": {
         "nxtPid": "nxtPid"
       },
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/entries/([^/]+?)\\.json$",
-      "namedDataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/entries/(?<nxtPid>[^/]+?)\\.json$"
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/entries/([^/]+?)\\.json$",
+      "namedDataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/entries/(?<nxtPid>[^/]+?)\\.json$"
+    },
+    {
+      "page": "/events",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/events\\.json$"
+    },
+    {
+      "page": "/friend-codes",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/friend-codes\\.json$"
+    },
+    {
+      "page": "/guides",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/guides\\.json$"
+    },
+    {
+      "page": "/guides/series/[series]",
+      "routeKeys": {
+        "nxtPseries": "nxtPseries"
+      },
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/guides/series/([^/]+?)\\.json$",
+      "namedDataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/guides/series/(?<nxtPseries>[^/]+?)\\.json$"
+    },
+    {
+      "page": "/guides/[slug]",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/guides/([^/]+?)\\.json$",
+      "namedDataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/guides/(?<nxtPslug>[^/]+?)\\.json$"
+    },
+    {
+      "page": "/gyms",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/gyms\\.json$"
     },
     {
       "page": "/login",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/login\\.json$"
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/login\\.json$"
+    },
+    {
+      "page": "/notifications",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/notifications\\.json$"
     },
     {
       "page": "/register",
-      "dataRouteRegex": "^/_next/data/E2EDG\\-HY0JAMO9gskU\\-FC/register\\.json$"
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/register\\.json$"
+    },
+    {
+      "page": "/trades",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades\\.json$"
+    },
+    {
+      "page": "/trades/new",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades/new\\.json$"
+    },
+    {
+      "page": "/trades/wanted",
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades/wanted\\.json$"
+    },
+    {
+      "page": "/trades/[id]",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades/([^/]+?)\\.json$",
+      "namedDataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades/(?<nxtPid>[^/]+?)\\.json$"
+    },
+    {
+      "page": "/trades/[id]/edit",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "dataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades/([^/]+?)/edit\\.json$",
+      "namedDataRouteRegex": "^/_next/data/S0Z22S0QHc8iFkWT0g5ek/trades/(?<nxtPid>[^/]+?)/edit\\.json$"
     }
   ],
   "rsc": {
