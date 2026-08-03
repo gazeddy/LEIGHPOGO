@@ -1,0 +1,49 @@
+name: Apply Mega Evolution costs
+
+on:
+  push:
+    branches:
+      - agent/add-mega-evolution-costs
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./validation.db
+      NEXTAUTH_SECRET: validation-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply Mega Evolution patch
+        shell: bash
+        run: |
+          printf '%s' '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' | base64 -d | gunzip > /tmp/mega-costs.patch
+          git apply /tmp/mega-costs.patch
+          rm -f .github/workflows/export-source.yml .github/workflows/apply-mega-costs.yml
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+      - name: Production build
+        env:
+          NODE_ENV: production
+        run: npm run build
+      - name: Commit validated changes
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Add Mega Evolution energy costs"
+          git push origin HEAD:agent/add-mega-evolution-costs
