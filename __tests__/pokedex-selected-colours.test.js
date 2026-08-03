@@ -29,4 +29,11 @@ describe("Pokédex selected colour transitions", () => {
     expect(styles).toContain('border-color: #2ea043')
     expect(styles).toContain('background: rgba(35, 134, 54, 0.12)')
   })
+
+  test("mobile taps cannot leave the summary button stuck green", () => {
+    expect(styles).toContain('button.pokemon-card-summary:hover')
+    expect(styles).toContain('button.pokemon-card-summary:active')
+    expect(styles).toContain('background: transparent')
+    expect(styles).toContain('-webkit-tap-highlight-color: transparent')
+  })
 })
