@@ -36,6 +36,20 @@ function draftFromOverride(override) {
   }
 }
 
+function toggleRegionalArea(currentRegions, area, checked) {
+  const selected = new Set(
+    Array.isArray(currentRegions) ? currentRegions : []
+  )
+
+  if (checked) {
+    selected.add(area)
+  } else {
+    selected.delete(area)
+  }
+
+  return REGIONAL_AREAS.filter((candidate) => selected.has(candidate))
+}
+
 export default function PokemonRegionalAdmin() {
   const [catalog, setCatalog] = useState(null)
   const [overrides, setOverrides] = useState([])
@@ -217,8 +231,9 @@ export default function PokemonRegionalAdmin() {
           <div>
             <h2>Regional Pokémon</h2>
             <p className="muted">
-              Mark species that are normally location locked. Select several broad
-              areas where needed, and use custom locations for country-specific locks.
+              Mark species that are normally location locked. Tick each exact
+              lock area that applies, and use custom locations for
+              country-specific locks.
             </p>
           </div>
           {message && <p className="status-text">{message}</p>}
@@ -263,7 +278,9 @@ export default function PokemonRegionalAdmin() {
               const draft = draftFor(row)
               return (
                 <article
-                  className={`admin-regional-row ${draft.isRegional ? "regional" : ""}`}
+                  className={`admin-regional-row ${
+                    draft.isRegional ? "regional" : ""
+                  }`}
                   key={row.dexNumber}
                 >
                   <div className="admin-regional-name">
@@ -275,6 +292,7 @@ export default function PokemonRegionalAdmin() {
                       <small>{row.regionalLocations.join(" · ")}</small>
                     )}
                   </div>
+
                   <label>
                     Regional status
                     <select
@@ -289,27 +307,37 @@ export default function PokemonRegionalAdmin() {
                       <option value="regional">Regional</option>
                     </select>
                   </label>
-                  <label>
-                    Primary lock area(s)
-                    <select
-                      multiple
-                      size="4"
-                      disabled={!draft.isRegional}
-                      value={draft.regions || []}
-                      onChange={(event) =>
-                        updateDraft(row.dexNumber, {
-                          regions: Array.from(
-                            event.target.selectedOptions,
-                            (option) => option.value
-                          ),
-                        })
-                      }
-                    >
+
+                  <fieldset
+                    className="admin-regional-locks"
+                    disabled={!draft.isRegional}
+                  >
+                    <legend>Primary lock area(s)</legend>
+                    <div className="admin-regional-lock-options">
                       {REGIONAL_AREAS.map((area) => (
-                        <option value={area} key={area}>{area}</option>
+                        <label
+                          className="admin-regional-lock-option"
+                          key={area}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(draft.regions || []).includes(area)}
+                            onChange={(event) =>
+                              updateDraft(row.dexNumber, {
+                                regions: toggleRegionalArea(
+                                  draft.regions,
+                                  area,
+                                  event.target.checked
+                                ),
+                              })
+                            }
+                          />
+                          <span>{area}</span>
+                        </label>
                       ))}
-                    </select>
-                  </label>
+                    </div>
+                  </fieldset>
+
                   <label>
                     Custom locations
                     <input
@@ -324,6 +352,7 @@ export default function PokemonRegionalAdmin() {
                       placeholder="e.g. United Kingdom, Ireland"
                     />
                   </label>
+
                   <label>
                     Note
                     <input
@@ -337,6 +366,7 @@ export default function PokemonRegionalAdmin() {
                       placeholder="Optional form or event details"
                     />
                   </label>
+
                   <button
                     type="button"
                     onClick={() => saveRegionalStatus(row)}
@@ -351,28 +381,141 @@ export default function PokemonRegionalAdmin() {
         )}
 
         <style jsx>{`
-          .admin-regional-container { max-width: 1250px; padding-top: 0; }
-          .admin-regional-section { margin-top: -4px; }
-          .admin-regional-heading h2 { margin-bottom: 6px; }
-          .admin-regional-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 14px 0; }
-          .admin-regional-controls label, .admin-regional-row label { display: grid; gap: 5px; font-size: 0.8rem; font-weight: 700; }
-          .admin-regional-controls input[type="search"] { min-width: 260px; }
-          .admin-regional-checkbox { grid-auto-flow: column; align-items: center; }
-          .admin-regional-summary { margin: 0 0 7px auto; }
-          .admin-regional-list { display: grid; gap: 8px; max-height: 760px; overflow: auto; padding-right: 4px; }
-          .admin-regional-row { display: grid; grid-template-columns: minmax(170px, 1fr) 145px minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) auto; align-items: end; gap: 10px; padding: 12px; border: 1px solid #30363d; border-radius: 9px; background: #161b22; }
-          .admin-regional-row.regional { border-left: 4px solid #a371f7; }
-          .admin-regional-name { display: grid; gap: 3px; align-self: center; }
-          .admin-regional-name small { color: #8b949e; }
-          .admin-regional-row select[multiple] { min-height: 96px; }
+          .admin-regional-container {
+            max-width: 1250px;
+            padding-top: 0;
+          }
+          .admin-regional-section {
+            margin-top: -4px;
+          }
+          .admin-regional-heading h2 {
+            margin-bottom: 6px;
+          }
+          .admin-regional-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: end;
+            gap: 12px;
+            margin: 14px 0;
+          }
+          .admin-regional-controls label,
+          .admin-regional-row > label {
+            display: grid;
+            gap: 5px;
+            font-size: 0.8rem;
+            font-weight: 700;
+          }
+          .admin-regional-controls input[type="search"] {
+            min-width: 260px;
+          }
+          .admin-regional-checkbox {
+            grid-auto-flow: column;
+            align-items: center;
+          }
+          .admin-regional-summary {
+            margin: 0 0 7px auto;
+          }
+          .admin-regional-list {
+            display: grid;
+            gap: 8px;
+            max-height: 760px;
+            overflow: auto;
+            padding-right: 4px;
+          }
+          .admin-regional-row {
+            display: grid;
+            grid-template-columns:
+              minmax(170px, 0.9fr) 145px minmax(280px, 1.6fr)
+              minmax(180px, 1fr) minmax(180px, 1fr) auto;
+            align-items: end;
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid #30363d;
+            border-radius: 9px;
+            background: #161b22;
+          }
+          .admin-regional-row.regional {
+            border-left: 4px solid #a371f7;
+          }
+          .admin-regional-name {
+            display: grid;
+            gap: 3px;
+            align-self: center;
+          }
+          .admin-regional-name small {
+            color: #8b949e;
+          }
+          .admin-regional-locks {
+            min-width: 0;
+            margin: 0;
+            padding: 8px;
+            border: 1px solid #30363d;
+            border-radius: 7px;
+          }
+          .admin-regional-locks:disabled {
+            opacity: 0.55;
+          }
+          .admin-regional-locks legend {
+            padding: 0 5px;
+            font-size: 0.8rem;
+            font-weight: 700;
+          }
+          .admin-regional-lock-options {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px 10px;
+            max-height: 175px;
+            overflow-y: auto;
+          }
+          .admin-regional-row .admin-regional-lock-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            min-width: 0;
+            font-size: 0.78rem;
+            font-weight: 500;
+            line-height: 1.25;
+            cursor: pointer;
+          }
+          .admin-regional-lock-option input {
+            flex: 0 0 auto;
+            margin: 2px 0 0;
+          }
+          .admin-regional-lock-option span {
+            min-width: 0;
+          }
           @media (max-width: 1050px) {
-            .admin-regional-row { grid-template-columns: 1fr 1fr; }
-            .admin-regional-row button { justify-self: start; }
-            .admin-regional-summary { width: 100%; margin-left: 0; }
+            .admin-regional-row {
+              grid-template-columns: 1fr 1fr;
+            }
+            .admin-regional-locks {
+              grid-column: 1 / -1;
+            }
+            .admin-regional-row button {
+              justify-self: start;
+            }
+            .admin-regional-summary {
+              width: 100%;
+              margin-left: 0;
+            }
           }
           @media (max-width: 600px) {
-            .admin-regional-controls, .admin-regional-row { display: grid; grid-template-columns: 1fr; }
-            .admin-regional-controls input[type="search"] { min-width: 0; width: 100%; }
+            .admin-regional-controls,
+            .admin-regional-row {
+              display: grid;
+              grid-template-columns: 1fr;
+            }
+            .admin-regional-controls input[type="search"] {
+              min-width: 0;
+              width: 100%;
+            }
+            .admin-regional-lock-options {
+              grid-template-columns: 1fr;
+              max-height: none;
+            }
+            .admin-regional-locks {
+              grid-column: auto;
+            }
           }
         `}</style>
       </section>
