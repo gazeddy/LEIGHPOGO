@@ -26,9 +26,18 @@ describe("Pokédex regional administration", () => {
     expect(app).toContain("<PokemonRegionalAdmin />")
     expect(regionalAdmin).toContain("Regional status")
     expect(regionalAdmin).toContain("Primary lock area(s)")
-    expect(regionalAdmin).toContain("multiple")
     expect(regionalAdmin).toContain("Custom locations")
     expect(regionalAdmin).toContain("Regional first")
+  })
+
+  test("uses individually selectable lock-area checkboxes", () => {
+    expect(regionalAdmin).toContain("toggleRegionalArea")
+    expect(regionalAdmin).toContain('className="admin-regional-lock-options"')
+    expect(regionalAdmin).toContain('className="admin-regional-lock-option"')
+    expect(regionalAdmin).toContain('type="checkbox"')
+    expect(regionalAdmin).toContain("event.target.checked")
+    expect(regionalAdmin).not.toContain("selectedOptions")
+    expect(regionalAdmin).not.toContain("<select\n                      multiple")
   })
 
   test("stores regional metadata independently from release overrides", () => {
