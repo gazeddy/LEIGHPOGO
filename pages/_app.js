@@ -1,3 +1,4 @@
+import Head from "next/head"
 import { SessionProvider } from "next-auth/react"
 import { useRouter } from "next/router"
 import "leaflet/dist/leaflet.css"
@@ -16,6 +17,7 @@ import EventTicker from "../components/events/EventTicker"
 import RaidBossTicker from "../components/events/RaidBossTicker"
 import NewGymTicker from "../components/gyms/NewGymTicker"
 import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
+import PwaBootstrap from "../components/PwaBootstrap"
 
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
@@ -24,6 +26,15 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
 
   return (
     <SessionProvider session={session}>
+      <Head>
+        <meta name="theme-color" content="#0d1117" />
+        <meta name="application-name" content="LEIGHPOGO" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="LEIGHPOGO" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+      </Head>
+      <PwaBootstrap />
       <PokedexCatalogFetchGuard />
       <Navbar />
       {showEventTicker && <EventTicker />}
