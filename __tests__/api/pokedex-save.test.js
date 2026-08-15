@@ -9,8 +9,8 @@ jest.mock("../../pages/api/auth/[...nextauth]", () => ({
   authOptions: {},
 }))
 
-const deleteMany = jest.fn()
-const createMany = jest.fn()
+const mockDeleteMany = jest.fn()
+const mockCreateMany = jest.fn()
 
 jest.mock("../../lib/prisma", () => ({
   __esModule: true,
@@ -21,8 +21,8 @@ jest.mock("../../lib/prisma", () => ({
     $transaction: jest.fn(async (callback) =>
       callback({
         pokedexEntry: {
-          deleteMany,
-          createMany,
+          deleteMany: mockDeleteMany,
+          createMany: mockCreateMany,
         },
       })
     ),
@@ -54,8 +54,8 @@ const handler = require("../../pages/api/pokedex").default
 describe("PUT /api/pokedex", () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    deleteMany.mockResolvedValue({ count: 0 })
-    createMany.mockResolvedValue({ count: 0 })
+    mockDeleteMany.mockResolvedValue({ count: 0 })
+    mockCreateMany.mockResolvedValue({ count: 0 })
     getServerSession.mockResolvedValue({
       user: { id: 42, ign: "gaz", role: "user" },
     })
@@ -71,16 +71,16 @@ describe("PUT /api/pokedex", () => {
     await handler(req, res)
 
     expect(res._getStatusCode()).toBe(200)
-    expect(deleteMany).toHaveBeenCalledTimes(1)
-    expect(deleteMany).toHaveBeenCalledWith({ where: { ownerId: 42 } })
-    expect(createMany).toHaveBeenCalledTimes(5)
+    expect(mockDeleteMany).toHaveBeenCalledTimes(1)
+    expect(mockDeleteMany).toHaveBeenCalledWith({ where: { ownerId: 42 } })
+    expect(mockCreateMany).toHaveBeenCalledTimes(5)
 
-    const writtenDexNumbers = createMany.mock.calls.flatMap(
+    const writtenDexNumbers = mockCreateMany.mock.calls.flatMap(
       ([call]) => call.data.map((entry) => entry.dexNumber)
     )
     expect(writtenDexNumbers).toEqual(dexNumbers)
     expect(
-      Math.max(...createMany.mock.calls.map(([call]) => call.data.length))
+      Math.max(...mockCreateMany.mock.calls.map(([call]) => call.data.length))
     ).toBeLessThanOrEqual(250)
   })
 })
