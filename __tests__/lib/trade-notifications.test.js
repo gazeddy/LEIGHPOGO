@@ -6,20 +6,36 @@ jest.mock("../../lib/prisma", () => ({
     findMany: jest.fn(),
   },
   tradeNotification: {
+    findMany: jest.fn(),
     upsert: jest.fn(),
   },
 }))
 
+jest.mock("../../lib/pushServer", () => ({
+  sendPushToUser: jest.fn(() =>
+    Promise.resolve({
+      configured: true,
+      subscriptions: 1,
+      sent: 1,
+      failed: 0,
+      removed: 0,
+    }),
+  ),
+}))
+
 const prisma = require("../../lib/prisma")
+const { sendPushToUser } = require("../../lib/pushServer")
 const {
   syncWantedTradeNotificationsForListing,
   tradeModifierLabels,
+  tradePushPayload,
   wantedTradeMatchesOffer,
 } = require("../../lib/tradeNotifications")
 
 describe("wishlist trade matching", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    prisma.tradeNotification.findMany.mockResolvedValue([])
     prisma.tradeNotification.upsert.mockImplementation(({ create }) =>
       Promise.resolve(create),
     )
@@ -71,6 +87,23 @@ describe("wishlist trade matching", () => {
     })).toEqual(["Shiny", "Lucky", "XXL", "Special background"])
   })
 
+  it("builds push payloads that deep-link to the matching listing", () => {
+    expect(tradePushPayload(
+      {
+        ownerId: 2,
+        type: "WISHLIST_MATCH",
+        pokemonName: "Pikachu",
+        modifierSummary: "Shiny",
+      },
+      { id: 17, owner: { ign: "Ash" } },
+    )).toEqual({
+      title: "Wanted trade found: Pikachu",
+      body: "Ash listed Shiny Pikachu, matching your wanted list.",
+      url: "/trades/17",
+      tag: "trade-2-17-pikachu",
+    })
+  })
+
   it("notifies each wishlist owner and the listing owner", async () => {
     prisma.wantedTrade.findMany.mockResolvedValueOnce([
       {
@@ -89,6 +122,7 @@ describe("wishlist trade matching", () => {
     await syncWantedTradeNotificationsForListing({
       id: 17,
       ownerId: 1,
+      owner: { ign: "Ash" },
       items: [
         {
           direction: "OFFER",
@@ -104,6 +138,7 @@ describe("wishlist trade matching", () => {
       include: { owner: { select: { ign: true } } },
     })
     expect(prisma.tradeNotification.upsert).toHaveBeenCalledTimes(3)
+    expect(sendPushToUser).toHaveBeenCalledTimes(3)
 
     const notifications = prisma.tradeNotification.upsert.mock.calls.map(
       ([call]) => call.create,
@@ -133,6 +168,30 @@ describe("wishlist trade matching", () => {
     ]))
   })
 
+  it("does not re-push a trade notification that already exists", async () => {
+    prisma.wantedTrade.findMany.mockResolvedValueOnce([
+      {
+        ownerId: 2,
+        owner: { ign: "Misty" },
+        pokemonName: "Pikachu",
+      },
+    ])
+    prisma.tradeNotification.findMany.mockResolvedValueOnce([
+      { ownerId: 2, listingId: 22, pokemonName: "Pikachu" },
+      { ownerId: 1, listingId: 22, pokemonName: "Pikachu" },
+    ])
+
+    await syncWantedTradeNotificationsForListing({
+      id: 22,
+      ownerId: 1,
+      owner: { ign: "Ash" },
+      items: [{ direction: "OFFER", pokemonName: "Pikachu" }],
+    })
+
+    expect(prisma.tradeNotification.upsert).toHaveBeenCalledTimes(2)
+    expect(sendPushToUser).not.toHaveBeenCalled()
+  })
+
   it("does not notify the listing owner when nobody else matches", async () => {
     prisma.wantedTrade.findMany.mockResolvedValueOnce([])
 
@@ -143,6 +202,8 @@ describe("wishlist trade matching", () => {
     })
 
     expect(notifications).toEqual([])
+    expect(prisma.tradeNotification.findMany).not.toHaveBeenCalled()
     expect(prisma.tradeNotification.upsert).not.toHaveBeenCalled()
+    expect(sendPushToUser).not.toHaveBeenCalled()
   })
 })
