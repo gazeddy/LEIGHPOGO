@@ -2,18 +2,8 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "./auth/[...nextauth]"
 import prisma from "../../lib/prisma"
 
-const {
-  filterReleasedDexNumbers,
-  getReleasedPokemonData,
-} = require("../../lib/releasedPokemonCache")
-const {
-  applyPokemonAvailabilityOverrides,
-} = require("../../lib/pokemonAvailability")
-const {
-  readPokemonAvailabilityOverrides,
-} = require("../../lib/pokemonAvailabilityStore")
-
 const POKEDEX_WRITE_CHUNK_SIZE = 250
+const MAX_REASONABLE_DEX_NUMBER = 5000
 
 function disableCaching(res) {
   res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate")
@@ -24,40 +14,28 @@ function disableCaching(res) {
 
 async function ensureSession(req, res) {
   const session = await getServerSession(req, res, authOptions)
-  if (!session) {
+  if (!session?.user?.id) {
     res.status(401).json({ error: "You must be signed in to manage your Pokédex." })
     return null
   }
   return session
 }
 
-async function loadEffectiveReleasedPokemon(res) {
-  let releasedPokemonData
+function normaliseDexNumbers(values) {
+  if (!Array.isArray(values)) return null
 
-  try {
-    releasedPokemonData = await getReleasedPokemonData()
-  } catch (error) {
-    console.error("Failed to load released Pokémon data", error)
-    res.status(503).json({ error: "The released Pokémon list is temporarily unavailable." })
-    return null
-  }
-
-  try {
-    const overrideResult = await readPokemonAvailabilityOverrides()
-    return {
-      ...releasedPokemonData,
-      dexNumbers: applyPokemonAvailabilityOverrides(
-        releasedPokemonData.dexNumbers,
-        overrideResult.overrides
-      ),
-    }
-  } catch (error) {
-    console.error(
-      "Failed to apply Pokémon availability overrides while saving Pokédex progress; using POGOAPI release status",
-      error
+  return Array.from(
+    new Set(
+      values
+        .map(Number)
+        .filter(
+          (dexNumber) =>
+            Number.isInteger(dexNumber) &&
+            dexNumber > 0 &&
+            dexNumber <= MAX_REASONABLE_DEX_NUMBER
+        )
     )
-    return releasedPokemonData
-  }
+  ).sort((left, right) => left - right)
 }
 
 function chunkDexNumbers(dexNumbers, chunkSize = POKEDEX_WRITE_CHUNK_SIZE) {
@@ -86,21 +64,22 @@ export default async function handler(req, res) {
   const session = await ensureSession(req, res)
   if (!session) return
 
-  const releasedPokemonData = await loadEffectiveReleasedPokemon(res)
-  if (!releasedPokemonData) return
+  const ownerId = Number(session.user.id)
+  if (!Number.isInteger(ownerId) || ownerId <= 0) {
+    res.status(401).json({ error: "Your session is invalid. Please sign in again." })
+    return
+  }
 
   if (req.method === "GET") {
     try {
       const entries = await prisma.pokedexEntry.findMany({
-        where: { ownerId: session.user.id },
+        where: { ownerId },
         select: { dexNumber: true },
+        orderBy: { dexNumber: "asc" },
       })
 
       res.status(200).json({
-        dexNumbers: filterReleasedDexNumbers(
-          entries.map((entry) => entry.dexNumber),
-          releasedPokemonData.dexNumbers
-        ),
+        dexNumbers: entries.map((entry) => entry.dexNumber),
       })
     } catch (error) {
       console.error("Failed to fetch Pokédex entries", error)
@@ -110,21 +89,16 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "PUT") {
-    const { dexNumbers } = req.body || {}
+    const dexNumbers = normaliseDexNumbers(req.body?.dexNumbers)
 
-    if (!Array.isArray(dexNumbers)) {
+    if (dexNumbers === null) {
       res.status(400).json({ error: "dexNumbers must be an array." })
       return
     }
 
-    const releasedDexNumbers = filterReleasedDexNumbers(
-      dexNumbers,
-      releasedPokemonData.dexNumbers
-    )
-
     try {
-      await replacePokedexEntries(session.user.id, releasedDexNumbers)
-      res.status(200).json({ dexNumbers: releasedDexNumbers })
+      await replacePokedexEntries(ownerId, dexNumbers)
+      res.status(200).json({ dexNumbers })
     } catch (error) {
       console.error("Failed to save Pokédex entries", error)
       res.status(500).json({ error: "Unable to save your Pokédex right now." })
