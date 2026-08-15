@@ -58,37 +58,19 @@ function TickerItems({
             <span className="ticker-heading">{item.heading}</span>
             <span className="ticker-name">{item.name}</span>
             <time dateTime={item.start}>{formatTickerDate(item.start)}</time>
-            {item.eventUrl && item.eventUrlLabel && (
-              <span className="ticker-action ticker-meetup">
-                {item.eventUrlLabel} ↗
-              </span>
-            )}
           </>
         );
 
         return (
           <span key={key} className="ticker-item">
-            {item.eventUrl ? (
-              <a
-                href={item.eventUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ticker-event-link"
-                tabIndex={duplicate ? -1 : undefined}
-                title={`Open ${item.eventUrlLabel || "Campfire meetup"} for ${item.name}`}
-              >
-                {primaryContent}
-              </a>
-            ) : (
-              <Link
-                href={{ pathname: "/events", query: { event: item.eventID } }}
-                className="ticker-event-link"
-                tabIndex={duplicate ? -1 : undefined}
-                title={`View ${item.name} on the Events page`}
-              >
-                {primaryContent}
-              </Link>
-            )}
+            <Link
+              href={{ pathname: "/events", query: { event: item.eventID } }}
+              className="ticker-event-link"
+              tabIndex={duplicate ? -1 : undefined}
+              title={`View ${item.name} on the Events page`}
+            >
+              {primaryContent}
+            </Link>
 
             {item.guideSlug && item.guideTitle && (
               <Link
@@ -179,8 +161,6 @@ export default function EventTicker() {
       enabled: items.length > 0,
     });
 
-
-
   const message =
     status === "loading"
       ? "Loading upcoming events…"
@@ -190,9 +170,9 @@ export default function EventTicker() {
 
   return (
     <section
-    className={`event-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
-    aria-label="Upcoming events"
-  >
+      className={`event-ticker${paused ? " paused" : ""}${dragging ? " dragging" : ""}`}
+      aria-label="Upcoming events"
+    >
       <div className="ticker-label">
         <span aria-hidden="true">●</span>
         Upcoming
@@ -381,14 +361,9 @@ export default function EventTicker() {
           text-decoration: underline;
         }
 
-        .ticker-meetup {
-          color: #79c0ff;
-        }
-
         .ticker-guide {
           color: #3fb950;
         }
-
       `}</style>
     </section>
   );
