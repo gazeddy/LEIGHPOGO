@@ -32,6 +32,53 @@
   gap: 16px;
 }
 
+.push-settings {
+  display: grid;
+  gap: 14px;
+}
+
+.push-settings-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.push-status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid #30363d;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.push-status.enabled {
+  border-color: #2ea043;
+  color: #3fb950;
+}
+
+.push-status.disabled {
+  color: #8b949e;
+}
+
+.push-settings-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.push-warning {
+  padding: 10px 12px;
+  border: 1px solid #d29922;
+  border-radius: 8px;
+  color: #e3b341;
+}
+
+.push-message {
+  margin-top: 0;
+}
+
 .notification-list {
   display: grid;
   gap: 14px;
@@ -69,8 +116,13 @@
 
 @media (max-width: 700px) {
   .notifications-hero,
-  .notification-card-main {
+  .notification-card-main,
+  .push-settings-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .push-status {
+    align-self: flex-start;
   }
 }
