@@ -17,10 +17,13 @@ MERGER="${SCRIPT_ROOT}/scripts/merge-dev-data.py"
 LIVE_HEAD_BEFORE=""
 LIVE_WAS_ACTIVE=0
 DEV_WAS_ACTIVE=0
+CUTOVER_STARTED=0
 CODE_UPDATED=0
 DB_SWAPPED=0
 RUNTIME_APPLIED=0
 SUCCESS=0
+LIVE_DB_OWNER=""
+LIVE_DB_MODE=""
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
@@ -148,12 +151,19 @@ rollback() {
     exit 0
   fi
 
+  if (( ! CUTOVER_STARTED )); then
+    exit "$exit_code"
+  fi
+
   echo >&2
   echo "Cutover failed; rolling LIVE back." >&2
   systemctl stop "$LIVE_SERVICE" >/dev/null 2>&1 || true
 
   if (( DB_SWAPPED )) && [[ -f "$RUN_DIR/live/live.db" ]]; then
+    rm -f "$LIVE_DB-wal" "$LIVE_DB-shm"
     cp -a "$RUN_DIR/live/live.db" "$LIVE_DB"
+    if [[ -n "$LIVE_DB_OWNER" ]]; then chown "$LIVE_DB_OWNER" "$LIVE_DB" || true; fi
+    if [[ -n "$LIVE_DB_MODE" ]]; then chmod "$LIVE_DB_MODE" "$LIVE_DB" || true; fi
   fi
 
   if (( RUNTIME_APPLIED )) && [[ -d "$RUN_DIR/live" ]]; then
@@ -172,7 +182,7 @@ rollback() {
     ) || true
   fi
 
-  rm -f "$CANDIDATE_DB"
+  rm -f "$CANDIDATE_DB" "$CANDIDATE_DB-wal" "$CANDIDATE_DB-shm"
   restore_service_states
 
   echo "Rollback finished. Snapshots are retained in: $RUN_DIR" >&2
@@ -221,6 +231,7 @@ fi
 
 if service_is_active "$LIVE_SERVICE"; then LIVE_WAS_ACTIVE=1; fi
 if service_is_active "$DEV_SERVICE"; then DEV_WAS_ACTIVE=1; fi
+CUTOVER_STARTED=1
 
 log "Stopping LIVE and TEST so the final snapshots cannot change"
 systemctl stop "$LIVE_SERVICE"
@@ -298,6 +309,7 @@ FK_ERRORS="$(sqlite3 "$CANDIDATE_DB" 'PRAGMA foreign_key_check;')"
 log "Swapping the validated candidate into LIVE"
 chown "$LIVE_DB_OWNER" "$CANDIDATE_DB"
 chmod "$LIVE_DB_MODE" "$CANDIDATE_DB"
+rm -f "$LIVE_DB-wal" "$LIVE_DB-shm"
 mv -f "$CANDIDATE_DB" "$LIVE_DB"
 DB_SWAPPED=1
 
