@@ -1,7 +1,4 @@
-import {
-  getEventDestination,
-  type PokemonGoEventSummary,
-} from "../../lib/events";
+import type { PokemonGoEventSummary } from "../../lib/events";
 
 interface EventCardProps {
   event: PokemonGoEventSummary;
@@ -53,10 +50,8 @@ function formatEventRange(start: string, end: string): string {
 
 export default function EventCard({ event }: EventCardProps) {
   const tags = event.tags ?? [];
-  const eventLink = getEventDestination(event);
-  const linkLabel = event.campfireUrl?.trim()
-    ? "View meetup on Campfire"
-    : "View event details";
+  const leekDuckUrl = event.link?.trim() || null;
+  const campfireUrl = event.campfireUrl?.trim() || null;
 
   return (
     <article className="event-card">
@@ -88,15 +83,29 @@ export default function EventCard({ event }: EventCardProps) {
           </div>
         )}
 
-        {eventLink && (
-          <a
-            href={eventLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="event-link"
-          >
-            {linkLabel} <span aria-hidden="true">↗</span>
-          </a>
+        {(leekDuckUrl || campfireUrl) && (
+          <div className="event-links">
+            {leekDuckUrl && (
+              <a
+                href={leekDuckUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="event-link"
+              >
+                View on LeekDuck <span aria-hidden="true">↗</span>
+              </a>
+            )}
+            {campfireUrl && (
+              <a
+                href={campfireUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="event-link event-link-campfire"
+              >
+                View meetup on Campfire <span aria-hidden="true">↗</span>
+              </a>
+            )}
+          </div>
         )}
       </div>
 
@@ -188,14 +197,25 @@ export default function EventCard({ event }: EventCardProps) {
           font-size: 0.72rem;
         }
 
-        .event-link {
+        .event-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px 16px;
           margin-top: 18px;
+        }
+
+        .event-link {
           color: #58a6ff;
           font-weight: 700;
           text-decoration: none;
         }
 
-        .event-link:hover {
+        .event-link-campfire {
+          color: #3fb950;
+        }
+
+        .event-link:hover,
+        .event-link:focus-visible {
           text-decoration: underline;
         }
       `}</style>
