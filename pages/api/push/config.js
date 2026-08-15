@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../auth/[...nextauth]"
+import { isWebPushConfigured } from "../../../lib/webPush"
 
 const sessionUserId = (session) => {
   const userId = Number(session?.user?.id)
@@ -19,12 +20,11 @@ export default async function handler(req, res) {
 
   res.setHeader("Cache-Control", "private, no-store")
 
-  const publicKey = String(
-    process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
-  ).trim()
+  const publicKey = String(process.env.VAPID_PUBLIC_KEY || "").trim()
+  const configured = isWebPushConfigured()
 
   return res.status(200).json({
-    configured: Boolean(publicKey),
-    publicKey: publicKey || null,
+    configured,
+    publicKey: configured ? publicKey : null,
   })
 }
