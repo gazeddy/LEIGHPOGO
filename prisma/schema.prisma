@@ -19,6 +19,7 @@ model User {
   tradeListings      TradeListing[]
   wantedTrades       WantedTrade[]
   tradeNotifications TradeNotification[]
+  pushSubscriptions  PushSubscription[]
 }
 
 model Entry {
@@ -147,4 +148,18 @@ model TradeNotification {
 
   @@unique([ownerId, listingId, pokemonName])
   @@index([ownerId, readAt, createdAt])
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  ownerId   Int
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
 }
