@@ -43,6 +43,17 @@
   margin-top: 16px;
 }
 
+.trade-trainer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.pokemon-go-launch-button {
+  width: auto;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
@@ -195,7 +206,8 @@
   }
 
   .trade-card-actions > *,
-  .trade-section-header > .secondary-button {
+  .trade-section-header > .secondary-button,
+  .trade-trainer-actions > * {
     width: 100%;
   }
 }
