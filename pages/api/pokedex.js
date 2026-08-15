@@ -13,6 +13,8 @@ const {
   readPokemonAvailabilityOverrides,
 } = require("../../lib/pokemonAvailabilityStore")
 
+const POKEDEX_WRITE_CHUNK_SIZE = 250
+
 function disableCaching(res) {
   res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate")
   res.setHeader("CDN-Cache-Control", "no-store")
@@ -58,6 +60,26 @@ async function loadEffectiveReleasedPokemon(res) {
   }
 }
 
+function chunkDexNumbers(dexNumbers, chunkSize = POKEDEX_WRITE_CHUNK_SIZE) {
+  const chunks = []
+  for (let index = 0; index < dexNumbers.length; index += chunkSize) {
+    chunks.push(dexNumbers.slice(index, index + chunkSize))
+  }
+  return chunks
+}
+
+export async function replacePokedexEntries(ownerId, dexNumbers) {
+  await prisma.$transaction(async (tx) => {
+    await tx.pokedexEntry.deleteMany({ where: { ownerId } })
+
+    for (const chunk of chunkDexNumbers(dexNumbers)) {
+      await tx.pokedexEntry.createMany({
+        data: chunk.map((dexNumber) => ({ ownerId, dexNumber })),
+      })
+    }
+  })
+}
+
 export default async function handler(req, res) {
   disableCaching(res)
 
@@ -101,26 +123,7 @@ export default async function handler(req, res) {
     )
 
     try {
-      await prisma.$transaction([
-        prisma.pokedexEntry.deleteMany({
-          where: releasedDexNumbers.length
-            ? {
-                ownerId: session.user.id,
-                dexNumber: { notIn: releasedDexNumbers },
-              }
-            : { ownerId: session.user.id },
-        }),
-        ...releasedDexNumbers.map((dexNumber) =>
-          prisma.pokedexEntry.upsert({
-            where: {
-              ownerId_dexNumber: { ownerId: session.user.id, dexNumber },
-            },
-            update: {},
-            create: { ownerId: session.user.id, dexNumber },
-          })
-        ),
-      ])
-
+      await replacePokedexEntries(session.user.id, releasedDexNumbers)
       res.status(200).json({ dexNumbers: releasedDexNumbers })
     } catch (error) {
       console.error("Failed to save Pokédex entries", error)
