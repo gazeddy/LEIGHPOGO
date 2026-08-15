@@ -6,6 +6,19 @@ const {
   filterReleasedDexNumbers,
   getReleasedPokemonData,
 } = require("../../lib/releasedPokemonCache")
+const {
+  applyPokemonAvailabilityOverrides,
+} = require("../../lib/pokemonAvailability")
+const {
+  readPokemonAvailabilityOverrides,
+} = require("../../lib/pokemonAvailabilityStore")
+
+function disableCaching(res) {
+  res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  res.setHeader("CDN-Cache-Control", "no-store")
+  res.setHeader("Pragma", "no-cache")
+  res.setHeader("Expires", "0")
+}
 
 async function ensureSession(req, res) {
   const session = await getServerSession(req, res, authOptions)
@@ -16,21 +29,42 @@ async function ensureSession(req, res) {
   return session
 }
 
-async function loadReleasedPokemon(res) {
+async function loadEffectiveReleasedPokemon(res) {
+  let releasedPokemonData
+
   try {
-    return await getReleasedPokemonData()
+    releasedPokemonData = await getReleasedPokemonData()
   } catch (error) {
     console.error("Failed to load released Pokémon data", error)
     res.status(503).json({ error: "The released Pokémon list is temporarily unavailable." })
     return null
   }
+
+  try {
+    const overrideResult = await readPokemonAvailabilityOverrides()
+    return {
+      ...releasedPokemonData,
+      dexNumbers: applyPokemonAvailabilityOverrides(
+        releasedPokemonData.dexNumbers,
+        overrideResult.overrides
+      ),
+    }
+  } catch (error) {
+    console.error(
+      "Failed to apply Pokémon availability overrides while saving Pokédex progress; using POGOAPI release status",
+      error
+    )
+    return releasedPokemonData
+  }
 }
 
 export default async function handler(req, res) {
+  disableCaching(res)
+
   const session = await ensureSession(req, res)
   if (!session) return
 
-  const releasedPokemonData = await loadReleasedPokemon(res)
+  const releasedPokemonData = await loadEffectiveReleasedPokemon(res)
   if (!releasedPokemonData) return
 
   if (req.method === "GET") {
