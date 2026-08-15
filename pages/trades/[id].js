@@ -3,6 +3,7 @@ import { useRouter } from "next/router"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../api/auth/[...nextauth]"
 import prisma from "../../lib/prisma"
+import OpenPokemonGoButton from "../../components/OpenPokemonGoButton"
 import {
   getEligibleTradeUser,
   purgeExpiredTradeListings,
@@ -137,6 +138,9 @@ export default function TradeListingPage({ listing, viewer }) {
         {listing.location && (
           <p><strong>General location:</strong> {listing.location}</p>
         )}
+        <div className="trade-trainer-actions">
+          <OpenPokemonGoButton />
+        </div>
       </div>
 
       <TradeItemList title="Pokémon offered" items={offeredItems} />
