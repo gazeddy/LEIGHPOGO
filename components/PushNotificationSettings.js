@@ -184,7 +184,7 @@ export default function PushNotificationSettings() {
     setMessage("")
 
     try {
-      const response = await fetch("/api/push/test", { method: "POST" })
+      const response = await fetch("/api/push/send-test", { method: "POST" })
       const body = await response.json().catch(() => ({}))
 
       if (!response.ok) {
