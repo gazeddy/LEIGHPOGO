@@ -7,11 +7,12 @@ const read = (...parts) =>
 describe("caught Pokédex persistence", () => {
   const pokedexApi = read("pages", "api", "pokedex.js")
 
-  test("uses the same admin-adjusted release status as the Pokédex catalog", () => {
-    expect(pokedexApi).toContain("applyPokemonAvailabilityOverrides")
-    expect(pokedexApi).toContain("readPokemonAvailabilityOverrides")
-    expect(pokedexApi).toContain("releasedPokemonData.dexNumbers")
-    expect(pokedexApi).toContain("overrideResult.overrides")
+  test("keeps caught progress independent of changing release metadata", () => {
+    expect(pokedexApi).not.toContain("getReleasedPokemonData")
+    expect(pokedexApi).not.toContain("filterReleasedDexNumbers")
+    expect(pokedexApi).not.toContain("readPokemonAvailabilityOverrides")
+    expect(pokedexApi).toContain("normaliseDexNumbers")
+    expect(pokedexApi).toContain("replacePokedexEntries(ownerId, dexNumbers)")
   })
 
   test("does not allow caught progress responses to be cached", () => {
