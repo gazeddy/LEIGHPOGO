@@ -20,10 +20,44 @@ const TICKER_EXCLUDED_TYPES = new Set([
 
 export const RAID_NEXT_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-function parseEventDate(value: string): Date {
-  const includesTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+function hasExplicitTimeZone(value: string): boolean {
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+}
 
-  return new Date(includesTimeZone ? value : `${value}Z`);
+function parseEventDate(value: string): Date {
+  return new Date(hasExplicitTimeZone(value) ? value : `${value}Z`);
+}
+
+function londonWallClockMs(now: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)]),
+  );
+
+  return Date.UTC(
+    values.year,
+    values.month - 1,
+    values.day,
+    values.hour,
+    values.minute,
+    values.second,
+    now.getUTCMilliseconds(),
+  );
+}
+
+function comparisonNowMs(now: Date, eventValue: string): number {
+  return hasExplicitTimeZone(eventValue) ? now.getTime() : londonWallClockMs(now);
 }
 
 function eventOverlapsWeekend(event: PokemonGoEventSummary): boolean {
@@ -86,11 +120,13 @@ function isActiveAt(event: PokemonGoEventSummary, now: Date): boolean {
   const start = parseEventDate(event.start);
   const end = parseEventDate(event.end);
 
+  const nowMs = comparisonNowMs(now, event.start);
+
   return (
     !Number.isNaN(start.getTime()) &&
     !Number.isNaN(end.getTime()) &&
-    start.getTime() <= now.getTime() &&
-    end.getTime() > now.getTime()
+    start.getTime() <= nowMs &&
+    end.getTime() > nowMs
   );
 }
 
@@ -199,10 +235,10 @@ export function selectNextRaidBosses(
   now: Date = new Date(),
   noticeWindowMs: number = RAID_NEXT_NOTICE_WINDOW_MS,
 ): RaidBossTickerItem[] {
-  const nowMs = now.getTime();
-  const windowEnd = nowMs + noticeWindowMs;
   const future = selectRaidBossEvents(events).filter((item) => {
     const startMs = parseEventDate(item.start).getTime();
+    const nowMs = comparisonNowMs(now, item.start);
+    const windowEnd = nowMs + noticeWindowMs;
     return Number.isFinite(startMs) && startMs > nowMs && startMs <= windowEnd;
   });
   const firstStartByCategory = new Map<RaidCategory, number>();
