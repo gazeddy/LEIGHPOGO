@@ -20,18 +20,21 @@ describe("ticker regression wiring", () => {
   const newGymTicker = readSource("components/gyms/NewGymTicker.tsx");
   const scrollableTicker = readSource("components/tickers/useScrollableTicker.ts");
 
-  it("uses a Campfire URL as the primary event link with an Events-page fallback", () => {
-    expect(eventTicker).toMatch(
-      /item\.eventUrl \? \([\s\S]*?<a[\s\S]*?href=\{item\.eventUrl\}[\s\S]*?target="_blank"[\s\S]*?>[\s\S]*?\{primaryContent\}[\s\S]*?<\/a>[\s\S]*?\) : \([\s\S]*?<Link[\s\S]*?pathname: "\/events"[\s\S]*?event: item\.eventID/,
-    );
-    expect(eventTicker).toContain("{item.eventUrl && item.eventUrlLabel && (");
-    expect(eventTicker).toContain("{item.eventUrlLabel} ↗");
+  it("always opens event ticker items on the matching Events-page card", () => {
+    expect(eventTicker).toContain('pathname: "/events"');
+    expect(eventTicker).toContain("query: { event: item.eventID }");
+    expect(eventTicker).not.toContain("href={item.eventUrl}");
+    expect(eventTicker).not.toContain("target=\"_blank\"");
     expect(eventTicker).toContain("{item.guideSlug && item.guideTitle && (");
   });
 
-  it("uses the shared Campfire-first destination for cards and raid links", () => {
-    expect(eventCard).toContain("const eventLink = getEventDestination(event);");
-    expect(eventCard).toContain("href={eventLink}");
+  it("shows LeekDuck and optional Campfire links on event cards while raid links keep their shared destination", () => {
+    expect(eventCard).toContain("const leekDuckUrl = event.link?.trim() || null;");
+    expect(eventCard).toContain("const campfireUrl = event.campfireUrl?.trim() || null;");
+    expect(eventCard).toContain("href={leekDuckUrl}");
+    expect(eventCard).toContain("View on LeekDuck");
+    expect(eventCard).toContain("href={campfireUrl}");
+    expect(eventCard).toContain("View meetup on Campfire");
     expect(eventSelection).toContain("const link = getEventDestination(event);");
     expect(eventSelection).toContain("link,");
   });
