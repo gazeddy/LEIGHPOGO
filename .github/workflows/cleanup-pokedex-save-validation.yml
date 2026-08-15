@@ -1,0 +1,30 @@
+name: Cleanup Pokédex save validation branches
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+      - name: Delete temporary branches
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          while IFS= read -r ref; do
+            branch="${ref#origin/}"
+            case "$branch" in
+              HEAD|main|develop) continue ;;
+            esac
+            git push origin --delete "$branch"
+          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin)
