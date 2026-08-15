@@ -1,0 +1,35 @@
+name: Cleanup caught Pokédex validation
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-validation-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Delete branches except main and develop
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          while IFS= read -r ref; do
+            branch="${ref#origin/}"
+            case "$branch" in
+              HEAD|main|develop)
+                continue
+                ;;
+            esac
+            echo "Deleting $branch"
+            git push origin --delete "$branch"
+          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin)
