@@ -6,7 +6,9 @@ import {
   selectRaidBossEvents,
 } from "./event-selection";
 import { getEventsPageData } from "./events-server";
-import { getCurrentRaidBossProfiles } from "./raid-detail-source";
+import {
+  getCurrentRaidBossProfiles,
+} from "./raid-detail-source";
 import type {
   PokemonGoEventSummary,
   RaidBossProfileData,
@@ -19,6 +21,7 @@ import type {
 } from "./events";
 
 const CATEGORIES: RaidCategory[] = ["five-star", "shadow", "mega"];
+const PROFILE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 function parseJsonArray<T>(value: string | null | undefined): T[] {
   if (!value) return [];
@@ -58,35 +61,51 @@ async function syncRaidRotations(events: PokemonGoEventSummary[]): Promise<void>
   const sourceEvents = eventById(events);
   const rotations = selectRaidBossEvents(events);
 
-  await Promise.all(
-    rotations.map((item) => {
-      const source = sourceEvents.get(item.eventID);
-      return prisma.raidRotation.upsert({
-        where: { eventId: item.eventID },
-        update: {
-          category: item.category,
-          boss: item.boss,
-          start: eventDate(item.start),
-          end: eventDate(item.end),
-          startRaw: item.start,
-          endRaw: item.end,
-          sourceUrl: item.link,
-          imageUrl: source?.image ?? null,
-        },
-        create: {
-          eventId: item.eventID,
-          category: item.category,
-          boss: item.boss,
-          start: eventDate(item.start),
-          end: eventDate(item.end),
-          startRaw: item.start,
-          endRaw: item.end,
-          sourceUrl: item.link,
-          imageUrl: source?.image ?? null,
-        },
-      });
-    }),
+  if (rotations.length === 0) return;
+
+  const existingRows = await prisma.raidRotation.findMany({
+    where: { eventId: { in: rotations.map((item) => item.eventID) } },
+  });
+  const existingById = new Map(
+    existingRows.map((row: any) => [row.eventId, row]),
   );
+
+  for (const item of rotations) {
+    const source = sourceEvents.get(item.eventID);
+    const existing = existingById.get(item.eventID) as any;
+    const data = {
+      category: item.category,
+      boss: item.boss,
+      start: eventDate(item.start),
+      end: eventDate(item.end),
+      startRaw: item.start,
+      endRaw: item.end,
+      sourceUrl: item.link,
+      imageUrl: source?.image ?? null,
+    };
+
+    if (!existing) {
+      await prisma.raidRotation.create({
+        data: { eventId: item.eventID, ...data },
+      });
+      continue;
+    }
+
+    const unchanged =
+      existing.category === data.category &&
+      existing.boss === data.boss &&
+      existing.startRaw === data.startRaw &&
+      existing.endRaw === data.endRaw &&
+      (existing.sourceUrl ?? null) === data.sourceUrl &&
+      (existing.imageUrl ?? null) === data.imageUrl;
+
+    if (!unchanged) {
+      await prisma.raidRotation.update({
+        where: { eventId: item.eventID },
+        data,
+      });
+    }
+  }
 }
 
 async function saveProfile(profile: RaidBossProfileData): Promise<void> {
@@ -162,7 +181,43 @@ async function findReusableProfileKeys(item: RaidBossTickerItem): Promise<string
   ));
 }
 
-async function enrichActiveRotation(item: RaidBossTickerItem): Promise<void> {
+async function profilesAreFresh(
+  keys: string[],
+  now: Date,
+): Promise<boolean> {
+  if (keys.length === 0) return false;
+
+  const profiles = await prisma.raidBossProfile.findMany({
+    where: { key: { in: keys } },
+    select: { key: true, refreshedAt: true },
+  });
+
+  if (profiles.length !== keys.length) return false;
+
+  return profiles.every((profile: { refreshedAt: Date | null }) => {
+    if (!profile.refreshedAt) return false;
+    const refreshedAt = new Date(profile.refreshedAt).getTime();
+    return (
+      Number.isFinite(refreshedAt) &&
+      now.getTime() - refreshedAt < PROFILE_REFRESH_INTERVAL_MS
+    );
+  });
+}
+
+async function enrichActiveRotation(
+  item: RaidBossTickerItem,
+  now: Date = new Date(),
+): Promise<void> {
+  const rotation = await prisma.raidRotation.findUnique({
+    where: { eventId: item.eventID },
+    select: { bossKeys: true },
+  });
+
+  if (!rotation) return;
+
+  const existingKeys = parseJsonArray<string>(rotation.bossKeys);
+  if (await profilesAreFresh(existingKeys, now)) return;
+
   let keys: string[] = [];
   try {
     const profiles = await getCurrentRaidBossProfiles(item);
@@ -179,10 +234,13 @@ async function enrichActiveRotation(item: RaidBossTickerItem): Promise<void> {
   }
 
   if (keys.length > 0) {
-    await prisma.raidRotation.update({
-      where: { eventId: item.eventID },
-      data: { bossKeys: JSON.stringify(keys) },
-    });
+    const bossKeys = JSON.stringify(keys);
+    if (rotation.bossKeys !== bossKeys) {
+      await prisma.raidRotation.update({
+        where: { eventId: item.eventID },
+        data: { bossKeys },
+      });
+    }
   }
 }
 
@@ -255,7 +313,7 @@ function currentTickerLink(item: RaidBossTickerItem): string {
 }
 
 function nextTickerLink(item: RaidBossTickerItem): string {
-  return `/tools/raids#raid-${item.category}`;
+  return `/tools/raids#${categoryAnchor(item.category)}`;
 }
 
 function profileCatchCp(profiles: RaidBossProfileData[]) {
@@ -288,7 +346,7 @@ export async function getRaidToolsData(now: Date = new Date()): Promise<RaidTool
   await syncRaidRotations(eventData.events);
 
   const current = selectCurrentRaidBosses(eventData.events, now);
-  await Promise.all(current.map(enrichActiveRotation));
+  await Promise.all(current.map((item) => enrichActiveRotation(item, now)));
 
   const next = selectNextRaidBosses(eventData.events, now).map((item) => ({
     ...item,

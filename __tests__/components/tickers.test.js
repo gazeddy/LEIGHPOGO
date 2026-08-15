@@ -12,6 +12,8 @@ describe("ticker regression wiring", () => {
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
   const eventSelection = readSource("lib/event-selection.ts");
   const raidApi = readSource("pages/api/events/raids.ts");
+  const raidHistory = readSource("lib/raid-boss-history.ts");
+  const raidDetails = readSource("lib/raid-detail-source.ts");
   const raidCpCache = readSource("lib/raidBossCpCache.js");
   const dittoTicker = readSource("components/events/DittoDisguiseTicker.tsx");
   const dittoApi = readSource("pages/api/ditto-disguises.ts");
@@ -43,17 +45,17 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("tabIndex={duplicate ? -1 : undefined}");
     expect(raidTicker).toContain('className="raid-track"');
     expect(raidTicker).toContain("...viewportHandlers");
-    expect(raidTicker).toContain("animation: none;");
-    expect(raidTicker).toContain("transform: none;");
+    expect(raidTicker).toContain("animation:none;");
+    expect(raidTicker).toContain("transform:none;");
     expect(raidTicker).toContain("raid-group-duplicate");
   });
 
-  it("shows perfect catch CP values from the cached PoGoAPI raid data", () => {
-    expect(raidApi).toContain("getRaidBossCpData");
-    expect(raidApi).toContain("attachRaidBossCp");
-    expect(raidApi).toContain(
-      "Failed to enrich current raid bosses with PoGoAPI catch CP data",
-    );
+  it("shows perfect catch CP values from persisted active PoGoAPI raid data", () => {
+    expect(raidApi).toContain("getRaidToolsData");
+    expect(raidApi).toContain("data.tickerItems");
+    expect(raidHistory).toContain("getCurrentRaidBossProfiles");
+    expect(raidHistory).toContain("profileCatchCp");
+    expect(raidDetails).toContain("getRaidBossCpData");
     expect(raidTicker).toContain("formatCatchCp(item.catchCp)");
     expect(raidTicker).toContain("100% CP");
     expect(raidTicker).toContain("WB");
@@ -61,14 +63,26 @@ describe("ticker regression wiring", () => {
     expect(raidTicker).toContain("weather-boosted level 25");
   });
 
-  it("shows an accessible sparkle for PoGoAPI shiny-capable raid bosses", () => {
+  it("keeps next raid bosses announcement-only until their start time", () => {
+    expect(eventSelection).toContain(
+      "RAID_NEXT_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000",
+    );
+    expect(raidHistory).toContain('state: "next" as const');
+    expect(raidHistory).toContain("catchCp: undefined");
+    expect(raidHistory).toContain("/tools/raids#");
+    expect(raidTicker).toContain('const isNext = item.state === "next"');
+    expect(raidTicker).toContain("isNext ? null : formatCatchCp(item.catchCp)");
+    expect(raidTicker).toContain("from ${formatDate(item.start, true)}");
+  });
+
+  it("shows an accessible sparkle for PoGoAPI shiny-capable active raid bosses", () => {
     expect(raidCpCache).toContain("value.possible_shiny === true");
     expect(raidCpCache).toContain("possibleShiny: boss.possibleShiny");
     expect(raidTicker).toContain("entry.possibleShiny");
     expect(raidTicker).toContain('className="raid-shiny-sparkle"');
     expect(raidTicker).toContain("✨");
-    expect(raidTicker).toContain("Shiny available:");
-    expect(raidTicker).toContain("raid-shiny-twinkle");
+    expect(raidTicker).toContain('aria-label="Shiny available"');
+    expect(raidTicker).toContain('title="Shiny available"');
   });
 
   it("keeps the Ditto ticker public, daily cached and between raids and new gyms", () => {
