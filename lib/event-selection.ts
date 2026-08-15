@@ -2,6 +2,7 @@ import {
   getEventDestination,
   type PokemonGoEventSummary,
   type RaidBossTickerItem,
+  type RaidCategory,
 } from "./events";
 
 const EVENTS_PAGE_EXCLUDED_TYPES = new Set([
@@ -16,6 +17,8 @@ const TICKER_EXCLUDED_TYPES = new Set([
   ...EVENTS_PAGE_EXCLUDED_TYPES,
   "pokemon-spotlight-hour",
 ]);
+
+export const RAID_NEXT_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function parseEventDate(value: string): Date {
   const includesTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
@@ -87,8 +90,14 @@ function isActiveAt(event: PokemonGoEventSummary, now: Date): boolean {
     !Number.isNaN(start.getTime()) &&
     !Number.isNaN(end.getTime()) &&
     start.getTime() <= now.getTime() &&
-    end.getTime() >= now.getTime()
+    end.getTime() > now.getTime()
   );
+}
+
+export function raidCategoryLabel(category: RaidCategory): string {
+  if (category === "five-star") return "5★";
+  if (category === "shadow") return "Shadow 5★";
+  return "Mega";
 }
 
 function raidBossItem(
@@ -102,8 +111,9 @@ function raidBossItem(
     return {
       eventID: event.eventID,
       category: "five-star",
-      label: "5★",
+      label: raidCategoryLabel("five-star"),
       boss: fiveStar[1].trim(),
+      start: event.start,
       end: event.end,
       link,
     };
@@ -115,8 +125,9 @@ function raidBossItem(
     return {
       eventID: event.eventID,
       category: "shadow",
-      label: "Shadow",
+      label: raidCategoryLabel("shadow"),
       boss: shadow[1].trim(),
+      start: event.start,
       end: event.end,
       link,
     };
@@ -128,8 +139,9 @@ function raidBossItem(
     return {
       eventID: event.eventID,
       category: "mega",
-      label: "Mega",
+      label: raidCategoryLabel("mega"),
       boss: mega[1].trim(),
+      start: event.start,
       end: event.end,
       link,
     };
@@ -138,30 +150,78 @@ function raidBossItem(
   return null;
 }
 
+export function selectRaidBossEvents(
+  events: PokemonGoEventSummary[],
+): RaidBossTickerItem[] {
+  return events
+    .filter((event) => event.eventType.toLowerCase() === "raid-battles")
+    .map(raidBossItem)
+    .filter((item): item is RaidBossTickerItem => item !== null);
+}
+
+const categoryOrder: Record<RaidCategory, number> = {
+  "five-star": 0,
+  shadow: 1,
+  mega: 2,
+};
+
+function sortRaidItems(items: RaidBossTickerItem[]): RaidBossTickerItem[] {
+  return items.sort((left, right) => {
+    const categoryDifference =
+      categoryOrder[left.category] - categoryOrder[right.category];
+
+    if (categoryDifference !== 0) return categoryDifference;
+
+    const startDifference = left.start.localeCompare(right.start);
+    return startDifference !== 0
+      ? startDifference
+      : left.boss.localeCompare(right.boss);
+  });
+}
+
 export function selectCurrentRaidBosses(
   events: PokemonGoEventSummary[],
   now: Date = new Date(),
 ): RaidBossTickerItem[] {
-  const categoryOrder: Record<RaidBossTickerItem["category"], number> = {
-    "five-star": 0,
-    shadow: 1,
-    mega: 2,
-  };
+  return sortRaidItems(
+    selectRaidBossEvents(events).filter((item) => {
+      const event = {
+        start: item.start,
+        end: item.end,
+      } as PokemonGoEventSummary;
+      return isActiveAt(event, now);
+    }),
+  );
+}
 
-  return events
-    .filter(
-      (event) =>
-        event.eventType.toLowerCase() === "raid-battles" &&
-        isActiveAt(event, now),
-    )
-    .map(raidBossItem)
-    .filter((item): item is RaidBossTickerItem => item !== null)
-    .sort((left, right) => {
-      const categoryDifference =
-        categoryOrder[left.category] - categoryOrder[right.category];
+export function selectNextRaidBosses(
+  events: PokemonGoEventSummary[],
+  now: Date = new Date(),
+  noticeWindowMs: number = RAID_NEXT_NOTICE_WINDOW_MS,
+): RaidBossTickerItem[] {
+  const nowMs = now.getTime();
+  const windowEnd = nowMs + noticeWindowMs;
+  const future = selectRaidBossEvents(events).filter((item) => {
+    const startMs = parseEventDate(item.start).getTime();
+    return Number.isFinite(startMs) && startMs > nowMs && startMs <= windowEnd;
+  });
+  const firstStartByCategory = new Map<RaidCategory, number>();
 
-      return categoryDifference !== 0
-        ? categoryDifference
-        : left.boss.localeCompare(right.boss);
-    });
+  for (const item of future) {
+    const startMs = parseEventDate(item.start).getTime();
+    const existing = firstStartByCategory.get(item.category);
+    if (existing === undefined || startMs < existing) {
+      firstStartByCategory.set(item.category, startMs);
+    }
+  }
+
+  return sortRaidItems(
+    future
+      .filter(
+        (item) =>
+          parseEventDate(item.start).getTime() ===
+          firstStartByCategory.get(item.category),
+      )
+      .map((item) => ({ ...item, state: "next" as const })),
+  );
 }

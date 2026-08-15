@@ -125,6 +125,9 @@ export default function Navbar() {
               <span className="nav-caret" aria-hidden="true" />
             </button>
             <div id="tools-navigation" className="nav-submenu">
+              <Link href="/tools/raids" className="nav-item nav-subitem">
+                Raids
+              </Link>
               <Link href="/search-strings" className="nav-item nav-subitem">
                 Search Builder
               </Link>

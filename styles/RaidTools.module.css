@@ -1,0 +1,293 @@
+.page {
+  padding-top: 34px;
+  padding-bottom: 72px;
+}
+
+.hero {
+  max-width: 850px;
+  margin-bottom: 28px;
+}
+
+.eyebrow,
+.columnHeader p {
+  margin: 0 0 7px;
+  color: #79c0ff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 6vw, 4rem);
+}
+
+.hero > p:not(.eyebrow):not(.warning) {
+  margin: 13px 0 0;
+  color: #8b949e;
+  line-height: 1.6;
+}
+
+.warning {
+  margin: 14px 0 0;
+  border: 1px solid #6e5500;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #211c0d;
+  color: #f2cc60;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.column {
+  min-width: 0;
+  scroll-margin-top: 20px;
+}
+
+.columnHeader {
+  margin-bottom: 12px;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 10px;
+}
+
+.columnHeader h2 {
+  margin: 0;
+  font-size: 1.55rem;
+}
+
+.nextNotice {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 12px;
+  border: 1px dashed #58a6ff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(56, 139, 253, 0.08);
+}
+
+.nextNotice span {
+  color: #79c0ff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.nextNotice strong {
+  color: #f0f6fc;
+  font-size: 1rem;
+}
+
+.nextNotice small {
+  color: #8b949e;
+}
+
+.rotations,
+.bossList {
+  display: grid;
+  gap: 12px;
+}
+
+.rotationCard {
+  scroll-margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  background: #161b22;
+}
+
+.activeCard {
+  border-color: #2ea043;
+  box-shadow: inset 0 3px 0 #2ea043;
+}
+
+.rotationHeader {
+  padding: 15px 16px;
+  border-bottom: 1px solid #30363d;
+  background: #0f141b;
+}
+
+.rotationHeader h2 {
+  margin: 7px 0 4px;
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+
+.rotationHeader p {
+  margin: 0;
+  color: #8b949e;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.statusLine {
+  min-height: 20px;
+}
+
+.currentBadge,
+.historyBadge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.currentBadge {
+  background: rgba(46, 160, 67, 0.18);
+  color: #56d364;
+}
+
+.historyBadge {
+  background: #21262d;
+  color: #8b949e;
+}
+
+.bossList {
+  padding: 12px;
+}
+
+.bossDetails {
+  border: 1px solid #30363d;
+  border-radius: 11px;
+  padding: 13px;
+  background: #0d1117;
+}
+
+.bossHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bossHeading h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.types {
+  margin: 3px 0 0;
+  color: #a5d6ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.shiny {
+  flex: 0 0 auto;
+  color: #f2cc60;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.cpGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cpGrid > div {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #21262d;
+  border-radius: 9px;
+  padding: 9px;
+  background: #161b22;
+}
+
+.cpGrid span,
+.cpGrid small {
+  color: #8b949e;
+  font-size: 0.68rem;
+}
+
+.cpGrid strong {
+  color: #f0f6fc;
+  font-size: 1.12rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.weather {
+  margin: 10px 0 0;
+  color: #b1bac4;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.matchups {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.matchupGroup h4 {
+  margin: 0 0 6px;
+  color: #8b949e;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  border: 1px solid #30363d;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #161b22;
+  color: #c9d1d9;
+  font-size: 0.7rem;
+}
+
+.chip strong {
+  color: #f0f6fc;
+}
+
+.emphasisChip {
+  border-color: #da3633;
+  background: rgba(248, 81, 73, 0.11);
+  color: #ff7b72;
+}
+
+.missingDetails,
+.empty {
+  margin: 0;
+  padding: 14px 16px;
+  color: #8b949e;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 1050px) {
+  .columns {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .rotations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding-top: 24px;
+  }
+
+  .rotations {
+    grid-template-columns: 1fr;
+  }
+}

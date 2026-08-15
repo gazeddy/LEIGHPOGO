@@ -163,3 +163,43 @@ model PushSubscription {
 
   @@index([ownerId])
 }
+
+model RaidBossProfile {
+  id               Int       @id @default(autoincrement())
+  key              String    @unique
+  category         String
+  name             String
+  pokemonId        Int?
+  form             String?
+  tier             String?
+  types            String?
+  weaknesses       String?
+  resistances      String?
+  boostedWeather   String?
+  maxUnboostedCp   Int?
+  maxBoostedCp     Int?
+  possibleShiny    Boolean?
+  refreshedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([category, name])
+}
+
+model RaidRotation {
+  id        Int      @id @default(autoincrement())
+  eventId   String   @unique
+  category  String
+  boss      String
+  start     DateTime
+  end       DateTime
+  startRaw  String
+  endRaw    String
+  sourceUrl String?
+  imageUrl  String?
+  bossKeys  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, start])
+}

@@ -1,0 +1,317 @@
+import prisma from "./prisma";
+import {
+  raidCategoryLabel,
+  selectCurrentRaidBosses,
+  selectNextRaidBosses,
+  selectRaidBossEvents,
+} from "./event-selection";
+import { getEventsPageData } from "./events-server";
+import { getCurrentRaidBossProfiles } from "./raid-detail-source";
+import type {
+  PokemonGoEventSummary,
+  RaidBossProfileData,
+  RaidBossTickerItem,
+  RaidCategory,
+  RaidCategoryData,
+  RaidRotationData,
+  RaidToolsData,
+  RaidTypeMatchup,
+} from "./events";
+
+const CATEGORIES: RaidCategory[] = ["five-star", "shadow", "mega"];
+
+function parseJsonArray<T>(value: string | null | undefined): T[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function anchorPart(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "raid";
+}
+
+export function raidRotationAnchor(category: RaidCategory, eventID: string): string {
+  return `raid-${category}-${anchorPart(eventID)}`;
+}
+
+function categoryAnchor(category: RaidCategory): string {
+  return `raid-${category}`;
+}
+
+function eventDate(value: string): Date {
+  const includesTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+  return new Date(includesTimeZone ? value : `${value}Z`);
+}
+
+function eventById(events: PokemonGoEventSummary[]): Map<string, PokemonGoEventSummary> {
+  return new Map(events.map((event) => [event.eventID, event]));
+}
+
+async function syncRaidRotations(events: PokemonGoEventSummary[]): Promise<void> {
+  const sourceEvents = eventById(events);
+  const rotations = selectRaidBossEvents(events);
+
+  await Promise.all(
+    rotations.map((item) => {
+      const source = sourceEvents.get(item.eventID);
+      return prisma.raidRotation.upsert({
+        where: { eventId: item.eventID },
+        update: {
+          category: item.category,
+          boss: item.boss,
+          start: eventDate(item.start),
+          end: eventDate(item.end),
+          startRaw: item.start,
+          endRaw: item.end,
+          sourceUrl: item.link,
+          imageUrl: source?.image ?? null,
+        },
+        create: {
+          eventId: item.eventID,
+          category: item.category,
+          boss: item.boss,
+          start: eventDate(item.start),
+          end: eventDate(item.end),
+          startRaw: item.start,
+          endRaw: item.end,
+          sourceUrl: item.link,
+          imageUrl: source?.image ?? null,
+        },
+      });
+    }),
+  );
+}
+
+async function saveProfile(profile: RaidBossProfileData): Promise<void> {
+  await prisma.raidBossProfile.upsert({
+    where: { key: profile.key },
+    update: {
+      category: profile.category,
+      name: profile.name,
+      pokemonId: profile.pokemonId,
+      form: profile.form,
+      tier: profile.tier,
+      types: JSON.stringify(profile.types),
+      weaknesses: JSON.stringify(profile.weaknesses),
+      resistances: JSON.stringify(profile.resistances),
+      boostedWeather: JSON.stringify(profile.boostedWeather),
+      maxUnboostedCp: profile.maxUnboostedCp,
+      maxBoostedCp: profile.maxBoostedCp,
+      possibleShiny: profile.possibleShiny,
+      refreshedAt: profile.refreshedAt ? new Date(profile.refreshedAt) : null,
+    },
+    create: {
+      key: profile.key,
+      category: profile.category,
+      name: profile.name,
+      pokemonId: profile.pokemonId,
+      form: profile.form,
+      tier: profile.tier,
+      types: JSON.stringify(profile.types),
+      weaknesses: JSON.stringify(profile.weaknesses),
+      resistances: JSON.stringify(profile.resistances),
+      boostedWeather: JSON.stringify(profile.boostedWeather),
+      maxUnboostedCp: profile.maxUnboostedCp,
+      maxBoostedCp: profile.maxBoostedCp,
+      possibleShiny: profile.possibleShiny,
+      refreshedAt: profile.refreshedAt ? new Date(profile.refreshedAt) : null,
+    },
+  });
+}
+
+function normaliseLooseName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[’']/g, "")
+    .replace(/\b(?:forme?|mega|shadow)\b/gi, " ")
+    .replace(/[^a-z0-9♀♂]+/gi, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function rotationBossParts(value: string): string[] {
+  return value
+    .replace(/\s+(?:and|&)\s+/gi, ",")
+    .replace(/\s*\/\s*/g, ",")
+    .split(",")
+    .map(normaliseLooseName)
+    .filter(Boolean);
+}
+
+async function findReusableProfileKeys(item: RaidBossTickerItem): Promise<string[]> {
+  const parts = rotationBossParts(item.boss);
+  if (parts.length === 0) return [];
+  const profiles = await prisma.raidBossProfile.findMany({
+    where: { category: item.category },
+    select: { key: true, name: true },
+  });
+  return Array.from(new Set(
+    parts.flatMap((part) => profiles
+      .filter((profile: { key: string; name: string }) => {
+        const name = normaliseLooseName(profile.name);
+        return name === part || name.includes(part) || part.includes(name);
+      })
+      .map((profile: { key: string; name: string }) => profile.key)),
+  ));
+}
+
+async function enrichActiveRotation(item: RaidBossTickerItem): Promise<void> {
+  let keys: string[] = [];
+  try {
+    const profiles = await getCurrentRaidBossProfiles(item);
+    for (const profile of profiles) {
+      await saveProfile(profile);
+    }
+    keys = profiles.map((profile) => profile.key);
+  } catch (error) {
+    console.error(`Unable to refresh raid details for ${item.boss}`, error);
+  }
+
+  if (keys.length === 0) {
+    keys = await findReusableProfileKeys(item);
+  }
+
+  if (keys.length > 0) {
+    await prisma.raidRotation.update({
+      where: { eventId: item.eventID },
+      data: { bossKeys: JSON.stringify(keys) },
+    });
+  }
+}
+
+function profileFromRow(row: any): RaidBossProfileData {
+  return {
+    key: row.key,
+    category: row.category as RaidCategory,
+    name: row.name,
+    pokemonId: row.pokemonId ?? null,
+    form: row.form ?? null,
+    tier: row.tier ?? null,
+    types: parseJsonArray<string>(row.types),
+    weaknesses: parseJsonArray<RaidTypeMatchup>(row.weaknesses),
+    resistances: parseJsonArray<RaidTypeMatchup>(row.resistances),
+    boostedWeather: parseJsonArray<string>(row.boostedWeather),
+    maxUnboostedCp: row.maxUnboostedCp ?? null,
+    maxBoostedCp: row.maxBoostedCp ?? null,
+    possibleShiny: row.possibleShiny ?? null,
+    refreshedAt: row.refreshedAt ? new Date(row.refreshedAt).toISOString() : null,
+  };
+}
+
+async function profilesForRotation(row: any): Promise<RaidBossProfileData[]> {
+  let keys = parseJsonArray<string>(row.bossKeys);
+  if (keys.length === 0) {
+    const fallbackItem: RaidBossTickerItem = {
+      eventID: row.eventId,
+      category: row.category,
+      label: raidCategoryLabel(row.category),
+      boss: row.boss,
+      start: row.startRaw,
+      end: row.endRaw,
+      link: row.sourceUrl,
+    };
+    keys = await findReusableProfileKeys(fallbackItem);
+  }
+  if (keys.length === 0) return [];
+  const rows = await prisma.raidBossProfile.findMany({ where: { key: { in: keys } } });
+  const byKey = new Map(rows.map((profile: any) => [profile.key, profile]));
+  return keys
+    .map((key) => byKey.get(key))
+    .filter(Boolean)
+    .map(profileFromRow);
+}
+
+async function categoryHistory(category: RaidCategory, now: Date): Promise<RaidRotationData[]> {
+  const rows = await prisma.raidRotation.findMany({
+    where: { category, start: { lte: now } },
+    orderBy: { start: "desc" },
+    take: 5,
+  });
+
+  return Promise.all(rows.map(async (row: any) => ({
+    eventID: row.eventId,
+    category,
+    label: raidCategoryLabel(category),
+    boss: row.boss,
+    start: row.startRaw,
+    end: row.endRaw,
+    active: new Date(row.start) <= now && new Date(row.end) > now,
+    sourceUrl: row.sourceUrl ?? null,
+    imageUrl: row.imageUrl ?? null,
+    anchor: raidRotationAnchor(category, row.eventId),
+    bosses: await profilesForRotation(row),
+  })));
+}
+
+function currentTickerLink(item: RaidBossTickerItem): string {
+  return `/tools/raids#${raidRotationAnchor(item.category, item.eventID)}`;
+}
+
+function nextTickerLink(item: RaidBossTickerItem): string {
+  return `/tools/raids#raid-${item.category}`;
+}
+
+function profileCatchCp(profiles: RaidBossProfileData[]) {
+  return profiles
+    .filter((profile) => profile.maxUnboostedCp && profile.maxBoostedCp)
+    .map((profile) => ({
+      boss: profile.name,
+      maxUnboostedCp: profile.maxUnboostedCp as number,
+      maxBoostedCp: profile.maxBoostedCp as number,
+      possibleShiny: profile.possibleShiny === true,
+    }));
+}
+
+async function currentTickerItems(items: RaidBossTickerItem[]): Promise<RaidBossTickerItem[]> {
+  return Promise.all(items.map(async (item) => {
+    const row = await prisma.raidRotation.findUnique({ where: { eventId: item.eventID } });
+    const profiles = row ? await profilesForRotation(row) : [];
+    const catchCp = profileCatchCp(profiles);
+    return {
+      ...item,
+      state: "current" as const,
+      link: currentTickerLink(item),
+      ...(catchCp.length > 0 ? { catchCp } : {}),
+    };
+  }));
+}
+
+export async function getRaidToolsData(now: Date = new Date()): Promise<RaidToolsData> {
+  const eventData = await getEventsPageData(240);
+  await syncRaidRotations(eventData.events);
+
+  const current = selectCurrentRaidBosses(eventData.events, now);
+  await Promise.all(current.map(enrichActiveRotation));
+
+  const next = selectNextRaidBosses(eventData.events, now).map((item) => ({
+    ...item,
+    state: "next" as const,
+    link: nextTickerLink(item),
+    catchCp: undefined,
+  }));
+
+  const histories = await Promise.all(CATEGORIES.map((category) => categoryHistory(category, now)));
+  const categories: RaidCategoryData[] = CATEGORIES.map((category, index) => ({
+    category,
+    label: raidCategoryLabel(category),
+    rotations: histories[index],
+    next: next.find((item) => item.category === category) ?? null,
+  }));
+
+  return {
+    categories,
+    tickerItems: [
+      ...(await currentTickerItems(current)),
+      ...next,
+    ],
+    fetchedAt: eventData.fetchedAt,
+    warning: eventData.warning,
+  };
+}

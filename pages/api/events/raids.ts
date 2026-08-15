@@ -1,11 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { RaidBossTickerItem } from "../../../lib/events";
-import { selectCurrentRaidBosses } from "../../../lib/event-selection";
-import { getEventsPageData } from "../../../lib/events-server";
-import {
-  attachRaidBossCp,
-  getRaidBossCpData,
-} from "../../../lib/raidBossCpCache";
+import { getRaidToolsData } from "../../../lib/raid-boss-history";
 
 type RaidTickerResponse =
   | {
@@ -26,29 +21,14 @@ export default async function handler(
   }
 
   try {
-    const eventData = await getEventsPageData(160);
-    const currentRaidBosses = selectCurrentRaidBosses(eventData.events);
-    let items = currentRaidBosses;
-
-    try {
-      const raidBossCpData = await getRaidBossCpData();
-      items = attachRaidBossCp(currentRaidBosses, raidBossCpData.bosses);
-    } catch (error) {
-      console.error(
-        "Failed to enrich current raid bosses with PoGoAPI catch CP data",
-        error,
-      );
-    }
-
+    const data = await getRaidToolsData();
     res.setHeader("Cache-Control", "private, no-store");
-
     return res.status(200).json({
-      items,
-      fetchedAt: eventData.fetchedAt,
+      items: data.tickerItems,
+      fetchedAt: data.fetchedAt,
     });
   } catch (error) {
-    console.error("Failed to load current raid bosses", error);
-
+    console.error("Failed to load raid boss ticker data", error);
     return res.status(502).json({
       error:
         error instanceof Error
