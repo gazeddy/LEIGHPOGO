@@ -18,8 +18,10 @@ export default function PushNotificationSettings() {
   const [publicKey, setPublicKey] = useState("")
   const [permission, setPermission] = useState("default")
   const [subscribed, setSubscribed] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [activeAction, setActiveAction] = useState("")
   const [message, setMessage] = useState("")
+
+  const busy = Boolean(activeAction)
 
   useEffect(() => {
     let cancelled = false
@@ -60,7 +62,9 @@ export default function PushNotificationSettings() {
           setPublicKey(config.publicKey || "")
           setSubscribed(Boolean(existingSubscription))
           if (!config.configured) {
-            setMessage("Push is ready in V3, but the server VAPID public key has not been configured yet.")
+            setMessage(
+              "Push is wired into V3, but the server VAPID configuration is not complete yet.",
+            )
           }
         }
       } catch (error) {
@@ -82,7 +86,7 @@ export default function PushNotificationSettings() {
   const enablePush = async () => {
     if (!supported || !configured || !publicKey || busy) return
 
-    setBusy(true)
+    setActiveAction("enable")
     setMessage("")
 
     let createdSubscription = null
@@ -135,14 +139,14 @@ export default function PushNotificationSettings() {
       setSubscribed(false)
       setMessage(error.message || "Unable to enable push notifications.")
     } finally {
-      setBusy(false)
+      setActiveAction("")
     }
   }
 
   const disablePush = async () => {
     if (!supported || busy) return
 
-    setBusy(true)
+    setActiveAction("disable")
     setMessage("")
 
     try {
@@ -169,7 +173,30 @@ export default function PushNotificationSettings() {
     } catch (error) {
       setMessage(error.message || "Unable to disable push notifications.")
     } finally {
-      setBusy(false)
+      setActiveAction("")
+    }
+  }
+
+  const sendTestPush = async () => {
+    if (!subscribed || busy) return
+
+    setActiveAction("test")
+    setMessage("")
+
+    try {
+      const response = await fetch("/api/push/test", { method: "POST" })
+      const body = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to send a test notification.")
+      }
+
+      const deviceLabel = body.sent === 1 ? "device" : "devices"
+      setMessage(`Test notification sent to ${body.sent} subscribed ${deviceLabel}.`)
+    } catch (error) {
+      setMessage(error.message || "Unable to send a test notification.")
+    } finally {
+      setActiveAction("")
     }
   }
 
@@ -203,16 +230,26 @@ export default function PushNotificationSettings() {
 
       <div className="push-settings-actions">
         {subscribed ? (
-          <button type="button" className="secondary-button" disabled={busy} onClick={disablePush}>
-            {busy ? "Disabling..." : "Disable push notifications"}
-          </button>
+          <>
+            <button type="button" disabled={busy} onClick={sendTestPush}>
+              {activeAction === "test" ? "Sending..." : "Send test push"}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={busy}
+              onClick={disablePush}
+            >
+              {activeAction === "disable" ? "Disabling..." : "Disable push notifications"}
+            </button>
+          </>
         ) : (
           <button
             type="button"
             disabled={checking || busy || !supported || !configured || permission === "denied"}
             onClick={enablePush}
           >
-            {busy ? "Enabling..." : "Enable push notifications"}
+            {activeAction === "enable" ? "Enabling..." : "Enable push notifications"}
           </button>
         )}
       </div>
