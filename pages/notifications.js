@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import { purgeExpiredTradeListings } from "../lib/tradeServer"
+import PushNotificationSettings from "../components/PushNotificationSettings"
 import {
   serializeTradeNotification,
   tradeNotificationInclude,
@@ -85,6 +86,8 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
           </button>
         )}
       </div>
+
+      <PushNotificationSettings />
 
       {notifications.length === 0 ? (
         <div className="card">
