@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import prisma from "./prisma";
 import { getRaidToolsData } from "./raid-boss-history";
 import {
@@ -6,6 +7,8 @@ import {
   isWednesdayRaidHour,
 } from "./raid-hour-reminder";
 import { isWebPushConfigured, sendWebPush } from "./webPush";
+
+export const RAID_HOUR_EASTER_EGG_ONE_IN = 100;
 
 export interface RaidHourPushResult {
   configured: boolean;
@@ -21,6 +24,7 @@ export interface RaidHourPushResult {
 interface DueSubscription {
   subscription: {
     id: number;
+    ownerId: number;
     endpoint: string;
     p256dh: string;
     auth: string;
@@ -44,6 +48,30 @@ const emptyResult = (
   reason,
 });
 
+export function selectRaidHourEasterEggOwner(
+  dateKey: string,
+  ownerIds: number[],
+  secret: string,
+  oneIn: number = RAID_HOUR_EASTER_EGG_ONE_IN,
+): number | null {
+  const uniqueOwnerIds = Array.from(
+    new Set(ownerIds.filter((ownerId) => Number.isInteger(ownerId))),
+  ).sort((left, right) => left - right);
+  const safeOneIn = Math.max(1, Math.floor(oneIn));
+  const seed = String(secret || "").trim();
+
+  if (!seed || uniqueOwnerIds.length === 0) return null;
+
+  const digest = crypto
+    .createHmac("sha256", seed)
+    .update(`raid-hour-easter-egg:${dateKey}`)
+    .digest();
+
+  if (digest.readUInt32BE(0) % safeOneIn !== 0) return null;
+
+  return uniqueOwnerIds[digest.readUInt32BE(4) % uniqueOwnerIds.length];
+}
+
 export async function sendWednesdayRaidHourPush(
   now: Date = new Date(),
 ): Promise<RaidHourPushResult> {
@@ -54,6 +82,7 @@ export async function sendWednesdayRaidHourPush(
   const subscriptions = await prisma.pushSubscription.findMany({
     select: {
       id: true,
+      ownerId: true,
       endpoint: true,
       p256dh: true,
       auth: true,
@@ -87,12 +116,31 @@ export async function sendWednesdayRaidHourPush(
 
   const bosses = (fiveStar.catchCp ?? []).map((entry) => entry.boss);
   const payloadByDate = new Map<string, ReturnType<typeof buildRaidHourPushPayload>>();
+  const easterEggPayloadByDate = new Map<
+    string,
+    ReturnType<typeof buildRaidHourPushPayload>
+  >();
+  const easterEggOwnerByDate = new Map<string, number | null>();
+  const allOwnerIds = subscriptions.map((subscription: any) => subscription.ownerId);
+  const schedulerSecret = String(process.env.RAID_HOUR_CRON_SECRET || "").trim();
 
   for (const entry of due) {
     if (!payloadByDate.has(entry.dateKey)) {
       payloadByDate.set(
         entry.dateKey,
         buildRaidHourPushPayload(fiveStar, entry.dateKey),
+      );
+      easterEggPayloadByDate.set(
+        entry.dateKey,
+        buildRaidHourPushPayload(fiveStar, entry.dateKey, true),
+      );
+      easterEggOwnerByDate.set(
+        entry.dateKey,
+        selectRaidHourEasterEggOwner(
+          entry.dateKey,
+          allOwnerIds,
+          schedulerSecret,
+        ),
       );
     }
   }
@@ -107,7 +155,11 @@ export async function sendWednesdayRaidHourPush(
 
   const results = await Promise.all(
     due.map(async ({ subscription, dateKey }) => {
-      const payload = payloadByDate.get(dateKey);
+      const isEasterEggRecipient =
+        easterEggOwnerByDate.get(dateKey) === subscription.ownerId;
+      const payload = isEasterEggRecipient
+        ? easterEggPayloadByDate.get(dateKey)
+        : payloadByDate.get(dateKey);
       if (!payload) return { state: "failed" as const };
 
       const claim = await prisma.pushSubscription.updateMany({
