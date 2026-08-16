@@ -3,8 +3,10 @@
  * Run with: npm test
  */
 
-process.env.DATABASE_URL =
-  process.env.DATABASE_URL || "file:trade-tests?mode=memory&cache=shared"
+// Never inherit DATABASE_URL from Next/Jest's loaded .env. These tests rebuild
+// their schema, so they must always use an isolated in-memory SQLite database.
+const TEST_DATABASE_URL = "file:trade-tests?mode=memory&cache=shared"
+process.env.DATABASE_URL = TEST_DATABASE_URL
 
 const { createMocks } = require("node-mocks-http")
 const { getServerSession } = require("next-auth/next")
@@ -26,6 +28,10 @@ const prisma = require("../../lib/prisma")
 const handler = require("../../pages/api/trades").default
 
 const ensureSchema = async () => {
+  if (process.env.DATABASE_URL !== TEST_DATABASE_URL) {
+    throw new Error("Refusing to rebuild a non-test database from trades.test.js")
+  }
+
   await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON")
   await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "TradeListingItem"')
   await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "TradeListing"')
