@@ -11,6 +11,24 @@ const urlBase64ToUint8Array = (value) => {
 const unsupportedMessage =
   "Push notifications are not available in this browser. On iPhone or iPad, install LEIGHPOGO to the Home Screen first."
 
+const browserTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"
+  } catch {
+    return "Europe/London"
+  }
+}
+
+const saveSubscription = (subscription) =>
+  fetch("/api/push/subscription", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subscription: subscription.toJSON(),
+      timeZone: browserTimeZone(),
+    }),
+  })
+
 export default function PushNotificationSettings() {
   const [checking, setChecking] = useState(true)
   const [supported, setSupported] = useState(false)
@@ -56,6 +74,12 @@ export default function PushNotificationSettings() {
 
         const config = await configResponse.json()
         const existingSubscription = await registration.pushManager.getSubscription()
+
+        if (existingSubscription) {
+          saveSubscription(existingSubscription).catch((error) => {
+            console.warn("Unable to sync push subscription timezone", error)
+          })
+        }
 
         if (!cancelled) {
           setConfigured(Boolean(config.configured && config.publicKey))
@@ -119,11 +143,7 @@ export default function PushNotificationSettings() {
         createdSubscription = subscription
       }
 
-      const response = await fetch("/api/push/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: subscription.toJSON() }),
-      })
+      const response = await saveSubscription(subscription)
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
@@ -213,6 +233,9 @@ export default function PushNotificationSettings() {
           <h2>Push notifications</h2>
           <p className="muted">
             Get LEIGHPOGO alerts even when the site is not open. Permission is only requested when you choose Enable.
+          </p>
+          <p className="muted">
+            Push-enabled devices receive the Wednesday 18:00 local-time 5★ Raid Hour reminder with the current boss and hundo CPs.
           </p>
         </div>
         <span className={`push-status ${subscribed ? "enabled" : "disabled"}`}>
