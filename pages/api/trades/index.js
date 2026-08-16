@@ -7,6 +7,7 @@ import {
   tradeListingInclude,
 } from "../../../lib/tradeServer"
 import { syncWantedTradeNotificationsForListing } from "../../../lib/tradeNotifications"
+import { recordUsageEvent } from "../../../lib/usageEvents"
 import {
   addOneMonth,
   serializeTradeListing,
@@ -79,6 +80,14 @@ export default async function handler(req, res) {
     })
 
     await createMatchNotifications(listing)
+    await recordUsageEvent({
+      type: "TRADE_CREATED",
+      ownerId: tradeUser.id,
+      path: "/trades/new",
+      userAgent: req.headers["user-agent"],
+      metadata: { listingId: listing.id },
+    })
+
     return res.status(201).json(serializeTradeListing(listing))
   }
 

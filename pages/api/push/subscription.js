@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../auth/[...nextauth]"
 import prisma from "../../../lib/prisma"
+import { recordUsageEvent } from "../../../lib/usageEvents"
 
 const sessionUserId = (session) => {
   const userId = Number(session?.user?.id)
@@ -73,6 +74,13 @@ export default async function handler(req, res) {
       },
     })
 
+    await recordUsageEvent({
+      type: "PUSH_ENABLED",
+      ownerId: userId,
+      path: "/notifications",
+      userAgent: req.headers["user-agent"],
+    })
+
     return res.status(200).json({
       subscribed: true,
       endpoint: saved.endpoint,
@@ -93,6 +101,15 @@ export default async function handler(req, res) {
         endpoint,
       },
     })
+
+    if (result.count > 0) {
+      await recordUsageEvent({
+        type: "PUSH_DISABLED",
+        ownerId: userId,
+        path: "/notifications",
+        userAgent: req.headers["user-agent"],
+      })
+    }
 
     return res.status(200).json({
       subscribed: false,

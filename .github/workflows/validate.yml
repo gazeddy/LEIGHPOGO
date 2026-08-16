@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - feature/member-gym-addition
+      - v3
 
 jobs:
   test-and-build:

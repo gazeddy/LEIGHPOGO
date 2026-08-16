@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth/next";
 import AddGymForm from "../components/gyms/AddGymForm";
 import GymRemovalReporter from "../components/gyms/GymRemovalReporter";
 import { readGymState, sortGyms } from "../lib/gyms";
+import { recordUsageEvent } from "../lib/usageEvents";
 import { authOptions } from "./api/auth/[...nextauth]";
 
 const GymMap = dynamic(() => import("../components/gyms/GymMap"), {
@@ -35,6 +36,19 @@ export const getServerSideProps: GetServerSideProps<GymPageProps> = async (
         permanent: false,
       },
     };
+  }
+
+  const userId = Number(
+    (session as { user?: { id?: string | number } }).user?.id,
+  );
+
+  if (Number.isInteger(userId)) {
+    await recordUsageEvent({
+      type: "GYM_MAP_OPENED",
+      ownerId: userId,
+      path: "/gyms",
+      userAgent: context.req.headers["user-agent"],
+    });
   }
 
   const state = await readGymState();

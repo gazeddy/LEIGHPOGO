@@ -5,6 +5,7 @@ import {
   friendCodeGrabNotificationInclude,
   serializeFriendCodeGrabNotification,
 } from "../../lib/friendCodeNotifications"
+import { recordUsageEvent } from "../../lib/usageEvents"
 
 const DEDUPE_WINDOW_MS = 5 * 60 * 1000
 
@@ -41,6 +42,14 @@ export default async function handler(req, res) {
   if (!entry) {
     return res.status(404).json({ error: "Friend-code entry not found" })
   }
+
+  await recordUsageEvent({
+    type: "FRIEND_CODE_COPIED",
+    ownerId: userId,
+    path: "/friend-codes",
+    userAgent: req.headers["user-agent"],
+    metadata: { entryId },
+  })
 
   if (entry.ownerId === userId) {
     return res.status(200).json({ created: false, self: true })

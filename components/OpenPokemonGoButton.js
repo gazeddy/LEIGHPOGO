@@ -12,9 +12,27 @@ const isAppleMobile = () => {
 const isAndroid = () =>
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)
 
+const recordPokemonGoLaunch = () => {
+  if (typeof window === "undefined") return
+
+  fetch("/api/usage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "POKEMON_GO_LAUNCHED",
+      path: window.location.pathname,
+    }),
+    keepalive: true,
+  }).catch(() => {
+    // Launching the game should never be blocked by analytics.
+  })
+}
+
 export default function OpenPokemonGoButton({ className = "" }) {
   const openPokemonGo = () => {
     if (typeof window === "undefined") return
+
+    recordPokemonGoLaunch()
 
     if (isAndroid()) {
       const fallback = encodeURIComponent(PLAY_STORE_URL)

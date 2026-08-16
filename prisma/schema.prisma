@@ -22,6 +22,7 @@ model User {
   pushSubscriptions           PushSubscription[]
   friendCodeGrabNotifications FriendCodeGrabNotification[] @relation("FriendCodeGrabOwner")
   friendCodeCopies            FriendCodeGrabNotification[] @relation("FriendCodeGrabActor")
+  usageEvents                 UsageEvent[]
 }
 
 model Entry {
@@ -166,6 +167,21 @@ model FriendCodeGrabNotification {
 
   @@index([ownerId, readAt, createdAt])
   @@index([copiedById, entryId, createdAt])
+}
+
+model UsageEvent {
+  id        Int      @id @default(autoincrement())
+  type      String
+  ownerId   Int?
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  path      String?
+  device    String?
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([ownerId, createdAt])
 }
 
 model PushSubscription {

@@ -3,6 +3,7 @@ import { authOptions } from "../../auth/[...nextauth]"
 import prisma from "../../../../lib/prisma"
 import pokedexByRegion from "../../../../lib/pokedexData"
 import { getAuthenticatedUser } from "../../../../lib/tradeServer"
+import { recordUsageEvent } from "../../../../lib/usageEvents"
 import {
   buildReleasedPokemonOptions,
   serializeWantedTrade,
@@ -75,6 +76,17 @@ export default async function handler(req, res) {
         ...validated.value,
       },
       include: wantedTradeInclude,
+    })
+
+    await recordUsageEvent({
+      type: "WANTED_TRADE_CREATED",
+      ownerId: currentUser.id,
+      path: "/trades/wanted",
+      userAgent: req.headers["user-agent"],
+      metadata: {
+        wantedTradeId: entry.id,
+        dexNumber: entry.dexNumber,
+      },
     })
 
     return res.status(201).json(serializeWantedTrade(entry))
