@@ -12,10 +12,12 @@ import type {
   RaidTypeMatchup,
 } from "./events";
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const POKEMON_TYPES_URL = "https://pogoapi.net/api/v1/pokemon_types.json";
+const POKEMON_STATS_URL = "https://pogoapi.net/api/v1/pokemon_stats.json";
+const CP_MULTIPLIER_URL = "https://pogoapi.net/api/v1/cp_multiplier.json";
 const MEGA_POKEMON_URL = "https://pogoapi.net/api/v1/mega_pokemon.json";
 const TYPE_EFFECTIVENESS_URL = "https://pogoapi.net/api/v1/type_effectiveness.json";
 const WEATHER_BOOSTS_URL = "https://pogoapi.net/api/v1/weather_boosts.json";
@@ -29,6 +31,20 @@ interface PokemonTypeRecord {
   pokemon_name: string;
   form?: string;
   type: string[];
+}
+
+interface PokemonStatsRecord {
+  pokemon_id: number;
+  pokemon_name: string;
+  form?: string;
+  base_attack: number;
+  base_defense: number;
+  base_stamina: number;
+}
+
+interface CpMultiplierRecord {
+  level: number;
+  multiplier: number;
 }
 
 interface MegaPokemonRecord {
@@ -46,6 +62,8 @@ interface SupplementCache {
   version: number;
   checkedAt: string;
   pokemonTypes: PokemonTypeRecord[];
+  pokemonStats: PokemonStatsRecord[];
+  cpMultipliers: CpMultiplierRecord[];
   megaPokemon: MegaPokemonRecord[];
   effectiveness: TypeEffectiveness;
   weatherBoosts: WeatherBoosts;
@@ -60,6 +78,11 @@ function validStringArray(value: unknown): string[] {
     : [];
 }
 
+function finiteNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function validateCache(value: unknown): SupplementCache | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Partial<SupplementCache>;
@@ -68,6 +91,8 @@ function validateCache(value: unknown): SupplementCache | null {
     typeof candidate.checkedAt !== "string" ||
     !Number.isFinite(Date.parse(candidate.checkedAt)) ||
     !Array.isArray(candidate.pokemonTypes) ||
+    !Array.isArray(candidate.pokemonStats) ||
+    !Array.isArray(candidate.cpMultipliers) ||
     !Array.isArray(candidate.megaPokemon) ||
     !candidate.effectiveness ||
     typeof candidate.effectiveness !== "object" ||
@@ -117,8 +142,17 @@ async function fetchJson(url: string): Promise<unknown> {
 }
 
 async function refreshCache(): Promise<SupplementCache> {
-  const [pokemonTypes, megaPokemon, effectiveness, weatherBoosts] = await Promise.all([
+  const [
+    pokemonTypes,
+    pokemonStats,
+    cpMultipliers,
+    megaPokemon,
+    effectiveness,
+    weatherBoosts,
+  ] = await Promise.all([
     fetchJson(POKEMON_TYPES_URL),
+    fetchJson(POKEMON_STATS_URL),
+    fetchJson(CP_MULTIPLIER_URL),
     fetchJson(MEGA_POKEMON_URL),
     fetchJson(TYPE_EFFECTIVENESS_URL),
     fetchJson(WEATHER_BOOSTS_URL),
@@ -126,6 +160,8 @@ async function refreshCache(): Promise<SupplementCache> {
 
   if (
     !Array.isArray(pokemonTypes) ||
+    !Array.isArray(pokemonStats) ||
+    !Array.isArray(cpMultipliers) ||
     !Array.isArray(megaPokemon) ||
     !effectiveness ||
     typeof effectiveness !== "object" ||
@@ -141,6 +177,8 @@ async function refreshCache(): Promise<SupplementCache> {
     version: CACHE_VERSION,
     checkedAt: new Date().toISOString(),
     pokemonTypes: pokemonTypes as PokemonTypeRecord[],
+    pokemonStats: pokemonStats as PokemonStatsRecord[],
+    cpMultipliers: cpMultipliers as CpMultiplierRecord[],
     megaPokemon: megaPokemon as MegaPokemonRecord[],
     effectiveness: effectiveness as TypeEffectiveness,
     weatherBoosts: weatherBoosts as WeatherBoosts,
@@ -373,6 +411,75 @@ function boostedWeatherForTypes(types: string[], weatherBoosts: WeatherBoosts): 
     .sort();
 }
 
+export function calculatePerfectCp(
+  stats: PokemonStatsRecord,
+  multiplier: number,
+): number | null {
+  const attack = finiteNumber(stats.base_attack);
+  const defense = finiteNumber(stats.base_defense);
+  const stamina = finiteNumber(stats.base_stamina);
+  const cpMultiplier = finiteNumber(multiplier);
+
+  if (
+    attack === null ||
+    defense === null ||
+    stamina === null ||
+    cpMultiplier === null ||
+    cpMultiplier <= 0
+  ) {
+    return null;
+  }
+
+  const cp = Math.floor(
+    ((attack + 15) * Math.sqrt(defense + 15) * Math.sqrt(stamina + 15) * cpMultiplier ** 2) /
+      10,
+  );
+  return Math.max(10, cp);
+}
+
+function baseStatsScore(mega: MegaPokemonRecord, stats: PokemonStatsRecord): number {
+  const idMatch = Number(stats.pokemon_id) === Number(mega.pokemon_id);
+  const nameMatch = normaliseBossName(stats.pokemon_name) === normaliseBossName(mega.pokemon_name);
+  if (!idMatch && !nameMatch) return -1;
+
+  const form = normaliseBossName(stats.form ?? "normal");
+  return (idMatch ? 100 : 0) + (nameMatch ? 40 : 0) + (form === "normal" ? 60 : 0);
+}
+
+function findBasePokemonStats(
+  mega: MegaPokemonRecord,
+  records: PokemonStatsRecord[],
+): PokemonStatsRecord | null {
+  return records
+    .map((record, index) => ({ record, index, score: baseStatsScore(mega, record) }))
+    .filter((entry) => entry.score >= 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.record ?? null;
+}
+
+function findCpMultiplier(records: CpMultiplierRecord[], level: number): number | null {
+  const record = records.find((entry) => Math.abs(Number(entry.level) - level) < 0.000001);
+  return finiteNumber(record?.multiplier);
+}
+
+export function calculateMegaEncounterCp(
+  mega: MegaPokemonRecord,
+  pokemonStats: PokemonStatsRecord[],
+  cpMultipliers: CpMultiplierRecord[],
+): { maxUnboostedCp: number | null; maxBoostedCp: number | null } {
+  const stats = findBasePokemonStats(mega, pokemonStats);
+  const level20 = findCpMultiplier(cpMultipliers, 20);
+  const level25 = findCpMultiplier(cpMultipliers, 25);
+
+  if (!stats) {
+    return { maxUnboostedCp: null, maxBoostedCp: null };
+  }
+
+  return {
+    maxUnboostedCp: level20 === null ? null : calculatePerfectCp(stats, level20),
+    maxBoostedCp: level25 === null ? null : calculatePerfectCp(stats, level25),
+  };
+}
+
 export function raidBossProfileKey(
   category: RaidCategory,
   boss: PogoApiRaidBossCp,
@@ -396,6 +503,11 @@ function megaSupplementProfile(
 ): RaidBossProfileData {
   const types = validStringArray(record.type);
   const { weaknesses, resistances } = calculateTypeMatchups(types, supplement.effectiveness);
+  const encounterCp = calculateMegaEncounterCp(
+    record,
+    supplement.pokemonStats,
+    supplement.cpMultipliers,
+  );
   return {
     key: megaSupplementProfileKey(record),
     category: "mega",
@@ -407,8 +519,8 @@ function megaSupplementProfile(
     weaknesses,
     resistances,
     boostedWeather: boostedWeatherForTypes(types, supplement.weatherBoosts),
-    maxUnboostedCp: null,
-    maxBoostedCp: null,
+    maxUnboostedCp: encounterCp.maxUnboostedCp,
+    maxBoostedCp: encounterCp.maxBoostedCp,
     possibleShiny: null,
     refreshedAt,
   };
