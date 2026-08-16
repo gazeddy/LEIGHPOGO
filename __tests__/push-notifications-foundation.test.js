@@ -39,13 +39,17 @@ describe("V3 push notification foundation", () => {
     expect(component).toContain('fetch("/api/push/subscription"')
   })
 
-  it("does not add fetch caching to the service worker", () => {
+  it("keeps service-worker caching away from API, auth and Next data requests", () => {
     const serviceWorker = fs.readFileSync(
       path.join(process.cwd(), "public/sw.js"),
       "utf8",
     )
 
     expect(serviceWorker).toContain('addEventListener("push"')
-    expect(serviceWorker).not.toContain('addEventListener("fetch"')
+    expect(serviceWorker).toContain('addEventListener("fetch"')
+    expect(serviceWorker).toContain('url.pathname.startsWith("/api/")')
+    expect(serviceWorker).toContain('url.pathname.startsWith("/auth/")')
+    expect(serviceWorker).toContain('url.pathname.startsWith("/_next/data/")')
+    expect(serviceWorker).toContain('request.mode === "navigate"')
   })
 })
