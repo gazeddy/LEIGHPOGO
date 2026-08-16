@@ -3,17 +3,19 @@ import { useRouter } from "next/router";
 import {
   CircleMarker,
   MapContainer,
+  Marker,
   Popup,
   TileLayer,
   useMap,
   useMapEvents,
 } from "react-leaflet";
-import type { LatLngBoundsExpression } from "leaflet";
+import { divIcon, type LatLngBoundsExpression } from "leaflet";
 
 export interface MapGym {
   id: string;
   name: string;
   alias: string | null;
+  markerEmoji: string | null;
   url: string | null;
   lat: number;
   lon: number;
@@ -44,6 +46,46 @@ const LEIGH_CENTRE: UserLocation = { lat: 53.49, lon: -2.52 };
 
 function displayName(gym: MapGym): string {
   return gym.alias || gym.name;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#039;";
+      default:
+        return character;
+    }
+  });
+}
+
+function customGymIcon(gym: MapGym, selected: boolean) {
+  const size = selected ? 40 : 34;
+  const classes = [
+    "gym-custom-marker",
+    selected ? "selected" : "",
+    gym.exRaidEligible ? "ex" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return divIcon({
+    className: classes,
+    html: `<span class="gym-custom-marker-shell"><span class="gym-custom-marker-symbol">${escapeHtml(
+      gym.markerEmoji || "",
+    )}</span></span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2)],
+  });
 }
 
 function newGymOpacity(gym: MapGym): number {
@@ -304,7 +346,10 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
                 onClick={() => selectGym(gym)}
               >
                 <span>
-                  <strong>{displayName(gym)}</strong>
+                  <strong>
+                    {gym.markerEmoji && <span className="gym-result-icon">{gym.markerEmoji}</span>}
+                    {displayName(gym)}
+                  </strong>
                   {gym.alias && <small>{gym.name}</small>}
                 </span>
                 <span className="gym-result-meta">
@@ -348,6 +393,23 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
           {filteredGyms.map((gym) => {
             const opacity = newGymOpacity(gym);
             const selected = selectedId === gym.id;
+            const popup = (
+              <Popup>
+                <div className="gym-popup">
+                  <strong>{displayName(gym)}</strong>
+                  {gym.alias && <small>Official name: {gym.name}</small>}
+                  {opacity > 0 && <span className="new-badge">New gym</span>}
+                  {gym.exRaidEligible && <span>EX raid eligible</span>}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${gym.lat},${gym.lon}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Directions in Google Maps
+                  </a>
+                </div>
+              </Popup>
+            );
 
             return (
               <Fragment key={gym.id}>
@@ -366,33 +428,29 @@ export default function GymMap({ gyms, importedAt }: GymMapProps) {
                     }}
                   />
                 )}
-                <CircleMarker
-                  center={[gym.lat, gym.lon]}
-                  radius={selected ? 10 : 7}
-                  eventHandlers={{ click: () => selectGym(gym) }}
-                  pathOptions={{
-                    color: selected ? "#ffffff" : gym.exRaidEligible ? "#a371f7" : "#2ea043",
-                    fillColor: gym.exRaidEligible ? "#8957e5" : "#238636",
-                    fillOpacity: 0.92,
-                    weight: selected ? 4 : 2,
-                  }}
-                >
-                  <Popup>
-                    <div className="gym-popup">
-                      <strong>{displayName(gym)}</strong>
-                      {gym.alias && <small>Official name: {gym.name}</small>}
-                      {opacity > 0 && <span className="new-badge">New gym</span>}
-                      {gym.exRaidEligible && <span>EX raid eligible</span>}
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${gym.lat},${gym.lon}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Directions in Google Maps
-                      </a>
-                    </div>
-                  </Popup>
-                </CircleMarker>
+                {gym.markerEmoji ? (
+                  <Marker
+                    position={[gym.lat, gym.lon]}
+                    icon={customGymIcon(gym, selected)}
+                    eventHandlers={{ click: () => selectGym(gym) }}
+                  >
+                    {popup}
+                  </Marker>
+                ) : (
+                  <CircleMarker
+                    center={[gym.lat, gym.lon]}
+                    radius={selected ? 10 : 7}
+                    eventHandlers={{ click: () => selectGym(gym) }}
+                    pathOptions={{
+                      color: selected ? "#ffffff" : gym.exRaidEligible ? "#a371f7" : "#2ea043",
+                      fillColor: gym.exRaidEligible ? "#8957e5" : "#238636",
+                      fillOpacity: 0.92,
+                      weight: selected ? 4 : 2,
+                    }}
+                  >
+                    {popup}
+                  </CircleMarker>
+                )}
               </Fragment>
             );
           })}
