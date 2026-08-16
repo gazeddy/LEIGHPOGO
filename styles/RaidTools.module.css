@@ -229,7 +229,8 @@
   margin-top: 12px;
 }
 
-.matchupGroup h4 {
+.matchupGroup h4,
+.searchSection h4 {
   margin: 0 0 6px;
   color: #8b949e;
   font-size: 0.7rem;
@@ -262,6 +263,53 @@
   color: #ff7b72;
 }
 
+.searchSection {
+  margin-top: 12px;
+  border-top: 1px solid #21262d;
+  padding-top: 12px;
+}
+
+.searchStringRow {
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.searchString {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: #161b22;
+  color: #a5d6ff;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.copyButton {
+  flex: 0 0 auto;
+  border: 1px solid #388bfd;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: rgba(56, 139, 253, 0.12);
+  color: #79c0ff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.copyButton:hover {
+  background: rgba(56, 139, 253, 0.2);
+}
+
+.copyButton:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+
 .missingDetails,
 .empty {
   margin: 0;
@@ -289,5 +337,13 @@
 
   .rotations {
     grid-template-columns: 1fr;
+  }
+
+  .searchStringRow {
+    flex-direction: column;
+  }
+
+  .copyButton {
+    width: 100%;
   }
 }
