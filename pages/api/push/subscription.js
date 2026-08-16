@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../auth/[...nextauth]"
 import prisma from "../../../lib/prisma"
+import { normalisePushTimeZone } from "../../../lib/raid-hour-reminder"
 import { recordUsageEvent } from "../../../lib/usageEvents"
 
 const sessionUserId = (session) => {
@@ -33,6 +34,7 @@ export default async function handler(req, res) {
       where: { ownerId: userId },
       select: {
         endpoint: true,
+        timeZone: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -42,6 +44,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       subscriptions: subscriptions.map((subscription) => ({
         endpoint: subscription.endpoint,
+        timeZone: subscription.timeZone,
         createdAt: subscription.createdAt.toISOString(),
         updatedAt: subscription.updatedAt.toISOString(),
       })),
@@ -55,35 +58,47 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid push subscription." })
     }
 
+    const timeZone = normalisePushTimeZone(req.body?.timeZone)
+    const existing = await prisma.pushSubscription.findUnique({
+      where: { endpoint: subscription.endpoint },
+      select: { ownerId: true },
+    })
+
     const saved = await prisma.pushSubscription.upsert({
       where: { endpoint: subscription.endpoint },
       create: {
         ownerId: userId,
         ...subscription,
+        timeZone,
         userAgent: req.headers["user-agent"] || null,
       },
       update: {
         ownerId: userId,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
+        timeZone,
         userAgent: req.headers["user-agent"] || null,
       },
       select: {
         endpoint: true,
+        timeZone: true,
         updatedAt: true,
       },
     })
 
-    await recordUsageEvent({
-      type: "PUSH_ENABLED",
-      ownerId: userId,
-      path: "/notifications",
-      userAgent: req.headers["user-agent"],
-    })
+    if (!existing || existing.ownerId !== userId) {
+      await recordUsageEvent({
+        type: "PUSH_ENABLED",
+        ownerId: userId,
+        path: "/notifications",
+        userAgent: req.headers["user-agent"],
+      })
+    }
 
     return res.status(200).json({
       subscribed: true,
       endpoint: saved.endpoint,
+      timeZone: saved.timeZone,
       updatedAt: saved.updatedAt.toISOString(),
     })
   }
