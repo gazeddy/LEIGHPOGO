@@ -3,7 +3,10 @@
  * Run with: npm test
  */
 
-process.env.DATABASE_URL = process.env.DATABASE_URL || "file:memdb1?mode=memory&cache=shared";
+// Never inherit DATABASE_URL from Next/Jest's loaded .env. These tests rebuild
+// their schema, so they must always use an isolated in-memory SQLite database.
+const TEST_DATABASE_URL = "file:entry-tests?mode=memory&cache=shared";
+process.env.DATABASE_URL = TEST_DATABASE_URL;
 
 const fs = require("fs");
 const path = require("path");
@@ -22,6 +25,10 @@ const prisma = require("../../lib/prisma");
 const handler = require("../../pages/api/entries").default;
 
 const ensureSchema = async () => {
+  if (process.env.DATABASE_URL !== TEST_DATABASE_URL) {
+    throw new Error("Refusing to rebuild a non-test database from entries.test.js");
+  }
+
   await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
   await prisma.$executeRawUnsafe(`
     DROP TABLE IF EXISTS "Entry";
