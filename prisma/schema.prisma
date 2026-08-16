@@ -185,15 +185,17 @@ model UsageEvent {
 }
 
 model PushSubscription {
-  id        Int      @id @default(autoincrement())
-  ownerId   Int
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  userAgent String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                      Int      @id @default(autoincrement())
+  ownerId                 Int
+  owner                   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  endpoint                String   @unique
+  p256dh                  String
+  auth                    String
+  userAgent               String?
+  timeZone                String   @default("Europe/London")
+  lastRaidHourReminderKey String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@index([ownerId])
 }
