@@ -64,6 +64,7 @@ export default async function handler(
       id: `${COMMUNITY_GYM_ID_PREFIX}${randomUUID()}`,
       name: title,
       alias: null,
+      markerEmoji: null,
       url: null,
       lat,
       lon,
