@@ -241,6 +241,48 @@ export function matchRaidBossRecords(
   ).values());
 }
 
+function megaRecordAliases(record: MegaPokemonRecord): string[] {
+  const form = normaliseBossName(record.form ?? "normal");
+  return Array.from(new Set([
+    record.mega_name,
+    record.pokemon_name,
+    form && form !== "normal" ? `${record.pokemon_name} ${record.form}` : "",
+    form && form !== "normal" ? `${record.form} ${record.pokemon_name}` : "",
+  ].filter(Boolean).map(normaliseBossName)));
+}
+
+function matchMegaPart(part: string, records: MegaPokemonRecord[]): MegaPokemonRecord | null {
+  const ranked = records
+    .map((record, index) => {
+      const score = megaRecordAliases(record).reduce((best, alias) => {
+        if (alias === part) return Math.max(best, 100);
+        if (alias.length >= 4 && part.includes(alias)) return Math.max(best, 60);
+        if (part.length >= 4 && alias.includes(part)) return Math.max(best, 50);
+        return best;
+      }, -1);
+      return { record, index, score };
+    })
+    .filter((entry) => entry.score >= 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+  return ranked[0]?.record ?? null;
+}
+
+export function matchMegaSupplementRecords(
+  item: RaidBossTickerItem,
+  records: MegaPokemonRecord[],
+): MegaPokemonRecord[] {
+  if (item.category !== "mega") return [];
+  return Array.from(new Map(
+    itemBossParts(item.boss)
+      .map((part) => matchMegaPart(part, records))
+      .filter((record): record is MegaPokemonRecord => Boolean(record))
+      .map((record) => [
+        `${normaliseBossName(record.mega_name)}|${normaliseBossName(record.form ?? "normal")}`,
+        record,
+      ]),
+  ).values());
+}
+
 function typeRecordScore(name: string, form: string, recordName: string, recordForm?: string): number {
   const targetName = normaliseBossName(name);
   const targetForm = normaliseBossName(form);
@@ -338,6 +380,40 @@ export function raidBossProfileKey(
   return [category, normaliseBossName(boss.name), normaliseBossName(boss.form), String(boss.tier)].join("|");
 }
 
+function megaSupplementProfileKey(record: MegaPokemonRecord): string {
+  return [
+    "mega",
+    normaliseBossName(record.mega_name),
+    normaliseBossName(record.form ?? "normal"),
+    "supplement",
+  ].join("|");
+}
+
+function megaSupplementProfile(
+  record: MegaPokemonRecord,
+  supplement: SupplementCache,
+  refreshedAt: string,
+): RaidBossProfileData {
+  const types = validStringArray(record.type);
+  const { weaknesses, resistances } = calculateTypeMatchups(types, supplement.effectiveness);
+  return {
+    key: megaSupplementProfileKey(record),
+    category: "mega",
+    name: record.mega_name || `Mega ${record.pokemon_name}`,
+    pokemonId: Number.isInteger(record.pokemon_id) ? record.pokemon_id : null,
+    form: record.form || null,
+    tier: "mega",
+    types,
+    weaknesses,
+    resistances,
+    boostedWeather: boostedWeatherForTypes(types, supplement.weatherBoosts),
+    maxUnboostedCp: null,
+    maxBoostedCp: null,
+    possibleShiny: null,
+    refreshedAt,
+  };
+}
+
 export async function getCurrentRaidBossProfiles(
   item: RaidBossTickerItem,
 ): Promise<RaidBossProfileData[]> {
@@ -345,8 +421,9 @@ export async function getCurrentRaidBossProfiles(
     getRaidBossCpData(),
     getSupplementData(),
   ]);
-
-  return matchRaidBossRecords(item, raidData.bosses).map((boss) => {
+  const refreshedAt = new Date().toISOString();
+  const matchedBosses = matchRaidBossRecords(item, raidData.bosses);
+  const profiles = matchedBosses.map((boss) => {
     const { types, pokemonId, displayName } = findTypes(item.category, item, boss, supplement);
     const { weaknesses, resistances } = calculateTypeMatchups(types, supplement.effectiveness);
     return {
@@ -363,7 +440,18 @@ export async function getCurrentRaidBossProfiles(
       maxUnboostedCp: boss.maxUnboostedCp,
       maxBoostedCp: boss.maxBoostedCp,
       possibleShiny: boss.possibleShiny,
-      refreshedAt: new Date().toISOString(),
+      refreshedAt,
     };
   });
+
+  if (item.category !== "mega") return profiles;
+
+  const matchedProfileNames = new Set(
+    profiles.map((profile) => normaliseBossName(profile.name)),
+  );
+  const supplementalProfiles = matchMegaSupplementRecords(item, supplement.megaPokemon)
+    .filter((record) => !matchedProfileNames.has(normaliseBossName(record.mega_name)))
+    .map((record) => megaSupplementProfile(record, supplement, refreshedAt));
+
+  return [...profiles, ...supplementalProfiles];
 }
