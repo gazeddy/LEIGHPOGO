@@ -66,4 +66,24 @@ describe("V3 Wednesday Raid Hour push wiring", () => {
     expect(installer).toContain("Persistent=true")
     expect(installer).toContain("/api/push/raid-hour")
   })
+
+  it("keeps the one-command V3 installer isolated from live", () => {
+    const installer = fs.readFileSync(
+      path.join(process.cwd(), "deploy/install-v3-test.sh"),
+      "utf8",
+    )
+
+    expect(installer).toContain('REPO_DIR="/projects/V3"')
+    expect(installer).toContain('SERVICE_NAME="leighpogo-test"')
+    expect(installer).toContain('PORT="3001"')
+    expect(installer).toContain('SITE_URL="https://dev.leighpogo.co.uk"')
+    expect(installer).toContain('LIVE_DIR="/projects/LIVE"')
+    expect(installer).toContain('LIVE_SERVICE="leighpogo.service"')
+    expect(installer).toContain('LIVE_PORT="3000"')
+    expect(installer).toContain("Refusing to use the LIVE checkout")
+    expect(installer).toContain("Refusing to target the live service")
+    expect(installer).toContain("Refusing to target the live port")
+    expect(installer).toContain('npm run db:deploy')
+    expect(installer).toContain('deploy/install-push.sh')
+  })
 })
