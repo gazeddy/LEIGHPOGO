@@ -52,6 +52,7 @@ describe("PWA foundation", () => {
     expect(app).toContain('name="apple-mobile-web-app-capable"')
     expect(app).toContain('rel="manifest" href="/manifest.webmanifest"')
     expect(app).toContain('rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"')
+    expect(app).toContain('import "../styles/pwa.css"')
   })
 
   it("ships the icon and offline assets referenced by the manifest and metadata", () => {
@@ -63,5 +64,27 @@ describe("PWA foundation", () => {
     ]) {
       expect(fs.existsSync(path.join(process.cwd(), asset))).toBe(true)
     }
+  })
+
+  it("provides a discoverable install flow for Chromium and iOS", () => {
+    const bootstrap = fs.readFileSync(
+      path.join(process.cwd(), "components/PwaBootstrap.js"),
+      "utf8",
+    )
+
+    expect(bootstrap).toContain('window.addEventListener("beforeinstallprompt"')
+    expect(bootstrap).toContain('window.addEventListener("appinstalled"')
+    expect(bootstrap).toContain("await prompt.prompt()")
+    expect(bootstrap).toContain("Add to Home Screen")
+    expect(bootstrap).toContain('window.navigator.standalone === true')
+  })
+
+  it("keeps generated and local Next.js files out of version control", () => {
+    const gitignore = fs.readFileSync(path.join(process.cwd(), ".gitignore"), "utf8")
+
+    expect(gitignore).toContain(".next/")
+    expect(gitignore).toContain("next-env.d.ts")
+    expect(gitignore).toContain(".env*")
+    expect(gitignore).toContain("!.env.example")
   })
 })
