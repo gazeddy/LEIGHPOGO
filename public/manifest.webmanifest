@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "LEIGHPOGO",
   "short_name": "LEIGHPOGO",
   "description": "Leigh Pokémon GO community tools",
@@ -7,12 +8,33 @@
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
+  "categories": ["social", "utilities"],
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "/pwa-icon.svg",
       "sizes": "any",
-      "type": "image/x-icon",
-      "purpose": "any"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Friend Codes",
+      "short_name": "Friend Codes",
+      "url": "/friend-codes",
+      "icons": [{ "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Gyms",
+      "short_name": "Gyms",
+      "url": "/gyms",
+      "icons": [{ "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Trades",
+      "short_name": "Trades",
+      "url": "/trades",
+      "icons": [{ "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]
 }
