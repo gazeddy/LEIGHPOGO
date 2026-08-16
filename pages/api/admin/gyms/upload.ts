@@ -136,7 +136,9 @@ function decodeCsv(body: UploadBody): Buffer {
   return buffer;
 }
 
-function parseGyms(buffer: Buffer): Omit<GymRecord, "alias">[] {
+function parseGyms(
+  buffer: Buffer,
+): Omit<GymRecord, "alias" | "markerEmoji">[] {
   let rows: CsvGymRow[];
 
   try {
@@ -239,7 +241,10 @@ async function archiveCsv(buffer: Buffer, uploadedAt: Date): Promise<string> {
   }
 }
 
-function sourceFieldsMatch(left: GymRecord, right: Omit<GymRecord, "alias">): boolean {
+function sourceFieldsMatch(
+  left: GymRecord,
+  right: Omit<GymRecord, "alias" | "markerEmoji">,
+): boolean {
   return (
     left.name === right.name &&
     left.url === right.url &&
@@ -318,6 +323,7 @@ export default async function handler(
         return {
           ...gym,
           alias: null,
+          markerEmoji: null,
           firstSeenAt: gym.firstSeenAt ?? (initialImport ? null : importedAt),
         };
       }
@@ -331,6 +337,7 @@ export default async function handler(
       return {
         ...gym,
         alias: existing.alias,
+        markerEmoji: existing.markerEmoji,
         firstSeenAt: earliestDate(existing.firstSeenAt, gym.firstSeenAt),
       };
     });
