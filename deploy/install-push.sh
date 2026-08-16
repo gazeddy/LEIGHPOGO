@@ -7,11 +7,18 @@ if [[ ${EUID} -ne 0 ]]; then
 fi
 
 SERVICE_NAME="${1:-leighpogo}"
-VAPID_SUBJECT="${2:-https://leighpogo.co.uk}"
+PORT="${2:-3000}"
+VAPID_SUBJECT="${3:-https://leighpogo.co.uk}"
 SERVICE_NAME="${SERVICE_NAME%.service}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]]; then
   echo "Invalid systemd service name: $SERVICE_NAME" >&2
+  exit 1
+fi
+
+if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+  echo "Invalid port: $PORT" >&2
   exit 1
 fi
 
@@ -35,6 +42,11 @@ DROPIN_FILE="${DROPIN_DIR}/push-notifications.conf"
 
 if ! systemctl cat "$APP_SERVICE" >/dev/null 2>&1; then
   echo "${APP_SERVICE} does not exist." >&2
+  exit 1
+fi
+
+if [[ ! -f "${SCRIPT_DIR}/install-raid-hour-timer.sh" ]]; then
+  echo "${SCRIPT_DIR}/install-raid-hour-timer.sh is missing." >&2
   exit 1
 fi
 
@@ -67,7 +79,8 @@ EOF
   echo "Generated VAPID keys in ${ENV_FILE}."
 fi
 
-# Keep the subject current without rotating the key pair.
+# Keep the subject current without rotating the key pair. Rotating an existing
+# VAPID key pair would invalidate browser subscriptions created with the old key.
 if grep -q '^VAPID_SUBJECT=' "$ENV_FILE"; then
   sed -i "s|^VAPID_SUBJECT=.*$|VAPID_SUBJECT=${VAPID_SUBJECT}|" "$ENV_FILE"
 else
@@ -84,13 +97,15 @@ EOF
 systemctl daemon-reload
 systemctl restart "$APP_SERVICE"
 
+# This creates/reuses RAID_HOUR_CRON_SECRET, attaches it to the application
+# service, and enables the persistent 15-minute scheduler timer.
+bash "${SCRIPT_DIR}/install-raid-hour-timer.sh" "$SERVICE_NAME" "$PORT"
+
 echo
-echo "Push notification VAPID configuration installed."
+echo "LEIGHPOGO push notification server setup is complete."
 echo "Application service: ${APP_SERVICE}"
-echo "Environment file: ${ENV_FILE}"
+echo "Push environment: ${ENV_FILE}"
 echo "VAPID subject: ${VAPID_SUBJECT}"
+echo "Raid Hour timer: ${SERVICE_NAME}-raid-hour.timer"
 echo
-echo "Next, install the Raid Hour scheduler from the app checkout:"
-echo "  sudo bash deploy/install-raid-hour-timer.sh ${SERVICE_NAME} 3000"
-echo
-echo "Then sign in to LEIGHPOGO, open Notifications, enable push, and use Send test push."
+echo "Now sign in to LEIGHPOGO, open Notifications, enable push, and use Send test push."
