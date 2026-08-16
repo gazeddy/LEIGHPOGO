@@ -1,76 +1,38 @@
-.pwa-install-banner {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 1000;
-  width: min(560px, calc(100% - 24px));
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 52px 16px 18px;
-  background: #161b22;
+.pwa-account-install {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 24px;
+  padding: 18px;
   border: 1px solid #30363d;
-  border-radius: 12px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  border-radius: 10px;
+  background: #161b22;
 }
 
-.pwa-install-copy {
-  flex: 1;
-  min-width: 0;
+.pwa-account-install h2 {
+  margin: 0 0 4px;
 }
 
-.pwa-install-copy strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 16px;
+.pwa-account-install button {
+  width: fit-content;
 }
 
-.pwa-install-copy p {
-  margin: 0;
+.pwa-account-install button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.pwa-install-ready {
+  color: #7ee787;
+  font-weight: 600;
+}
+
+.pwa-install-status {
   color: #c9d1d9;
-  line-height: 1.4;
-  font-size: 14px;
-}
-
-.pwa-install-actions {
-  flex: 0 0 auto;
-}
-
-.pwa-install-button {
-  width: auto;
-  white-space: nowrap;
-}
-
-.pwa-install-dismiss {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: transparent;
-  color: #8b949e;
-  font-size: 24px;
-  line-height: 1;
-}
-
-.pwa-install-dismiss:hover {
-  background: #21262d;
-  color: #fff;
+  line-height: 1.45;
 }
 
 @media (max-width: 600px) {
-  .pwa-install-banner {
-    bottom: 10px;
-    width: calc(100% - 20px);
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 48px 16px 16px;
-  }
-
-  .pwa-install-button {
+  .pwa-account-install button {
     width: 100%;
   }
 }
