@@ -1,5 +1,6 @@
 import Head from "next/head";
 import type { GetServerSideProps } from "next";
+import { useState } from "react";
 import { getRaidToolsData } from "../../lib/raid-boss-history";
 import type {
   RaidBossProfileData,
@@ -30,6 +31,40 @@ function formatDateRange(start: string, end: string): string {
 function formatMultiplier(value: number): string {
   const rounded = Math.round(value * 1000) / 1000;
   return `${rounded}×`;
+}
+
+function buildRaidSearchString(weaknesses: RaidTypeMatchup[]): string {
+  const ordered = [...weaknesses].sort((a, b) => b.multiplier - a.multiplier);
+  const uniqueTypes = Array.from(new Set(ordered.map((item) => item.type.toLowerCase())));
+  return uniqueTypes.map((type) => `@${type}`).join(",");
+}
+
+function CopySearchButton({ searchString }: { searchString: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copySearchString = async () => {
+    try {
+      await navigator.clipboard.writeText(searchString);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className={styles.searchStringRow}>
+      <code className={styles.searchString}>{searchString}</code>
+      <button
+        type="button"
+        className={styles.copyButton}
+        onClick={copySearchString}
+        aria-label={`Copy Pokémon GO raid search string ${searchString}`}
+      >
+        {copied ? "Copied!" : "Copy search"}
+      </button>
+    </div>
+  );
 }
 
 function MatchupList({
@@ -64,6 +99,7 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
   const weaknesses = boss.weaknesses.filter((item) => item.multiplier <= 1.61);
   const heavyResists = boss.resistances.filter((item) => item.multiplier < 0.624);
   const resistances = boss.resistances.filter((item) => item.multiplier >= 0.624);
+  const searchString = buildRaidSearchString(boss.weaknesses);
 
   return (
     <section className={styles.bossDetails} aria-label={`${boss.name} raid information`}>
@@ -104,6 +140,13 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
         <MatchupList title="Strong resistance" items={heavyResists} />
         <MatchupList title="Resists" items={resistances} />
       </div>
+
+      {searchString && (
+        <div className={styles.searchSection}>
+          <h4>Pokémon GO search</h4>
+          <CopySearchButton searchString={searchString} />
+        </div>
+      )}
     </section>
   );
 }
