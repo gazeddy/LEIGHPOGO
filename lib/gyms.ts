@@ -10,6 +10,7 @@ export interface GymRecord {
   id: string;
   name: string;
   alias: string | null;
+  markerEmoji: string | null;
   url: string | null;
   lat: number;
   lon: number;
@@ -126,6 +127,10 @@ export async function readGymState(): Promise<GymState> {
           typeof gym.alias === "string" && gym.alias.trim()
             ? gym.alias.trim()
             : null,
+        markerEmoji:
+          typeof gym.markerEmoji === "string" && gym.markerEmoji.trim()
+            ? gym.markerEmoji.trim()
+            : null,
         url: typeof gym.url === "string" && gym.url.trim() ? gym.url.trim() : null,
         exRaidEligible: gym.exRaidEligible === true,
         firstSeenAt:
@@ -216,4 +221,30 @@ export function cleanAlias(value: unknown): string | null {
   }
 
   return alias;
+}
+
+export function cleanMarkerEmoji(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const markerEmoji = value.trim();
+
+  if (!markerEmoji) {
+    return null;
+  }
+
+  if (markerEmoji.length > 24) {
+    throw new Error("Gym map icons must be a single emoji.");
+  }
+
+  const graphemes = [
+    ...new Intl.Segmenter("en", { granularity: "grapheme" }).segment(markerEmoji),
+  ];
+
+  if (graphemes.length !== 1 || /\s/.test(markerEmoji)) {
+    throw new Error("Gym map icons must be a single emoji.");
+  }
+
+  return markerEmoji;
 }
