@@ -8,7 +8,7 @@ describe("V3 push notification foundation", () => {
       "utf8",
     )
 
-    expect(schema).toContain("pushSubscriptions  PushSubscription[]")
+    expect(schema).toMatch(/pushSubscriptions\s+PushSubscription\[\]/)
     expect(schema).toContain("model PushSubscription")
     expect(schema).toContain("endpoint  String   @unique")
     expect(schema).toContain("@@index([ownerId])")
