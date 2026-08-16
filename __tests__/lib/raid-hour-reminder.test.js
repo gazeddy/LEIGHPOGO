@@ -5,6 +5,25 @@ const {
   normalisePushTimeZone,
 } = require("../../lib/raid-hour-reminder")
 
+const lunalaRaid = {
+  eventID: "five-star-example",
+  category: "five-star",
+  label: "5★ Raid Boss",
+  boss: "Lunala",
+  start: "2026-08-19T10:00:00",
+  end: "2026-08-26T10:00:00",
+  link: "/tools/raids#raid-five-star-five-star-example",
+  state: "current",
+  catchCp: [
+    {
+      boss: "Lunala",
+      maxUnboostedCp: 2310,
+      maxBoostedCp: 2887,
+      possibleShiny: false,
+    },
+  ],
+}
+
 describe("Wednesday Raid Hour push reminder", () => {
   it("fires at 18:00 Wednesday in the device timezone during BST", () => {
     const now = new Date("2026-08-19T17:00:00.000Z")
@@ -39,27 +58,7 @@ describe("Wednesday Raid Hour push reminder", () => {
   })
 
   it("builds the current five-star hundo CP notification", () => {
-    const payload = buildRaidHourPushPayload(
-      {
-        eventID: "five-star-example",
-        category: "five-star",
-        label: "5★ Raid Boss",
-        boss: "Lunala",
-        start: "2026-08-19T10:00:00",
-        end: "2026-08-26T10:00:00",
-        link: "/tools/raids#raid-five-star-five-star-example",
-        state: "current",
-        catchCp: [
-          {
-            boss: "Lunala",
-            maxUnboostedCp: 2310,
-            maxBoostedCp: 2887,
-            possibleShiny: false,
-          },
-        ],
-      },
-      "2026-08-19",
-    )
+    const payload = buildRaidHourPushPayload(lunalaRaid, "2026-08-19")
 
     expect(payload).toEqual({
       title: "5★ Raid Hour: Lunala",
@@ -68,5 +67,13 @@ describe("Wednesday Raid Hour push reminder", () => {
       renotify: false,
       url: "/tools/raids#raid-five-star-five-star-example",
     })
+  })
+
+  it("hides both CP values for the rare easter egg recipient", () => {
+    const payload = buildRaidHourPushPayload(lunalaRaid, "2026-08-19", true)
+
+    expect(payload.body).toBe("Hundo - 15/15/15")
+    expect(payload.body).not.toContain("2310")
+    expect(payload.body).not.toContain("2887")
   })
 })
