@@ -1,7 +1,15 @@
-const STATIC_CACHE = "leighpogo-static-v1"
+const STATIC_CACHE = "leighpogo-static-v2"
 const OFFLINE_URL = "/offline.html"
-const STATIC_ASSETS = [OFFLINE_URL, "/manifest.webmanifest", "/favicon.ico", "/pwa-icon.svg"]
-const DEFAULT_ICON = "/pwa-icon.svg"
+const STATIC_ASSETS = [
+  OFFLINE_URL,
+  "/manifest.webmanifest",
+  "/favicon.ico",
+  "/pwa-icon.svg",
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+  "/apple-touch-icon.png",
+]
+const DEFAULT_ICON = "/pwa-icon-192.png"
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

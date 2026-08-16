@@ -2,7 +2,7 @@ const fs = require("fs")
 const path = require("path")
 
 describe("PWA foundation", () => {
-  it("provides an installable standalone manifest with app shortcuts", () => {
+  it("provides an installable standalone manifest with PNG app icons and shortcuts", () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "public/manifest.webmanifest"), "utf8"),
     )
@@ -14,9 +14,15 @@ describe("PWA foundation", () => {
     expect(manifest.icons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          src: "/pwa-icon.svg",
-          sizes: "any",
-          purpose: expect.stringContaining("maskable"),
+          src: "/pwa-icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+        }),
+        expect.objectContaining({
+          src: "/pwa-icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
         }),
       ]),
     )
@@ -36,6 +42,7 @@ describe("PWA foundation", () => {
     expect(serviceWorker).toContain('url.pathname.startsWith("/_next/data/")')
     expect(serviceWorker).toContain('request.mode === "navigate"')
     expect(serviceWorker).toContain("caches.match(OFFLINE_URL)")
+    expect(serviceWorker).toContain('const DEFAULT_ICON = "/pwa-icon-192.png"')
   })
 
   it("publishes mobile and Apple PWA metadata", () => {
@@ -44,6 +51,17 @@ describe("PWA foundation", () => {
     expect(app).toContain('name="mobile-web-app-capable"')
     expect(app).toContain('name="apple-mobile-web-app-capable"')
     expect(app).toContain('rel="manifest" href="/manifest.webmanifest"')
-    expect(app).toContain('rel="apple-touch-icon" href="/pwa-icon.svg"')
+    expect(app).toContain('rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"')
+  })
+
+  it("ships the icon and offline assets referenced by the manifest and metadata", () => {
+    for (const asset of [
+      "public/pwa-icon-192.png",
+      "public/pwa-icon-512.png",
+      "public/apple-touch-icon.png",
+      "public/offline.html",
+    ]) {
+      expect(fs.existsSync(path.join(process.cwd(), asset))).toBe(true)
+    }
   })
 })
