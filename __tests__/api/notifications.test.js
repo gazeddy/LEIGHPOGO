@@ -17,6 +17,11 @@ jest.mock("../../lib/prisma", () => ({
     findFirst: jest.fn(),
     update: jest.fn(),
   },
+  friendCodeGrabNotification: {
+    count: jest.fn(),
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+  },
 }))
 
 const prisma = require("../../lib/prisma")
@@ -37,9 +42,10 @@ describe("notifications API", () => {
     expect(res._getStatusCode()).toBe(401)
   })
 
-  it("returns only the private unread count for navbar summaries", async () => {
+  it("returns the combined private unread count for navbar summaries", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.tradeNotification.count.mockResolvedValueOnce(3)
+    prisma.friendCodeGrabNotification.count.mockResolvedValueOnce(2)
     const { req, res } = createMocks({
       method: "GET",
       query: { summary: "1" },
@@ -48,29 +54,38 @@ describe("notifications API", () => {
     await collectionHandler(req, res)
 
     expect(res._getStatusCode()).toBe(200)
-    expect(JSON.parse(res._getData())).toEqual({ unreadCount: 3 })
+    expect(JSON.parse(res._getData())).toEqual({ unreadCount: 5 })
     expect(prisma.tradeNotification.count).toHaveBeenCalledWith({
       where: { ownerId: 12, readAt: null },
     })
+    expect(prisma.friendCodeGrabNotification.count).toHaveBeenCalledWith({
+      where: { ownerId: 12, readAt: null },
+    })
     expect(prisma.tradeNotification.findMany).not.toHaveBeenCalled()
+    expect(prisma.friendCodeGrabNotification.findMany).not.toHaveBeenCalled()
   })
 
   it("marks all of the current user's unread notifications as read", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.tradeNotification.updateMany.mockResolvedValueOnce({ count: 2 })
+    prisma.friendCodeGrabNotification.updateMany.mockResolvedValueOnce({ count: 1 })
     const { req, res } = createMocks({ method: "PUT" })
 
     await collectionHandler(req, res)
 
     expect(res._getStatusCode()).toBe(200)
-    expect(JSON.parse(res._getData())).toEqual({ updated: 2, unreadCount: 0 })
+    expect(JSON.parse(res._getData())).toEqual({ updated: 3, unreadCount: 0 })
     expect(prisma.tradeNotification.updateMany).toHaveBeenCalledWith({
+      where: { ownerId: 12, readAt: null },
+      data: { readAt: expect.any(Date) },
+    })
+    expect(prisma.friendCodeGrabNotification.updateMany).toHaveBeenCalledWith({
       where: { ownerId: 12, readAt: null },
       data: { readAt: expect.any(Date) },
     })
   })
 
-  it("does not allow a user to mark another user's notification as read", async () => {
+  it("does not allow a user to mark another user's trade notification as read", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.tradeNotification.findFirst.mockResolvedValueOnce(null)
     const { req, res } = createMocks({

@@ -10,8 +10,21 @@ import {
   serializeTradeNotification,
   tradeNotificationInclude,
 } from "../lib/tradeNotifications"
+import {
+  friendCodeGrabNotificationInclude,
+  serializeFriendCodeGrabNotification,
+} from "../lib/friendCodeNotifications"
 
 const notificationMessage = (notification) => {
+  if (notification.kind === "FRIEND_CODE_GRAB") {
+    const trainer = notification.copiedBy?.ign || "Another trainer"
+    const codeOwner = notification.entry?.trainerName
+      ? ` for ${notification.entry.trainerName}`
+      : ""
+
+    return `${trainer} copied your friend code${codeOwner}.`
+  }
+
   const modifiers = notification.modifierSummary
     ? `${notification.modifierSummary} `
     : ""
@@ -25,6 +38,11 @@ const notificationMessage = (notification) => {
 
   return `${notification.listing.owner.ign} listed ${modifiers}${notification.pokemonName}, matching your wanted list.`
 }
+
+const notificationTitle = (notification) =>
+  notification.kind === "FRIEND_CODE_GRAB"
+    ? "Friend code copied"
+    : notification.pokemonName
 
 export default function NotificationsPage({ initialNotifications, renderedAt }) {
   const router = useRouter()
@@ -53,22 +71,42 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
     notifyNavbar()
   }
 
-  const openListing = async (notification) => {
-    if (!notification.readAt) {
-      const response = await fetch(`/api/notifications/${notification.id}`, {
-        method: "PUT",
-      })
+  const markNotificationRead = async (notification) => {
+    if (notification.readAt) return notification
 
-      if (response.ok) {
-        const updated = await response.json()
-        setNotifications((current) =>
-          current.map((item) => item.id === updated.id ? updated : item),
-        )
-        notifyNavbar()
-      }
-    }
+    const url =
+      notification.kind === "FRIEND_CODE_GRAB"
+        ? `/api/friend-code-grabs/${notification.id}`
+        : `/api/notifications/${notification.id}`
+    const response = await fetch(url, { method: "PUT" })
 
+    if (!response.ok) return notification
+
+    const updated = await response.json()
+    const nextNotification =
+      notification.kind === "FRIEND_CODE_GRAB"
+        ? updated
+        : { kind: "TRADE", ...updated }
+
+    setNotifications((current) =>
+      current.map((item) =>
+        item.id === notification.id && item.kind === notification.kind
+          ? nextNotification
+          : item,
+      ),
+    )
+    notifyNavbar()
+    return nextNotification
+  }
+
+  const openTradeListing = async (notification) => {
+    await markNotificationRead(notification)
     router.push(`/trades/${notification.listingId}`)
+  }
+
+  const openFriendCodes = async (notification) => {
+    await markNotificationRead(notification)
+    router.push("/friend-codes")
   }
 
   return (
@@ -77,7 +115,7 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
         <div>
           <h1>Notifications</h1>
           <p className="muted">
-            Private alerts when someone offers something you want or when your listing matches another trainer&apos;s wanted list.
+            Private alerts for trade matches and when another logged-in trainer copies your friend code. Friend-code copy alerts stay in-app only and are not sent as push notifications.
           </p>
         </div>
         {unreadCount > 0 && (
@@ -91,15 +129,17 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
 
       {notifications.length === 0 ? (
         <div className="card">
-          <p className="muted">You do not have any trade notifications yet.</p>
-          <Link className="button-link" href="/trades/wanted">
-            View wanted trades
+          <p className="muted">You do not have any notifications yet.</p>
+          <Link className="button-link" href="/friend-codes">
+            View friend codes
           </Link>
         </div>
       ) : (
         <div className="notification-list">
           {notifications.map((notification) => {
+            const isFriendCodeGrab = notification.kind === "FRIEND_CODE_GRAB"
             const isAvailable =
+              !isFriendCodeGrab &&
               notification.listing.status === "ACTIVE" &&
               notification.listing.expiresAt &&
               new Date(notification.listing.expiresAt).getTime() > renderedAt
@@ -107,12 +147,12 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
             return (
               <article
                 className={`card notification-card ${notification.readAt ? "read" : "unread"}`}
-                key={notification.id}
+                key={`${notification.kind}-${notification.id}`}
               >
                 <div className="notification-card-main">
                   <div>
                     <div className="notification-title-row">
-                      <h2>{notification.pokemonName}</h2>
+                      <h2>{notificationTitle(notification)}</h2>
                       {!notification.readAt && (
                         <span className="notification-unread-badge">New</span>
                       )}
@@ -123,8 +163,12 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
                     </p>
                   </div>
 
-                  {isAvailable ? (
-                    <button type="button" onClick={() => openListing(notification)}>
+                  {isFriendCodeGrab ? (
+                    <button type="button" onClick={() => openFriendCodes(notification)}>
+                      View friend codes
+                    </button>
+                  ) : isAvailable ? (
+                    <button type="button" onClick={() => openTradeListing(notification)}>
                       View listing
                     </button>
                   ) : (
@@ -152,16 +196,34 @@ export async function getServerSideProps(context) {
 
   await purgeExpiredTradeListings()
 
-  const notifications = await prisma.tradeNotification.findMany({
-    where: { ownerId: userId },
-    include: tradeNotificationInclude,
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  })
+  const [tradeNotifications, friendCodeNotifications] = await Promise.all([
+    prisma.tradeNotification.findMany({
+      where: { ownerId: userId },
+      include: tradeNotificationInclude,
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.friendCodeGrabNotification.findMany({
+      where: { ownerId: userId },
+      include: friendCodeGrabNotificationInclude,
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+  ])
+
+  const notifications = [
+    ...tradeNotifications.map((notification) => ({
+      kind: "TRADE",
+      ...serializeTradeNotification(notification),
+    })),
+    ...friendCodeNotifications.map(serializeFriendCodeGrabNotification),
+  ]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 50)
 
   return {
     props: {
-      initialNotifications: notifications.map(serializeTradeNotification),
+      initialNotifications: notifications,
       renderedAt: Date.now(),
     },
   }

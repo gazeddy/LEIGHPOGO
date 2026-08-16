@@ -72,6 +72,18 @@ export default function FriendCodes({ entries }) {
     }
   }
 
+  const recordFriendCodeGrab = (entryId) => {
+    if (!session?.user?.id) return
+
+    fetch("/api/friend-code-grabs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId }),
+    }).catch(() => {
+      // Clipboard copy succeeded; notification logging is intentionally best-effort.
+    })
+  }
+
   const handleCopyFriendCode = async (entry) => {
     const code = normalizeFriendCode(entry.code)
 
@@ -84,6 +96,7 @@ export default function FriendCodes({ entries }) {
       await copyTextToClipboard(code)
       setCopiedEntryId(entry.id)
       setCopyError("")
+      recordFriendCodeGrab(entry.id)
     } catch (error) {
       console.error("Failed to copy friend code", error)
       setCopyError("The friend code could not be copied. Please copy it manually.")

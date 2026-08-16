@@ -8,29 +8,32 @@ datasource db {
 }
 
 model User {
-  id                 Int                 @id @default(autoincrement())
-  name               String?
-  ign                String              @unique
-  password           String
-  entries            Entry[]
-  role               String              @default("user")
-  searchStrings      SearchString[]
-  pokedexEntries     PokedexEntry[]
-  tradeListings      TradeListing[]
-  wantedTrades       WantedTrade[]
-  tradeNotifications TradeNotification[]
-  pushSubscriptions  PushSubscription[]
+  id                          Int                          @id @default(autoincrement())
+  name                        String?
+  ign                         String                       @unique
+  password                    String
+  entries                     Entry[]
+  role                        String                       @default("user")
+  searchStrings               SearchString[]
+  pokedexEntries              PokedexEntry[]
+  tradeListings               TradeListing[]
+  wantedTrades                WantedTrade[]
+  tradeNotifications          TradeNotification[]
+  pushSubscriptions           PushSubscription[]
+  friendCodeGrabNotifications FriendCodeGrabNotification[] @relation("FriendCodeGrabOwner")
+  friendCodeCopies            FriendCodeGrabNotification[] @relation("FriendCodeGrabActor")
 }
 
 model Entry {
-  id          Int      @id @default(autoincrement())
-  trainerName String
-  code        String
-  team        String   @default("MYSTIC")
-  ownerId     Int
-  owner       User     @relation(fields: [ownerId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                          Int                          @id @default(autoincrement())
+  trainerName                 String
+  code                        String
+  team                        String                       @default("MYSTIC")
+  ownerId                     Int
+  owner                       User                         @relation(fields: [ownerId], references: [id])
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  friendCodeGrabNotifications FriendCodeGrabNotification[]
 }
 
 model SearchString {
@@ -148,6 +151,21 @@ model TradeNotification {
 
   @@unique([ownerId, listingId, pokemonName])
   @@index([ownerId, readAt, createdAt])
+}
+
+model FriendCodeGrabNotification {
+  id         Int      @id @default(autoincrement())
+  ownerId    Int
+  owner      User     @relation("FriendCodeGrabOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  copiedById Int
+  copiedBy   User     @relation("FriendCodeGrabActor", fields: [copiedById], references: [id], onDelete: Cascade)
+  entryId    Int
+  entry      Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  readAt     DateTime?
+
+  @@index([ownerId, readAt, createdAt])
+  @@index([copiedById, entryId, createdAt])
 }
 
 model PushSubscription {
