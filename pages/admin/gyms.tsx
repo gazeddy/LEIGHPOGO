@@ -100,7 +100,8 @@ export default function GymAdminPage({
     useState<MaintenanceAction | null>(null);
   const [search, setSearch] = useState("");
   const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
-  const [savingAlias, setSavingAlias] = useState<string | null>(null);
+  const [markerEmojiDrafts, setMarkerEmojiDrafts] = useState<Record<string, string>>({});
+  const [savingDisplay, setSavingDisplay] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,7 +179,7 @@ export default function GymAdminPage({
   async function runMaintenance(action: MaintenanceAction) {
     const confirmation =
       action === "clear-new"
-        ? "Clear the new-gym status from every gym? This does not delete gyms or aliases, and a recovery backup will be created first."
+        ? "Clear the new-gym status from every gym? This does not delete gyms, aliases or custom icons, and a recovery backup will be created first."
         : `Restore the latest gym-state backup${latestBackup ? ` (${latestBackup.fileName})` : ""}? The current state will also be backed up so this rollback can be undone.`;
 
     if (!window.confirm(confirmation)) {
@@ -214,22 +215,23 @@ export default function GymAdminPage({
     }
   }
 
-  async function saveAlias(gym: GymRecord) {
+  async function saveDisplaySettings(gym: GymRecord) {
     setMessage(null);
     setError(null);
-    setSavingAlias(gym.id);
+    setSavingDisplay(gym.id);
 
     try {
       const alias = aliasDrafts[gym.id] ?? gym.alias ?? "";
+      const markerEmoji = markerEmojiDrafts[gym.id] ?? gym.markerEmoji ?? "";
       const response = await fetch("/api/admin/gyms/alias", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: gym.id, alias }),
+        body: JSON.stringify({ id: gym.id, alias, markerEmoji }),
       });
       const payload = await response.json();
 
       if (!response.ok || !payload.gym) {
-        throw new Error(payload.error || "The gym alias could not be saved.");
+        throw new Error(payload.error || "The gym display settings could not be saved.");
       }
 
       setGyms((current) =>
@@ -240,13 +242,20 @@ export default function GymAdminPage({
         delete next[gym.id];
         return next;
       });
+      setMarkerEmojiDrafts((current) => {
+        const next = { ...current };
+        delete next[gym.id];
+        return next;
+      });
       setMessage(payload.message);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "The gym alias could not be saved.",
+        caught instanceof Error
+          ? caught.message
+          : "The gym display settings could not be saved.",
       );
     } finally {
-      setSavingAlias(null);
+      setSavingDisplay(null);
     }
   }
 
@@ -260,7 +269,7 @@ export default function GymAdminPage({
           <div>
             <p className="eyebrow">Admin tools</p>
             <h1>Gym data</h1>
-            <p>Import the current gym export and manage community aliases.</p>
+            <p>Import the current gym export and manage community aliases and custom map icons.</p>
           </div>
           <div className="header-links">
             <Link href="/gyms">Open gym map</Link>
@@ -280,8 +289,8 @@ export default function GymAdminPage({
             </p>
             <p className="muted">
               The first upload is treated as the baseline. Later uploads preserve aliases
-              and mark previously unseen gym IDs as new for seven days. The complete gym
-              state is backed up before every import.
+              and custom map icons, and mark previously unseen gym IDs as new for seven
+              days. The complete gym state is backed up before every import.
             </p>
           </div>
           <div className="upload-controls">
@@ -305,9 +314,9 @@ export default function GymAdminPage({
               complete gym state from the latest recovery point.
             </p>
             <p className="muted">
-              Rollback includes official gyms, community-added gyms, aliases and removal
-              reports. The state being replaced is backed up first, so a rollback can be
-              reversed by running rollback again.
+              Rollback includes official gyms, community-added gyms, aliases, custom map
+              icons and removal reports. The state being replaced is backed up first, so a
+              rollback can be reversed by running rollback again.
             </p>
           </div>
           <div className="upload-controls">
@@ -345,8 +354,11 @@ export default function GymAdminPage({
         <section className="gym-admin-card alias-card">
           <div className="alias-heading">
             <div>
-              <h2>Community aliases</h2>
-              <p className="muted">Aliases are shown prominently while the official name remains visible.</p>
+              <h2>Community display settings</h2>
+              <p className="muted">
+                Set an optional alias and a single emoji for the map marker. Leave the icon
+                blank to keep the normal gym marker.
+              </p>
             </div>
             <label>
               Search gyms
@@ -366,7 +378,10 @@ export default function GymAdminPage({
               {filteredGyms.slice(0, 100).map((gym) => (
                 <article key={gym.id}>
                   <div className="gym-identity">
-                    <strong>{gym.alias || gym.name}</strong>
+                    <strong>
+                      {gym.markerEmoji && <span className="gym-admin-icon-preview">{gym.markerEmoji}</span>}
+                      {gym.alias || gym.name}
+                    </strong>
                     {gym.alias && <small>Official: {gym.name}</small>}
                     <small>{gym.id}</small>
                   </div>
@@ -384,12 +399,27 @@ export default function GymAdminPage({
                       }
                     />
                   </label>
+                  <label>
+                    Map icon
+                    <input
+                      value={markerEmojiDrafts[gym.id] ?? gym.markerEmoji ?? ""}
+                      maxLength={24}
+                      placeholder="e.g. 🐆"
+                      aria-label={`Custom map icon for ${gym.alias || gym.name}`}
+                      onChange={(event) =>
+                        setMarkerEmojiDrafts((current) => ({
+                          ...current,
+                          [gym.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
                   <button
                     type="button"
-                    disabled={savingAlias === gym.id}
-                    onClick={() => saveAlias(gym)}
+                    disabled={savingDisplay === gym.id}
+                    onClick={() => saveDisplaySettings(gym)}
                   >
-                    {savingAlias === gym.id ? "Saving…" : "Save alias"}
+                    {savingDisplay === gym.id ? "Saving…" : "Save display"}
                   </button>
                 </article>
               ))}
