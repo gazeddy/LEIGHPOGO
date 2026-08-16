@@ -13,16 +13,12 @@ import "../styles/pokedex-selection.css"
 import "../styles/pwa.css"
 import Navbar from "../components/Navbar"
 import PokemonRegionalAdmin from "../components/admin/PokemonRegionalAdmin"
-import DittoDisguiseTicker from "../components/events/DittoDisguiseTicker"
-import EventTicker from "../components/events/EventTicker"
-import RaidBossTicker from "../components/events/RaidBossTicker"
-import NewGymTicker from "../components/gyms/NewGymTicker"
+import TickerStack from "../components/tickers/TickerStack"
 import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
 import PwaBootstrap from "../components/PwaBootstrap"
 
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
-  const showEventTicker = !router.pathname.startsWith("/events")
   const showPokemonRegionalAdmin = router.pathname === "/admin/pokedex"
 
   return (
@@ -41,10 +37,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       <PwaBootstrap />
       <PokedexCatalogFetchGuard />
       <Navbar />
-      {showEventTicker && <EventTicker />}
-      <RaidBossTicker />
-      <DittoDisguiseTicker />
-      <NewGymTicker />
+      <TickerStack />
       <Component {...pageProps} />
       {showPokemonRegionalAdmin && <PokemonRegionalAdmin />}
     </SessionProvider>

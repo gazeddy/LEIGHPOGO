@@ -4,6 +4,7 @@ import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
 import PwaInstallButton from "../components/PwaInstallButton"
+import TickerPreferenceSettings from "../components/TickerPreferenceSettings"
 import { formatFriendCodeInput } from "../lib/friendCode"
 
 export default function Account({ entry }) {
@@ -79,6 +80,10 @@ export default function Account({ entry }) {
 
       <section>
         <PwaInstallButton />
+      </section>
+
+      <section>
+        <TickerPreferenceSettings />
       </section>
 
       <section>

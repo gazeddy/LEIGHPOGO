@@ -7,6 +7,11 @@ function readSource(relativePath) {
 
 describe("ticker regression wiring", () => {
   const app = readSource("pages/_app.js");
+  const tickerStack = readSource("components/tickers/TickerStack.js");
+  const tickerPreferences = readSource("lib/tickerPreferences.js");
+  const tickerPreferencesApi = readSource("pages/api/ticker-preferences.js");
+  const account = readSource("pages/account.js");
+  const prismaSchema = readSource("prisma/schema.prisma");
   const eventCard = readSource("components/events/EventCard.tsx");
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
@@ -100,13 +105,42 @@ describe("ticker regression wiring", () => {
       (dittoTicker.match(/<DittoItems disguises=\{disguises\} duplicate \/>/g) || []).length,
     ).toBe(6);
 
-    const raidPosition = app.indexOf("<RaidBossTicker />");
-    const dittoPosition = app.indexOf("<DittoDisguiseTicker />");
-    const gymPosition = app.indexOf("<NewGymTicker />");
+    const raidPosition = tickerStack.indexOf("<RaidBossTicker />");
+    const dittoPosition = tickerStack.indexOf("<DittoDisguiseTicker />");
+    const gymPosition = tickerStack.indexOf("<NewGymTicker />");
 
     expect(raidPosition).toBeGreaterThan(-1);
     expect(dittoPosition).toBeGreaterThan(raidPosition);
     expect(gymPosition).toBeGreaterThan(dittoPosition);
+  });
+
+  it("lets logged-in users control each ticker and hides matching tickers on their own pages", () => {
+    expect(app).toContain("<TickerStack />");
+    expect(account).toContain("<TickerPreferenceSettings />");
+    expect(tickerPreferences).toContain('EVENTS: "EVENTS"');
+    expect(tickerPreferences).toContain('RAID_BOSS: "RAID_BOSS"');
+    expect(tickerPreferences).toContain('DITTO: "DITTO"');
+    expect(tickerPreferences).toContain('NEW_GYMS: "NEW_GYMS"');
+    expect(tickerPreferences).toContain('pathname.startsWith("/events")');
+    expect(tickerPreferences).toContain('pathname.startsWith("/tools/raids")');
+    expect(tickerPreferences).toContain('pathname.startsWith("/gyms")');
+    expect(tickerStack).toContain("preferences[TICKER_TYPES.EVENTS]");
+    expect(tickerStack).toContain("preferences[TICKER_TYPES.RAID_BOSS]");
+    expect(tickerStack).toContain("preferences[TICKER_TYPES.DITTO]");
+    expect(tickerStack).toContain("preferences[TICKER_TYPES.NEW_GYMS]");
+    expect(tickerStack).toContain("hiddenTickers.has(TICKER_TYPES.EVENTS)");
+    expect(tickerStack).toContain("hiddenTickers.has(TICKER_TYPES.RAID_BOSS)");
+    expect(tickerStack).toContain("hiddenTickers.has(TICKER_TYPES.NEW_GYMS)");
+  });
+
+  it("persists per-user ticker settings while missing preferences remain enabled", () => {
+    expect(prismaSchema).toContain("tickerPreferences           UserTickerPreference[]");
+    expect(prismaSchema).toContain("model UserTickerPreference");
+    expect(prismaSchema).toContain("@@unique([ownerId, tickerType])");
+    expect(tickerPreferences).toContain("DEFAULT_TICKER_PREFERENCES");
+    expect(tickerPreferencesApi).toContain("prisma.userTickerPreference.findMany");
+    expect(tickerPreferencesApi).toContain("prisma.userTickerPreference.upsert");
+    expect(tickerPreferencesApi).toContain("normalizeTickerPreferences(rows)");
   });
 
   it("shares matching automatic speed and manual interaction behaviour", () => {
