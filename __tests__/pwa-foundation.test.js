@@ -66,7 +66,7 @@ describe("PWA foundation", () => {
     }
   })
 
-  it("provides a discoverable install flow for Chromium and iOS", () => {
+  it("captures Chromium install capability without showing a global install banner", () => {
     const bootstrap = fs.readFileSync(
       path.join(process.cwd(), "components/PwaBootstrap.js"),
       "utf8",
@@ -74,9 +74,26 @@ describe("PWA foundation", () => {
 
     expect(bootstrap).toContain('window.addEventListener("beforeinstallprompt"')
     expect(bootstrap).toContain('window.addEventListener("appinstalled"')
-    expect(bootstrap).toContain("await prompt.prompt()")
-    expect(bootstrap).toContain("Add to Home Screen")
-    expect(bootstrap).toContain('window.navigator.standalone === true')
+    expect(bootstrap).toContain("window[PWA_PROMPT_KEY] = event")
+    expect(bootstrap).toContain('window.dispatchEvent(new Event(READY_EVENT))')
+    expect(bootstrap).not.toContain("pwa-install-banner")
+  })
+
+  it("exposes the install action only from the authenticated account page", () => {
+    const account = fs.readFileSync(path.join(process.cwd(), "pages/account.js"), "utf8")
+    const installButton = fs.readFileSync(
+      path.join(process.cwd(), "components/PwaInstallButton.js"),
+      "utf8",
+    )
+
+    expect(account).toContain('import PwaInstallButton from "../components/PwaInstallButton"')
+    expect(account).toContain("<PwaInstallButton />")
+    expect(account).toContain("getServerSession")
+    expect(account).toContain('redirect: { destination: "/login", permanent: false }')
+    expect(installButton).toContain("Install LEIGHPOGO")
+    expect(installButton).toContain("await prompt.prompt()")
+    expect(installButton).toContain("SamsungBrowser")
+    expect(installButton).toContain("Add to Home Screen")
   })
 
   it("keeps generated and local Next.js files out of version control", () => {
