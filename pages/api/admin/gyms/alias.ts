@@ -3,6 +3,7 @@ import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import {
   cleanAlias,
+  cleanMarkerEmoji,
   readGymState,
   writeGymState,
   type GymRecord,
@@ -12,6 +13,7 @@ import { authOptions } from "../../auth/[...nextauth]";
 interface AliasBody {
   id?: unknown;
   alias?: unknown;
+  markerEmoji?: unknown;
 }
 
 type AliasResponse =
@@ -42,6 +44,7 @@ export default async function handler(
     }
 
     const alias = cleanAlias(body.alias);
+    const markerEmoji = cleanMarkerEmoji(body.markerEmoji);
     const state = await readGymState();
     const index = state.gyms.findIndex((gym) => gym.id === id);
 
@@ -49,20 +52,23 @@ export default async function handler(
       return res.status(404).json({ error: "Gym not found" });
     }
 
-    const gym = { ...state.gyms[index], alias };
+    const gym = { ...state.gyms[index], alias, markerEmoji };
     const gyms = [...state.gyms];
     gyms[index] = gym;
 
     await writeGymState({ ...state, gyms });
 
     return res.status(200).json({
-      message: alias ? "Gym alias saved." : "Gym alias removed.",
+      message: "Gym display settings saved.",
       gym,
     });
   } catch (error) {
-    console.error("Gym alias update failed", error);
+    console.error("Gym display settings update failed", error);
     return res.status(400).json({
-      error: error instanceof Error ? error.message : "The gym alias could not be saved.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "The gym display settings could not be saved.",
     });
   }
 }
