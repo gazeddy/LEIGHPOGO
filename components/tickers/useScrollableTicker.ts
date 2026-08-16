@@ -295,7 +295,6 @@ useEffect(() => {
       startScrollLeft: viewport.scrollLeft,
       dragged: false,
     };
-    viewport.setPointerCapture(event.pointerId);
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
@@ -312,6 +311,9 @@ useEffect(() => {
     }
 
     drag.dragged = true;
+    if (!viewport.hasPointerCapture(event.pointerId)) {
+      viewport.setPointerCapture(event.pointerId);
+    }
     setDragging(true);
     event.preventDefault();
 
