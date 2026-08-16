@@ -11,6 +11,7 @@ PORT="${2:-3000}"
 VAPID_SUBJECT="${3:-https://leighpogo.co.uk}"
 SERVICE_NAME="${SERVICE_NAME%.service}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 if [[ ! "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]]; then
   echo "Invalid systemd service name: $SERVICE_NAME" >&2
@@ -39,6 +40,7 @@ ENV_DIR="/etc/leighpogo"
 ENV_FILE="${ENV_DIR}/${SERVICE_NAME}-push.env"
 DROPIN_DIR="/etc/systemd/system/${APP_SERVICE}.d"
 DROPIN_FILE="${DROPIN_DIR}/push-notifications.conf"
+VAPID_GENERATOR="${REPO_DIR}/scripts/generateVapidKeys.js"
 
 if ! systemctl cat "$APP_SERVICE" >/dev/null 2>&1; then
   echo "${APP_SERVICE} does not exist." >&2
@@ -50,6 +52,11 @@ if [[ ! -f "${SCRIPT_DIR}/install-raid-hour-timer.sh" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$VAPID_GENERATOR" ]]; then
+  echo "${VAPID_GENERATOR} is missing." >&2
+  exit 1
+fi
+
 install -d -m 0750 "$ENV_DIR"
 
 if [[ -f "$ENV_FILE" ]] \
@@ -58,17 +65,14 @@ if [[ -f "$ENV_FILE" ]] \
   echo "Reusing existing VAPID keys in ${ENV_FILE}."
 else
   umask 077
-  VAPID_KEYS="$(node <<'NODE'
-const crypto = require('node:crypto')
-const ecdh = crypto.createECDH('prime256v1')
-ecdh.generateKeys()
-process.stdout.write(
-  `${ecdh.getPublicKey().toString('base64url')}\n${ecdh.getPrivateKey().toString('base64url')}`,
-)
-NODE
-)"
-  VAPID_PUBLIC_KEY="$(printf '%s\n' "$VAPID_KEYS" | sed -n '1p')"
-  VAPID_PRIVATE_KEY="$(printf '%s\n' "$VAPID_KEYS" | sed -n '2p')"
+  GENERATED_ENV="$(node "$VAPID_GENERATOR")"
+  VAPID_PUBLIC_KEY="$(printf '%s\n' "$GENERATED_ENV" | sed -n 's/^VAPID_PUBLIC_KEY=//p')"
+  VAPID_PRIVATE_KEY="$(printf '%s\n' "$GENERATED_ENV" | sed -n 's/^VAPID_PRIVATE_KEY=//p')"
+
+  if [[ -z "$VAPID_PUBLIC_KEY" || -z "$VAPID_PRIVATE_KEY" ]]; then
+    echo "Unable to generate VAPID keys." >&2
+    exit 1
+  fi
 
   cat > "$ENV_FILE" <<EOF
 VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
