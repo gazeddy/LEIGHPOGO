@@ -71,7 +71,7 @@ export function isWednesdayRaidHour(
 export function buildRaidHourPushPayload(
   item: RaidBossTickerItem,
   dateKey: string,
-  hundoLabel: "Hundo" | "15/15/15" = "Hundo",
+  easterEgg = false,
 ): RaidHourPushPayload | null {
   const catchCp = (item.catchCp ?? []).filter(
     (boss) =>
@@ -85,7 +85,9 @@ export function buildRaidHourPushPayload(
     const boss = catchCp[0];
     return {
       title: `5★ Raid Hour: ${boss.boss}`,
-      body: `${hundoLabel}: ${boss.maxUnboostedCp} CP • Weather boosted: ${boss.maxBoostedCp} CP`,
+      body: easterEgg
+        ? "Hundo - 15/15/15"
+        : `Hundo: ${boss.maxUnboostedCp} CP • Weather boosted: ${boss.maxBoostedCp} CP`,
       tag: `raid-hour-${dateKey}`,
       renotify: false,
       url: item.link || "/tools/raids#raid-five-star",
@@ -94,12 +96,14 @@ export function buildRaidHourPushPayload(
 
   return {
     title: "5★ Raid Hour",
-    body: catchCp
-      .map(
-        (boss) =>
-          `${boss.boss} — ${hundoLabel}: ${boss.maxUnboostedCp} CP / ${boss.maxBoostedCp} CP WB`,
-      )
-      .join(" • "),
+    body: easterEgg
+      ? "Hundo - 15/15/15"
+      : catchCp
+          .map(
+            (boss) =>
+              `${boss.boss}: ${boss.maxUnboostedCp} CP / ${boss.maxBoostedCp} CP WB`,
+          )
+          .join(" • "),
     tag: `raid-hour-${dateKey}`,
     renotify: false,
     url: item.link || "/tools/raids#raid-five-star",
