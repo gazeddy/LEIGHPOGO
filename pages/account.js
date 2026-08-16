@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
+import PwaInstallButton from "../components/PwaInstallButton"
 import { formatFriendCodeInput } from "../lib/friendCode"
 
 export default function Account({ entry }) {
@@ -75,6 +76,10 @@ export default function Account({ entry }) {
   return (
     <div className="container">
       <h1>Account settings</h1>
+
+      <section>
+        <PwaInstallButton />
+      </section>
 
       <section>
         <h2>Trainer profile</h2>
