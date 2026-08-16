@@ -43,6 +43,19 @@ describe("V3 Wednesday Raid Hour push wiring", () => {
     expect(endpoint).toContain("timingSafeEqual")
   })
 
+  it("installs server-side VAPID keys without exposing the private key", () => {
+    const installer = fs.readFileSync(
+      path.join(process.cwd(), "deploy/install-push.sh"),
+      "utf8",
+    )
+
+    expect(installer).toContain("VAPID_PUBLIC_KEY=")
+    expect(installer).toContain("VAPID_PRIVATE_KEY=")
+    expect(installer).toContain("VAPID_SUBJECT=")
+    expect(installer).toContain("chmod 0600")
+    expect(installer).toContain("EnvironmentFile=")
+  })
+
   it("installs a persistent 15-minute systemd timer", () => {
     const installer = fs.readFileSync(
       path.join(process.cwd(), "deploy/install-raid-hour-timer.sh"),
