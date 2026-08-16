@@ -9,6 +9,9 @@ import {
 import { isWebPushConfigured, sendWebPush } from "./webPush";
 
 export const RAID_HOUR_EASTER_EGG_ONE_IN = 100;
+export const RAID_HOUR_EASTER_EGG_COOLDOWN_WEEKS = 4;
+export const RAID_HOUR_EASTER_EGG_USAGE_TYPE = "RAID_HOUR_EASTER_EGG";
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface RaidHourPushResult {
   configured: boolean;
@@ -34,6 +37,13 @@ interface DueSubscription {
   dateKey: string;
 }
 
+interface SendResult {
+  state: "sent" | "failed" | "removed" | "claimed";
+  ownerId: number;
+  dateKey: string;
+  easterEgg: boolean;
+}
+
 const emptyResult = (
   configured: boolean,
   reason: string | null = null,
@@ -47,6 +57,27 @@ const emptyResult = (
   bosses: [],
   reason,
 });
+
+function dateKeyTime(dateKey: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+  const value = Date.parse(`${dateKey}T00:00:00.000Z`);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function isRaidHourEasterEggOwnerEligible(
+  dateKey: string,
+  lastSelectedDateKey: string | null | undefined,
+  cooldownWeeks: number = RAID_HOUR_EASTER_EGG_COOLDOWN_WEEKS,
+): boolean {
+  if (!lastSelectedDateKey || lastSelectedDateKey === dateKey) return true;
+
+  const current = dateKeyTime(dateKey);
+  const previous = dateKeyTime(lastSelectedDateKey);
+  if (current === null || previous === null) return true;
+  if (current <= previous) return false;
+
+  return current - previous > Math.max(0, cooldownWeeks) * WEEK_MS;
+}
 
 export function selectRaidHourEasterEggOwner(
   dateKey: string,
@@ -70,6 +101,16 @@ export function selectRaidHourEasterEggOwner(
   if (digest.readUInt32BE(0) % safeOneIn !== 0) return null;
 
   return uniqueOwnerIds[digest.readUInt32BE(4) % uniqueOwnerIds.length];
+}
+
+function easterEggDateKeyFromMetadata(metadata: string | null): string | null {
+  if (!metadata) return null;
+  try {
+    const value = JSON.parse(metadata);
+    return typeof value?.dateKey === "string" ? value.dateKey : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendWednesdayRaidHourPush(
@@ -121,8 +162,37 @@ export async function sendWednesdayRaidHourPush(
     ReturnType<typeof buildRaidHourPushPayload>
   >();
   const easterEggOwnerByDate = new Map<string, number | null>();
-  const allOwnerIds = subscriptions.map((subscription: any) => subscription.ownerId);
+  const allOwnerIds = Array.from(
+    new Set(subscriptions.map((subscription: any) => subscription.ownerId)),
+  );
   const schedulerSecret = String(process.env.RAID_HOUR_CRON_SECRET || "").trim();
+
+  const recentEasterEggs = await prisma.usageEvent.findMany({
+    where: {
+      type: RAID_HOUR_EASTER_EGG_USAGE_TYPE,
+      ownerId: { in: allOwnerIds },
+      createdAt: {
+        gte: new Date(
+          now.getTime() - (RAID_HOUR_EASTER_EGG_COOLDOWN_WEEKS + 2) * WEEK_MS,
+        ),
+      },
+    },
+    select: {
+      ownerId: true,
+      metadata: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const lastEasterEggDateByOwner = new Map<number, string>();
+  for (const event of recentEasterEggs as any[]) {
+    if (!Number.isInteger(event.ownerId) || lastEasterEggDateByOwner.has(event.ownerId)) {
+      continue;
+    }
+    const dateKey = easterEggDateKeyFromMetadata(event.metadata);
+    if (dateKey) lastEasterEggDateByOwner.set(event.ownerId, dateKey);
+  }
 
   for (const entry of due) {
     if (!payloadByDate.has(entry.dateKey)) {
@@ -134,11 +204,19 @@ export async function sendWednesdayRaidHourPush(
         entry.dateKey,
         buildRaidHourPushPayload(fiveStar, entry.dateKey, true),
       );
+
+      const eligibleOwnerIds = allOwnerIds.filter((ownerId) =>
+        isRaidHourEasterEggOwnerEligible(
+          entry.dateKey,
+          lastEasterEggDateByOwner.get(ownerId),
+        ),
+      );
+
       easterEggOwnerByDate.set(
         entry.dateKey,
         selectRaidHourEasterEggOwner(
           entry.dateKey,
-          allOwnerIds,
+          eligibleOwnerIds,
           schedulerSecret,
         ),
       );
@@ -153,14 +231,20 @@ export async function sendWednesdayRaidHourPush(
     };
   }
 
-  const results = await Promise.all(
-    due.map(async ({ subscription, dateKey }) => {
+  const results: SendResult[] = await Promise.all(
+    due.map(async ({ subscription, dateKey }): Promise<SendResult> => {
       const isEasterEggRecipient =
         easterEggOwnerByDate.get(dateKey) === subscription.ownerId;
       const payload = isEasterEggRecipient
         ? easterEggPayloadByDate.get(dateKey)
         : payloadByDate.get(dateKey);
-      if (!payload) return { state: "failed" as const };
+      const baseResult = {
+        ownerId: subscription.ownerId,
+        dateKey,
+        easterEgg: isEasterEggRecipient,
+      };
+
+      if (!payload) return { ...baseResult, state: "failed" };
 
       const claim = await prisma.pushSubscription.updateMany({
         where: {
@@ -174,7 +258,7 @@ export async function sendWednesdayRaidHourPush(
       });
 
       if (claim.count === 0) {
-        return { state: "claimed" as const };
+        return { ...baseResult, state: "claimed" };
       }
 
       try {
@@ -188,13 +272,13 @@ export async function sendWednesdayRaidHourPush(
           { ttl: 60 * 60 },
         );
 
-        if (result.ok) return { state: "sent" as const };
+        if (result.ok) return { ...baseResult, state: "sent" };
 
         if (result.expired) {
           await prisma.pushSubscription.deleteMany({
             where: { id: subscription.id },
           });
-          return { state: "removed" as const };
+          return { ...baseResult, state: "removed" };
         }
 
         await prisma.pushSubscription.updateMany({
@@ -206,7 +290,7 @@ export async function sendWednesdayRaidHourPush(
             lastRaidHourReminderKey: subscription.lastRaidHourReminderKey,
           },
         });
-        return { state: "failed" as const };
+        return { ...baseResult, state: "failed" };
       } catch (error) {
         console.error(
           "Unable to send Wednesday Raid Hour push notification:",
@@ -221,9 +305,30 @@ export async function sendWednesdayRaidHourPush(
             lastRaidHourReminderKey: subscription.lastRaidHourReminderKey,
           },
         });
-        return { state: "failed" as const };
+        return { ...baseResult, state: "failed" };
       }
     }),
+  );
+
+  const successfulEasterEggs = new Map<string, { ownerId: number; dateKey: string }>();
+  for (const result of results) {
+    if (result.state !== "sent" || !result.easterEgg) continue;
+    successfulEasterEggs.set(`${result.ownerId}:${result.dateKey}`, {
+      ownerId: result.ownerId,
+      dateKey: result.dateKey,
+    });
+  }
+
+  await Promise.all(
+    Array.from(successfulEasterEggs.values()).map(({ ownerId, dateKey }) =>
+      prisma.usageEvent.create({
+        data: {
+          type: RAID_HOUR_EASTER_EGG_USAGE_TYPE,
+          ownerId,
+          metadata: JSON.stringify({ dateKey }),
+        },
+      }),
+    ),
   );
 
   return {
