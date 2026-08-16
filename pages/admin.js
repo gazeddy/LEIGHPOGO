@@ -295,7 +295,7 @@ export default function Admin({ users, entries, searchStrings }) {
         </main>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         .admin-wrap {
           padding: 12px 16px;
         }
