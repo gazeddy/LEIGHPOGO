@@ -1,4 +1,7 @@
-import { matchMegaSupplementRecords } from "../../lib/raid-detail-source";
+import {
+  calculateMegaEncounterCp,
+  matchMegaSupplementRecords,
+} from "../../lib/raid-detail-source";
 import type { RaidBossTickerItem } from "../../lib/events";
 
 const megaRecords = [
@@ -57,5 +60,37 @@ describe("Mega raid detail fallback", () => {
     expect(
       matchMegaSupplementRecords(tickerItem("Garchomp", "five-star"), megaRecords),
     ).toEqual([]);
+  });
+
+  it("uses the normal form stats for the Mega raid catch encounter", () => {
+    const pokemonStats = [
+      {
+        pokemon_id: 445,
+        pokemon_name: "Garchomp",
+        form: "Costume",
+        base_attack: 1,
+        base_defense: 1,
+        base_stamina: 1,
+      },
+      {
+        pokemon_id: 445,
+        pokemon_name: "Garchomp",
+        form: "Normal",
+        base_attack: 261,
+        base_defense: 193,
+        base_stamina: 239,
+      },
+    ];
+    const cpMultipliers = [
+      { level: 20, multiplier: 0.5974000096321106 },
+      { level: 25, multiplier: 0.667934000492096 },
+    ];
+
+    expect(
+      calculateMegaEncounterCp(megaRecords[0], pokemonStats, cpMultipliers),
+    ).toEqual({
+      maxUnboostedCp: 2264,
+      maxBoostedCp: 2830,
+    });
   });
 });
