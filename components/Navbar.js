@@ -131,6 +131,16 @@ export default function Navbar() {
           <span>Leigh Pokemon Go Community</span>
         </Link>
 
+        {session && (
+          <Link
+            href="/gyms?add=1#add-gym"
+            className="app-new-gym-shortcut"
+            aria-label="Add a new gym"
+          >
+            ＋ Gym
+          </Link>
+        )}
+
         <button
           type="button"
           className="nav-toggle"
@@ -154,7 +164,7 @@ export default function Navbar() {
           <Link href="/events" className="nav-item nav-main-item">Events</Link>
           <Link href="/guides" className="nav-item nav-main-item">Guides</Link>
 
-          <div className={`nav-group ${toolsOpen ? "open" : ""}`}>
+          <div className={`nav-group nav-tools-dropdown ${toolsOpen ? "open" : ""}`}>
             <button
               type="button"
               className="nav-item nav-main-item nav-group-toggle"
@@ -166,27 +176,61 @@ export default function Navbar() {
               <span className="nav-caret" aria-hidden="true" />
             </button>
             <div id="tools-navigation" className="nav-submenu">
-              <Link href="/tools/raids" className="nav-item nav-subitem">
-                Raids
-              </Link>
-              <Link href="/search-strings" className="nav-item nav-subitem">
-                Search Builder
-              </Link>
-              <Link href="/pokedex" className="nav-item nav-subitem">
-                Pokédex
-              </Link>
+              <Link href="/tools/raids" className="nav-item nav-subitem">Raids</Link>
+              <Link href="/search-strings" className="nav-item nav-subitem">Search Builder</Link>
+              <Link href="/pokedex" className="nav-item nav-subitem">Pokédex</Link>
               {session && (
                 <>
-                  <Link href="/gyms" className="nav-item nav-subitem">
-                    Gym Map
-                  </Link>
-                  <Link href="/trades" className="nav-item nav-subitem">
-                    Trades
-                  </Link>
-                  <Link href="/trades/wanted" className="nav-item nav-subitem">
-                    Wanted Trades
-                  </Link>
+                  <Link href="/gyms" className="nav-item nav-subitem">Gym Map</Link>
+                  <Link href="/trades" className="nav-item nav-subitem">Trades</Link>
+                  <Link href="/trades/wanted" className="nav-item nav-subitem">Wanted Trades</Link>
                 </>
+              )}
+            </div>
+          </div>
+
+          <div className="app-tools-panel" aria-label="Quick tools">
+            <div className="app-tools-title">Quick tools</div>
+            <div className="app-tools-grid">
+              {session && (
+                <Link href="/gyms?add=1#add-gym" className="app-tool-card app-tool-card-primary">
+                  <span className="app-tool-symbol" aria-hidden="true">＋</span>
+                  <span><strong>New Gym</strong><small>Add with GPS</small></span>
+                </Link>
+              )}
+              {session && (
+                <Link href="/gyms" className="app-tool-card">
+                  <span className="app-tool-symbol" aria-hidden="true">⌖</span>
+                  <span><strong>Gym Map</strong><small>Find nearby gyms</small></span>
+                </Link>
+              )}
+              <Link href="/tools/raids" className="app-tool-card">
+                <span className="app-tool-symbol" aria-hidden="true">⚔</span>
+                <span><strong>Raids</strong><small>Boss counters</small></span>
+              </Link>
+              <Link href="/search-strings" className="app-tool-card">
+                <span className="app-tool-symbol" aria-hidden="true">⌕</span>
+                <span><strong>Search</strong><small>Build search strings</small></span>
+              </Link>
+              <Link href="/pokedex" className="app-tool-card">
+                <span className="app-tool-symbol" aria-hidden="true">◉</span>
+                <span><strong>Pokédex</strong><small>Track your dex</small></span>
+              </Link>
+              <Link href="/friend-codes" className="app-tool-card">
+                <span className="app-tool-symbol" aria-hidden="true">＋</span>
+                <span><strong>Friend Codes</strong><small>Copy trainer codes</small></span>
+              </Link>
+              {session && (
+                <Link href="/trades" className="app-tool-card">
+                  <span className="app-tool-symbol" aria-hidden="true">⇄</span>
+                  <span><strong>Trades</strong><small>Community listings</small></span>
+                </Link>
+              )}
+              {session && (
+                <Link href="/trades/wanted" className="app-tool-card">
+                  <span className="app-tool-symbol" aria-hidden="true">☆</span>
+                  <span><strong>Wanted</strong><small>Your wanted trades</small></span>
+                </Link>
               )}
             </div>
           </div>
@@ -216,37 +260,19 @@ export default function Navbar() {
                     <span className="nav-caret" aria-hidden="true" />
                   </button>
                   <div id="admin-navigation" className="nav-submenu">
-                    <Link href="/admin" className="nav-item nav-subitem">
-                      Admin Panel
-                    </Link>
-                    <Link href="/admin/usage" className="nav-item nav-subitem">
-                      Usage
-                    </Link>
-                    <Link href="/admin/pokedex" className="nav-item nav-subitem">
-                      Pokédex Availability
-                    </Link>
-                    <Link href="/admin/events" className="nav-item nav-subitem">
-                      Event Feed
-                    </Link>
-                    <Link href="/admin/event-types" className="nav-item nav-subitem">
-                      Event Types
-                    </Link>
-                    <Link href="/admin/content" className="nav-item nav-subitem">
-                      Guide Creator / Editor
-                    </Link>
-                    <Link href="/admin/gyms" className="nav-item nav-subitem">
-                      Gym Data
-                    </Link>
-                    <Link href="/admin/gym-removals" className="nav-item nav-subitem">
-                      Gym Removals
-                    </Link>
+                    <Link href="/admin" className="nav-item nav-subitem">Admin Panel</Link>
+                    <Link href="/admin/usage" className="nav-item nav-subitem">Usage</Link>
+                    <Link href="/admin/pokedex" className="nav-item nav-subitem">Pokédex Availability</Link>
+                    <Link href="/admin/events" className="nav-item nav-subitem">Event Feed</Link>
+                    <Link href="/admin/event-types" className="nav-item nav-subitem">Event Types</Link>
+                    <Link href="/admin/content" className="nav-item nav-subitem">Guide Creator / Editor</Link>
+                    <Link href="/admin/gyms" className="nav-item nav-subitem">Gym Data</Link>
+                    <Link href="/admin/gym-removals" className="nav-item nav-subitem">Gym Removals</Link>
                   </div>
                 </div>
               )}
 
-              <button type="button" className="nav-btn" onClick={handleLogout}>
-                Logout
-              </button>
+              <button type="button" className="nav-btn" onClick={handleLogout}>Logout</button>
             </>
           )}
 
