@@ -1,6 +1,6 @@
 import Head from "next/head"
 import { useSession } from "next-auth/react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
 import { openPokemonGo } from "../components/OpenPokemonGoButton"
@@ -39,7 +39,7 @@ function isMobileDevice() {
   return /Android/i.test(userAgent) || appleMobile
 }
 
-export default function FriendCodes({ entries }) {
+export default function FriendCodes({ entries, mobileDevice }) {
   const { data: session } = useSession()
   const [trainerName, setTrainerName] = useState("")
   const [friendCode, setFriendCode] = useState("")
@@ -48,11 +48,6 @@ export default function FriendCodes({ entries }) {
   const [entryList, setEntryList] = useState(entries)
   const [copiedEntryId, setCopiedEntryId] = useState(null)
   const [copyError, setCopyError] = useState("")
-  const [mobileDevice, setMobileDevice] = useState(false)
-
-  useEffect(() => {
-    setMobileDevice(isMobileDevice())
-  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -112,7 +107,9 @@ export default function FriendCodes({ entries }) {
       setCopiedEntryId(entry.id)
       setCopyError("")
 
-      if (mobileDevice) {
+      // The request controls the label; re-check the browser at tap time so iPadOS
+      // desktop-style user agents can still hand off correctly.
+      if (mobileDevice || isMobileDevice()) {
         openPokemonGo()
       }
 
@@ -290,7 +287,10 @@ export default function FriendCodes({ entries }) {
   )
 }
 
-export async function getServerSideProps() {
+export async function getServerSideProps(context) {
+  const userAgent = context.req.headers["user-agent"] || ""
+  const mobileDevice = /Android|iPhone|iPad|iPod/i.test(userAgent)
+
   const entries = await prisma.entry.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -309,6 +309,6 @@ export async function getServerSideProps() {
   }))
 
   return {
-    props: { entries: serializedEntries },
+    props: { entries: serializedEntries, mobileDevice },
   }
 }
