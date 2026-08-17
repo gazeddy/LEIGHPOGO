@@ -17,6 +17,7 @@ const GymMap = dynamic(() => import("../components/gyms/GymMap"), {
 interface GymPageProps {
   gyms: Awaited<ReturnType<typeof readGymState>>["gyms"];
   importedAt: string | null;
+  showAddGym: boolean;
 }
 
 export const getServerSideProps: GetServerSideProps<GymPageProps> = async (
@@ -52,11 +53,15 @@ export const getServerSideProps: GetServerSideProps<GymPageProps> = async (
   }
 
   const state = await readGymState();
+  const addGymQuery = Array.isArray(context.query.add)
+    ? context.query.add[0]
+    : context.query.add;
 
   return {
     props: {
       gyms: sortGyms(state.gyms),
       importedAt: state.importedAt,
+      showAddGym: addGymQuery === "1" || addGymQuery === "true",
     },
   };
 };
@@ -64,6 +69,7 @@ export const getServerSideProps: GetServerSideProps<GymPageProps> = async (
 export default function GymsPage({
   gyms,
   importedAt,
+  showAddGym,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
   return (
     <>
@@ -91,7 +97,7 @@ export default function GymsPage({
             <span><i className="new" /> Added in the last week</span>
           </div>
         </header>
-        <AddGymForm />
+        <AddGymForm initialOpen={showAddGym} />
         <GymRemovalReporter gyms={gyms} />
         <GymMap gyms={gyms} importedAt={importedAt} />
       </main>
