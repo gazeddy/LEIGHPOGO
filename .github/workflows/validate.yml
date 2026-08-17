@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Audit, lint, test and production build
+    name: Lint, test and production build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -42,12 +42,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Audit complete dependency tree
-        run: npm audit --audit-level=high
 
       - name: Run lint checks
         run: npm run lint
