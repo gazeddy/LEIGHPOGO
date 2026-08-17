@@ -9,12 +9,7 @@ import {
   normalizeFriendCode,
 } from "../lib/friendCode"
 
-async function copyTextToClipboard(value) {
-  if (navigator.clipboard?.writeText && window.isSecureContext) {
-    await navigator.clipboard.writeText(value)
-    return
-  }
-
+function copyTextSynchronously(value) {
   const textArea = document.createElement("textarea")
   textArea.value = value
   textArea.setAttribute("readonly", "")
@@ -93,29 +88,20 @@ export default function FriendCodes({ entries }) {
       return
     }
 
-    // Start the clipboard write, but do not await it before launching Pokémon GO.
-    // Keeping the launch in the original click handler preserves the browser's
-    // user-gesture context, which Android requires for reliable app hand-off.
-    let copyPromise
+    // The Android intent must remain directly associated with the user's click.
+    // Async Clipboard can interfere with that hand-off in Chromium, so use the
+    // synchronous copy path here and launch the game immediately afterwards.
     try {
-      copyPromise = copyTextToClipboard(code)
+      copyTextSynchronously(code)
+      setCopiedEntryId(entry.id)
+      setCopyError("")
+      recordFriendCodeGrab(entry.id)
     } catch (error) {
-      console.error("Failed to start friend code copy", error)
-      copyPromise = Promise.reject(error)
+      console.error("Failed to copy friend code", error)
+      setCopyError("The friend code could not be copied. Please copy it manually.")
     }
 
     openPokemonGo()
-
-    Promise.resolve(copyPromise)
-      .then(() => {
-        setCopiedEntryId(entry.id)
-        setCopyError("")
-        recordFriendCodeGrab(entry.id)
-      })
-      .catch((error) => {
-        console.error("Failed to copy friend code", error)
-        setCopyError("The friend code could not be copied. Please copy it manually.")
-      })
   }
 
   return (
