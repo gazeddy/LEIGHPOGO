@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
-import favicon from "./favicon.ico";
 
 const syncAppBadge = async (unreadCount) => {
   if (typeof navigator === "undefined") return;
@@ -123,7 +122,9 @@ export default function Navbar() {
       <div className="nav-inner">
         <Link href="/" className="nav-logo">
           <Image
-            src={favicon}
+            src="/pwa-icon-192.png"
+            width={32}
+            height={32}
             alt=""
             aria-hidden="true"
             className="nav-favicon"
