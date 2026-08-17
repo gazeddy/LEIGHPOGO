@@ -33,8 +33,8 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="LEIGHPOGO" />
         <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="icon" href="/pwa-icon-192.png" type="image/png" sizes="192x192" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png" />
       </Head>
       <PwaBootstrap />
       <PokedexCatalogFetchGuard />
