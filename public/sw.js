@@ -1,4 +1,4 @@
-const STATIC_CACHE = "leighpogo-static-v3"
+const STATIC_CACHE = "leighpogo-static-v4"
 const OFFLINE_URL = "/offline.html"
 const STATIC_ASSETS = [
   OFFLINE_URL,
