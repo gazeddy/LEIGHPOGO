@@ -16,3 +16,9 @@ next-env.d.ts
 /data/gym-state-backups/*.json
 /public/uploads/guides/*
 /data/pokemon-availability-overrides.json*
+
+# Generated from assets/pwa-icons by scripts/generatePwaIcons.js
+/public/pwa-icon-192.png
+/public/pwa-icon-512.png
+/public/pwa-icon-maskable-512.png
+/public/apple-touch-icon.png
