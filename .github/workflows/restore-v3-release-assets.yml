@@ -1,0 +1,38 @@
+name: Restore V3 release assets
+
+on:
+  push:
+    branches:
+      - v3
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Restore approved release assets
+        run: node scripts/restoreV3ReleaseAssets.js
+
+      - name: Commit restored assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public pages/trades/wanted.js
+          if git diff --cached --quiet; then
+            echo "No release assets needed restoring"
+            exit 0
+          fi
+          git commit -m "Restore V3 release assets"
+          git push origin HEAD:v3
