@@ -5,6 +5,29 @@ import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 import favicon from "./favicon.ico";
 
+const syncAppBadge = async (unreadCount) => {
+  if (typeof navigator === "undefined") return;
+
+  const count = Math.max(0, Number(unreadCount) || 0);
+
+  try {
+    if (count > 0) {
+      if (typeof navigator.setAppBadge === "function") {
+        await navigator.setAppBadge(count);
+      }
+      return;
+    }
+
+    if (typeof navigator.clearAppBadge === "function") {
+      await navigator.clearAppBadge();
+    } else if (typeof navigator.setAppBadge === "function") {
+      await navigator.setAppBadge(0);
+    }
+  } catch {
+    // App badging is an enhancement; unsupported or denied badges must not break navigation.
+  }
+};
+
 export default function Navbar() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -27,6 +50,7 @@ export default function Navbar() {
   useEffect(() => {
     if (!session?.user?.id) {
       setUnreadNotifications(0);
+      void syncAppBadge(0);
       return undefined;
     }
 
@@ -37,21 +61,36 @@ export default function Navbar() {
         const response = await fetch("/api/notifications?summary=1");
         if (!response.ok) return;
         const data = await response.json();
-        if (isActive) setUnreadNotifications(Number(data.unreadCount) || 0);
+        const unreadCount = Number(data.unreadCount) || 0;
+
+        if (isActive) {
+          setUnreadNotifications(unreadCount);
+          void syncAppBadge(unreadCount);
+        }
       } catch {
         // Keep navigation usable if the notification endpoint is temporarily unavailable.
       }
     };
 
-    loadUnreadNotifications();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadUnreadNotifications();
+      }
+    };
+
+    void loadUnreadNotifications();
     const interval = window.setInterval(loadUnreadNotifications, 60_000);
     router.events.on("routeChangeComplete", loadUnreadNotifications);
+    window.addEventListener("focus", loadUnreadNotifications);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("trade-notifications-updated", loadUnreadNotifications);
 
     return () => {
       isActive = false;
       window.clearInterval(interval);
       router.events.off("routeChangeComplete", loadUnreadNotifications);
+      window.removeEventListener("focus", loadUnreadNotifications);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("trade-notifications-updated", loadUnreadNotifications);
     };
   }, [router.events, session?.user?.id]);
@@ -74,6 +113,8 @@ export default function Navbar() {
     setOpen(false);
     setToolsOpen(false);
     setAdminOpen(false);
+    setUnreadNotifications(0);
+    void syncAppBadge(0);
     signOut({ callbackUrl: "/login" });
   };
 
