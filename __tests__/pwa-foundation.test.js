@@ -70,17 +70,23 @@ describe("PWA foundation", () => {
     expect(app).toContain('import "../styles/pwa.css"')
   })
 
-  it("generates the release icon assets from the checked-in Leigh artwork source", () => {
+  it("generates the release icon assets from the complete checked-in Leigh artwork source", () => {
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     )
+    const sourceParts = fs
+      .readdirSync(path.join(process.cwd(), "assets/pwa-icons"))
+      .filter((name) => name.startsWith("release-source.b64.part"))
+      .sort()
 
     expect(packageJson.scripts.prebuild).toBe(
       "node scripts/generatePwaIconsFixed.js",
     )
+    expect(sourceParts).toHaveLength(6)
+    expect(sourceParts[0]).toBe("release-source.b64.part01")
+    expect(sourceParts[5]).toBe("release-source.b64.part06")
 
     for (const asset of [
-      "assets/pwa-icons/release-source.js",
       "scripts/generatePwaIconsFixed.js",
       "public/favicon.ico",
       "public/pwa-icon-192.png",
