@@ -49,10 +49,11 @@ describe("PWA foundation", () => {
     expect(serviceWorker).toContain('request.mode === "navigate"')
     expect(serviceWorker).toContain("caches.match(OFFLINE_URL)")
     expect(serviceWorker).toContain('const DEFAULT_ICON = "/pwa-icon-192.png"')
+    expect(serviceWorker).toContain('"/favicon.ico"')
     expect(serviceWorker).toContain('"/pwa-icon-maskable-512.png"')
   })
 
-  it("publishes mobile and Apple PWA metadata using the release artwork", () => {
+  it("publishes mobile, browser and Apple metadata using the release artwork", () => {
     const app = fs.readFileSync(path.join(process.cwd(), "pages/_app.js"), "utf8")
 
     expect(app).toContain('name="mobile-web-app-capable"')
@@ -61,6 +62,7 @@ describe("PWA foundation", () => {
     expect(app).toContain(
       'rel="icon" href="/pwa-icon-192.png" type="image/png" sizes="192x192"',
     )
+    expect(app).toContain('rel="shortcut icon" href="/favicon.ico"')
     expect(app).toContain(
       'rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png"',
     )
@@ -72,6 +74,7 @@ describe("PWA foundation", () => {
     for (const asset of [
       "assets/pwa-icons/pwa-icon-192.b64.part01",
       "scripts/generatePwaIcons.js",
+      "public/favicon.ico",
       "public/pwa-icon-192.png",
       "public/pwa-icon-512.png",
       "public/pwa-icon-maskable-512.png",
@@ -119,6 +122,7 @@ describe("PWA foundation", () => {
     expect(gitignore).toContain("next-env.d.ts")
     expect(gitignore).toContain(".env*")
     expect(gitignore).toContain("!.env.example")
+    expect(gitignore).toContain("/public/favicon.ico")
     expect(gitignore).toContain("/public/pwa-icon-192.png")
     expect(gitignore).toContain("/public/pwa-icon-maskable-512.png")
   })
