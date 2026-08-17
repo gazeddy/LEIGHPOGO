@@ -30,23 +30,23 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Patch vulnerable brace-expansion override
+        run: npm pkg set overrides.brace-expansion=5.0.9
 
-      - name: Audit before updates
-        run: npm audit || true
+      - name: Install dependencies and refresh lockfile
+        run: npm install
 
       - name: Update packages within declared semver ranges
         run: npm update
 
       - name: Apply non-breaking audit fixes
-        run: npm audit fix
+        run: npm audit fix || true
 
-      - name: Audit production dependencies after fixes
-        run: npm audit --omit=dev || true
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
-      - name: Audit full dependency tree after fixes
-        run: npm audit || true
+      - name: Audit complete dependency tree
+        run: npm audit --audit-level=high
 
       - name: Lint
         run: npm run lint
