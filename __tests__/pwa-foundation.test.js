@@ -42,7 +42,7 @@ describe("PWA foundation", () => {
       "utf8",
     )
 
-    expect(serviceWorker).toContain('const STATIC_CACHE = "leighpogo-static-v3"')
+    expect(serviceWorker).toContain('const STATIC_CACHE = "leighpogo-static-v4"')
     expect(serviceWorker).toContain('const OFFLINE_URL = "/offline.html"')
     expect(serviceWorker).toContain('url.pathname.startsWith("/api/")')
     expect(serviceWorker).toContain('url.pathname.startsWith("/_next/data/")')
