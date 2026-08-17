@@ -64,7 +64,7 @@ describe("PWA foundation", () => {
     )
     expect(app).toContain('rel="shortcut icon" href="/favicon.ico"')
     expect(app).toContain(
-      'rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png"',
+      'rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"',
     )
     expect(app).not.toContain("/pwa-icon.svg")
     expect(app).toContain('import "../styles/pwa.css"')
