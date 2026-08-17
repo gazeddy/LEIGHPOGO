@@ -11,6 +11,10 @@ interface CreatedGym {
   id: string;
 }
 
+interface AddGymFormProps {
+  initialOpen?: boolean;
+}
+
 type LocationMode = "gps" | "manual";
 
 type CreateGymResponse =
@@ -50,8 +54,8 @@ function manualCoordinate(
   return coordinate;
 }
 
-export default function AddGymForm() {
-  const [open, setOpen] = useState(false);
+export default function AddGymForm({ initialOpen = false }: AddGymFormProps) {
+  const [open, setOpen] = useState(initialOpen);
   const [title, setTitle] = useState("");
   const [locationMode, setLocationMode] = useState<LocationMode>("gps");
   const [gpsLocation, setGpsLocation] = useState<CapturedLocation | null>(null);
@@ -201,7 +205,7 @@ export default function AddGymForm() {
   }
 
   return (
-    <section className={styles.panel} aria-label="Add a gym">
+    <section id="add-gym" className={styles.panel} aria-label="Add a gym">
       {!open ? (
         <div className={styles.launch}>
           <div className={styles.launchCopy}>
@@ -293,7 +297,7 @@ export default function AddGymForm() {
                   ? "Finding location…"
                   : gpsLocation
                     ? "Refresh GPS location"
-                    : "Try location again"}
+                    : "Use current location"}
               </button>
             </>
           ) : (
