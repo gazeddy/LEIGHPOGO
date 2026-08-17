@@ -71,9 +71,17 @@ describe("PWA foundation", () => {
   })
 
   it("generates the release icon assets from the checked-in Leigh artwork source", () => {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+    )
+
+    expect(packageJson.scripts.prebuild).toBe(
+      "node scripts/generatePwaIconsFixed.js",
+    )
+
     for (const asset of [
-      "assets/pwa-icons/pwa-icon-192.b64.part01",
-      "scripts/generatePwaIcons.js",
+      "assets/pwa-icons/release-source.js",
+      "scripts/generatePwaIconsFixed.js",
       "public/favicon.ico",
       "public/pwa-icon-192.png",
       "public/pwa-icon-512.png",
