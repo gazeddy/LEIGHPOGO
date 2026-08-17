@@ -1,10 +1,25 @@
 const fs = require("fs")
 const path = require("path")
 const zlib = require("zlib")
-const sourceBase64 = require("../assets/pwa-icons/release-source")
 
 const ROOT = path.resolve(__dirname, "..")
 const PUBLIC = path.join(ROOT, "public")
+const SOURCE_PARTS_DIR = path.join(ROOT, "assets", "pwa-icons")
+
+function readSourceBase64() {
+  const parts = fs
+    .readdirSync(SOURCE_PARTS_DIR)
+    .filter((name) => name.startsWith("release-source.b64.part"))
+    .sort()
+
+  if (!parts.length) {
+    throw new Error("No LEIGHPOGO icon source parts were found")
+  }
+
+  return parts
+    .map((name) => fs.readFileSync(path.join(SOURCE_PARTS_DIR, name), "utf8").trim())
+    .join("")
+}
 
 function crc32(buffer) {
   let crc = 0xffffffff
@@ -215,7 +230,7 @@ function encodeIco(png, size = 32) {
 
 fs.mkdirSync(PUBLIC, { recursive: true })
 
-const source = decodeIndexedPng(Buffer.from(sourceBase64, "base64"))
+const source = decodeIndexedPng(Buffer.from(readSourceBase64(), "base64"))
 const icon192 = encodeRgbPng(resizeImage(source, 192, 192))
 const icon512 = encodeRgbPng(resizeImage(source, 512, 512))
 const appleIcon = encodeRgbPng(resizeImage(source, 180, 180))
