@@ -3,17 +3,13 @@ import { useSession } from "next-auth/react"
 import { useState } from "react"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
+import { openPokemonGo } from "../components/OpenPokemonGoButton"
 import {
   formatFriendCodeInput,
   normalizeFriendCode,
 } from "../lib/friendCode"
 
-async function copyTextToClipboard(value) {
-  if (navigator.clipboard?.writeText && window.isSecureContext) {
-    await navigator.clipboard.writeText(value)
-    return
-  }
-
+function copyTextSynchronously(value) {
   const textArea = document.createElement("textarea")
   textArea.value = value
   textArea.setAttribute("readonly", "")
@@ -79,12 +75,13 @@ export default function FriendCodes({ entries }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entryId }),
+      keepalive: true,
     }).catch(() => {
       // Clipboard copy succeeded; notification logging is intentionally best-effort.
     })
   }
 
-  const handleCopyFriendCode = async (entry) => {
+  const handleCopyFriendCode = (entry) => {
     const code = normalizeFriendCode(entry.code)
 
     if (!code) {
@@ -93,9 +90,14 @@ export default function FriendCodes({ entries }) {
     }
 
     try {
-      await copyTextToClipboard(code)
+      // Keep the copy synchronous so the Pokémon GO deep-link navigation remains
+      // directly associated with the user's tap in Chromium/PWA mode.
+      copyTextSynchronously(code)
       setCopiedEntryId(entry.id)
       setCopyError("")
+
+      // `pokemongo:` is registered by Pokémon GO as a BROWSABLE VIEW deep link.
+      openPokemonGo()
       recordFriendCodeGrab(entry.id)
     } catch (error) {
       console.error("Failed to copy friend code", error)
@@ -192,9 +194,9 @@ export default function FriendCodes({ entries }) {
                           type="button"
                           className={`copy-code-button${copied ? " copied" : ""}`}
                           onClick={() => handleCopyFriendCode(entry)}
-                          aria-label={`${copied ? "Copied" : "Copy"} ${entry.trainerName || entry.owner.ign}'s friend code`}
+                          aria-label={`${copied ? "Copied and opened Pokémon GO for" : "Copy and open Pokémon GO for"} ${entry.trainerName || entry.owner.ign}'s friend code`}
                         >
-                          {copied ? "Copied" : "Copy"}
+                          {copied ? "Copied" : "Copy & Open"}
                         </button>
                       )}
                     </div>
@@ -221,7 +223,7 @@ export default function FriendCodes({ entries }) {
 
           .copy-code-button {
             width: auto;
-            min-width: 74px;
+            min-width: 96px;
             flex: 0 0 auto;
             padding: 7px 10px;
             border: 1px solid #30363d;
