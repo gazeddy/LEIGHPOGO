@@ -1,0 +1,72 @@
+name: Dependency maintenance
+
+on:
+  push:
+    branches:
+      - v3
+    paths:
+      - .github/workflows/dependency-maintenance.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit-update-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./dependency-maintenance.db
+      NEXTAUTH_SECRET: dependency-maintenance-only-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - name: Check out v3
+        uses: actions/checkout@v4
+        with:
+          ref: v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit before updates
+        run: npm audit || true
+
+      - name: Update packages within declared semver ranges
+        run: npm update
+
+      - name: Apply non-breaking audit fixes
+        run: npm audit fix
+
+      - name: Audit production dependencies after fixes
+        run: npm audit --omit=dev || true
+
+      - name: Audit full dependency tree after fixes
+        run: npm audit || true
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Commit dependency updates
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No dependency file changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: update dependencies and security fixes"
+          git push origin HEAD:v3
