@@ -31,6 +31,13 @@
   ],
   "shortcuts": [
     {
+      "name": "New Gym",
+      "short_name": "New Gym",
+      "description": "Add a missing Pokémon GO gym",
+      "url": "/gyms?add=1#add-gym",
+      "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
       "name": "Friend Codes",
       "short_name": "Friend Codes",
       "url": "/friend-codes",
