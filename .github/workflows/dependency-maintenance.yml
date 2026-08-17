@@ -13,7 +13,7 @@ permissions:
 jobs:
   audit-update-validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       DATABASE_URL: file:./dependency-maintenance.db
       NEXTAUTH_SECRET: dependency-maintenance-only-secret
@@ -59,7 +59,7 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Commit dependency updates
+      - name: Commit and preserve concurrent v3 changes
         run: |
           if git diff --quiet -- package.json package-lock.json; then
             echo "No dependency file changes to commit."
@@ -69,4 +69,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json
           git commit -m "chore: update dependencies and security fixes"
+          git fetch origin v3
+          if ! git diff --quiet "$GITHUB_SHA"..origin/v3 -- package.json package-lock.json; then
+            echo "package.json or package-lock.json changed remotely during this run; refusing to overwrite it."
+            exit 1
+          fi
+          git rebase origin/v3
+          npm audit --audit-level=high
+          npm test -- --runInBand --passWithNoTests
+          npm run build
           git push origin HEAD:v3
