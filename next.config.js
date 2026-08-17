@@ -2,6 +2,18 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "raw.githubusercontent.com",
+        port: "",
+        pathname: "/nileplumb/PkmnHomeIcons/master/UICONS_OS_128/team/**",
+        search: "",
+      },
+    ],
+  },
+
   // Disable TurboPack to avoid dev server issues
   //turbo: false,
 

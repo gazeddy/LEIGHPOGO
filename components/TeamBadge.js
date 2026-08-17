@@ -1,3 +1,4 @@
+import Image from "next/image"
 import React from "react"
 
 const TEAM_METADATA = {
@@ -34,7 +35,7 @@ export default function TeamBadge({ team }) {
   return (
     <span className="team-badge" title={`${meta.label} team`}>
       <span className="team-icon" style={{ backgroundColor: meta.color }} aria-hidden="true">
-        <img src={meta.icon} alt={`${meta.label} icon`} />
+        <Image src={meta.icon} alt={`${meta.label} icon`} width={22} height={22} />
       </span>
       <span className="team-label">{meta.label}</span>
     </span>
