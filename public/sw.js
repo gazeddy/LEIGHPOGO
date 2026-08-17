@@ -3,6 +3,7 @@ const OFFLINE_URL = "/offline.html"
 const STATIC_ASSETS = [
   OFFLINE_URL,
   "/manifest.webmanifest",
+  "/favicon.ico",
   "/pwa-icon-192.png",
   "/pwa-icon-512.png",
   "/pwa-icon-maskable-512.png",
