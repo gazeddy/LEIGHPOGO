@@ -8,7 +8,7 @@ import pokedexByRegion from "../../lib/pokedexData"
 import { getAuthenticatedUser } from "../../lib/tradeServer"
 import { formatFriendCode } from "../../lib/tradeUtils"
 import {
-  buildReleasedPokemonOptions,
+  buildEffectiveReleasedPokemonOptions,
   serializeWantedTrade,
   wantedTradeInclude,
 } from "../../lib/wantedTradeUtils"
@@ -402,10 +402,13 @@ export async function getServerSideProps(context) {
 
   try {
     const { getReleasedPokemonData } = require("../../lib/releasedPokemonCache")
+    const { readPokemonAvailabilityOverrides } = require("../../lib/pokemonAvailabilityStore")
     const releasedPokemonData = await getReleasedPokemonData()
-    pokemonOptions = buildReleasedPokemonOptions(
+    const overrideResult = await readPokemonAvailabilityOverrides()
+    pokemonOptions = buildEffectiveReleasedPokemonOptions(
       pokedexByRegion,
       releasedPokemonData.dexNumbers,
+      overrideResult.overrides,
     )
     releaseDataStale = releasedPokemonData.stale
   } catch (error) {

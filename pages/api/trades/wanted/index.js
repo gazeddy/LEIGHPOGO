@@ -5,7 +5,7 @@ import pokedexByRegion from "../../../../lib/pokedexData"
 import { getAuthenticatedUser } from "../../../../lib/tradeServer"
 import { recordUsageEvent } from "../../../../lib/usageEvents"
 import {
-  buildReleasedPokemonOptions,
+  buildEffectiveReleasedPokemonOptions,
   serializeWantedTrade,
   validateWantedTradePayload,
   wantedTradeDuplicateWhere,
@@ -37,22 +37,25 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    let releasedPokemonData
+    let pokemonOptions
 
     try {
       const { getReleasedPokemonData } = require("../../../../lib/releasedPokemonCache")
-      releasedPokemonData = await getReleasedPokemonData()
+      const { readPokemonAvailabilityOverrides } = require("../../../../lib/pokemonAvailabilityStore")
+      const releasedPokemonData = await getReleasedPokemonData()
+      const overrideResult = await readPokemonAvailabilityOverrides()
+      pokemonOptions = buildEffectiveReleasedPokemonOptions(
+        pokedexByRegion,
+        releasedPokemonData.dexNumbers,
+        overrideResult.overrides,
+      )
     } catch (error) {
-      console.error("Unable to validate a wanted trade against released Pokémon", error)
+      console.error("Unable to validate a wanted trade against effective Pokémon availability", error)
       return res.status(503).json({
         error: "The released Pokémon list is temporarily unavailable.",
       })
     }
 
-    const pokemonOptions = buildReleasedPokemonOptions(
-      pokedexByRegion,
-      releasedPokemonData.dexNumbers,
-    )
     const validated = validateWantedTradePayload(req.body, pokemonOptions)
 
     if (validated.error) {

@@ -4,6 +4,7 @@ import { getToken } from "next-auth/jwt"
 const publicPaths = [
   "/",           // ✅ MUST be public
   "/events",
+  "/friend-codes",
   "/login",
   "/register",
   "/favicon.ico",
@@ -13,6 +14,7 @@ function isPublicPath(pathname) {
   return (
     publicPaths.includes(pathname) ||
     pathname.startsWith("/events/") ||
+    pathname.startsWith("/friend-codes/") ||
     pathname.startsWith("/login/") ||
     pathname.startsWith("/register/") ||
     pathname.startsWith("/_next/") ||
