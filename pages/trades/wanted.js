@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { getServerSession } from "next-auth/next"
@@ -50,12 +51,13 @@ function WantedTradeCard({ entry, canDelete, onDelete }) {
   return (
     <article className="card wanted-trade-card">
       <div className="wanted-card-main">
-        <img
+        <Image
           src={pokemonSpriteUrl(entry.dexNumber)}
           alt=""
           aria-hidden="true"
+          width={76}
+          height={76}
           className="wanted-pokemon-sprite"
-          loading="lazy"
         />
         <div className="wanted-card-content">
           <div className="wanted-card-heading">
