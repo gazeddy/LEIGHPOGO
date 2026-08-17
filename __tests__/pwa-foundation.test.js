@@ -1,6 +1,15 @@
 const fs = require("fs")
 const path = require("path")
 
+function pngSize(filePath) {
+  const buffer = fs.readFileSync(filePath)
+  expect(buffer.subarray(1, 4).toString("ascii")).toBe("PNG")
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  }
+}
+
 describe("PWA foundation", () => {
   it("provides an installable standalone manifest with PNG app icons and shortcuts", () => {
     const manifest = JSON.parse(
@@ -70,33 +79,41 @@ describe("PWA foundation", () => {
     expect(app).toContain('import "../styles/pwa.css"')
   })
 
-  it("generates the release icon assets from the complete checked-in Leigh artwork source", () => {
+  it("ships the final release icons directly in public", () => {
+    const publicDir = path.join(process.cwd(), "public")
+
+    expect(pngSize(path.join(publicDir, "pwa-icon-192.png"))).toEqual({
+      width: 192,
+      height: 192,
+    })
+    expect(pngSize(path.join(publicDir, "pwa-icon-512.png"))).toEqual({
+      width: 512,
+      height: 512,
+    })
+    expect(pngSize(path.join(publicDir, "pwa-icon-maskable-512.png"))).toEqual({
+      width: 512,
+      height: 512,
+    })
+    expect(pngSize(path.join(publicDir, "apple-touch-icon.png"))).toEqual({
+      width: 180,
+      height: 180,
+    })
+    expect(fs.existsSync(path.join(publicDir, "favicon.ico"))).toBe(true)
+  })
+
+  it("does not regenerate release icons as a build side effect", () => {
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     )
-    const sourceParts = fs
-      .readdirSync(path.join(process.cwd(), "assets/pwa-icons"))
-      .filter((name) => name.startsWith("release-source.b64.part"))
-      .sort()
+    const gitignore = fs.readFileSync(path.join(process.cwd(), ".gitignore"), "utf8")
 
-    expect(packageJson.scripts.prebuild).toBe(
-      "node scripts/generatePwaIconsFixed.js",
-    )
-    expect(sourceParts).toHaveLength(6)
-    expect(sourceParts[0]).toBe("release-source.b64.part01")
-    expect(sourceParts[5]).toBe("release-source.b64.part06")
-
-    for (const asset of [
-      "scripts/generatePwaIconsFixed.js",
-      "public/favicon.ico",
-      "public/pwa-icon-192.png",
-      "public/pwa-icon-512.png",
-      "public/pwa-icon-maskable-512.png",
-      "public/apple-touch-icon.png",
-      "public/offline.html",
-    ]) {
-      expect(fs.existsSync(path.join(process.cwd(), asset))).toBe(true)
-    }
+    expect(packageJson.scripts.prebuild).toBeUndefined()
+    expect(packageJson.scripts.predev).toBeUndefined()
+    expect(packageJson.scripts.pretest).toBeUndefined()
+    expect(packageJson.scripts["pwa:icons"]).toBeUndefined()
+    expect(gitignore).not.toContain("/public/pwa-icon-192.png")
+    expect(gitignore).not.toContain("/public/pwa-icon-512.png")
+    expect(gitignore).not.toContain("/public/pwa-icon-maskable-512.png")
   })
 
   it("captures Chromium install capability without showing a global install banner", () => {
@@ -136,8 +153,5 @@ describe("PWA foundation", () => {
     expect(gitignore).toContain("next-env.d.ts")
     expect(gitignore).toContain(".env*")
     expect(gitignore).toContain("!.env.example")
-    expect(gitignore).toContain("/public/favicon.ico")
-    expect(gitignore).toContain("/public/pwa-icon-192.png")
-    expect(gitignore).toContain("/public/pwa-icon-maskable-512.png")
   })
 })
