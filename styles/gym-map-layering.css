@@ -1,0 +1,9 @@
+/* Keep Leaflet's high internal pane/control z-index values inside the map.
+ * This lets the sticky site navigation remain above the gym map while the
+ * page scrolls, without changing Leaflet control/marker ordering internally.
+ */
+.gym-map-panel {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
