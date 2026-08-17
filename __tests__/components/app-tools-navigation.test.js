@@ -6,8 +6,12 @@ describe("installed app quick tools", () => {
     path.join(process.cwd(), "components/Navbar.js"),
     "utf8",
   )
-  const navbarCss = fs.readFileSync(
-    path.join(process.cwd(), "styles/navbar.css"),
+  const appToolsCss = fs.readFileSync(
+    path.join(process.cwd(), "styles/app-tools.css"),
+    "utf8",
+  )
+  const app = fs.readFileSync(
+    path.join(process.cwd(), "pages/_app.js"),
     "utf8",
   )
   const gymsPage = fs.readFileSync(
@@ -24,9 +28,10 @@ describe("installed app quick tools", () => {
     expect(navbar).toContain('className="app-new-gym-shortcut"')
     expect(navbar).toContain('className="app-tools-panel"')
     expect(navbar).toContain('className="app-tools-grid"')
-    expect(navbarCss).toContain('@media (display-mode: standalone) and (max-width: 1050px)')
-    expect(navbarCss).toContain('.app-tools-grid')
-    expect(navbarCss).toContain('.nav-tools-dropdown')
+    expect(app).toContain('import "../styles/app-tools.css"')
+    expect(appToolsCss).toContain('@media (display-mode: standalone) and (max-width: 1050px)')
+    expect(appToolsCss).toContain('.app-tools-grid')
+    expect(appToolsCss).toContain('.nav-tools-dropdown')
   })
 
   it("opens the add-gym form directly when the quick-action query is present", () => {
