@@ -210,6 +210,25 @@ function encodeRgbPng(image) {
   ])
 }
 
+function encodeIco(png, size) {
+  const header = Buffer.alloc(6)
+  header.writeUInt16LE(0, 0)
+  header.writeUInt16LE(1, 2)
+  header.writeUInt16LE(1, 4)
+
+  const entry = Buffer.alloc(16)
+  entry[0] = size >= 256 ? 0 : size
+  entry[1] = size >= 256 ? 0 : size
+  entry[2] = 0
+  entry[3] = 0
+  entry.writeUInt16LE(1, 4)
+  entry.writeUInt16LE(32, 6)
+  entry.writeUInt32LE(png.length, 8)
+  entry.writeUInt32LE(22, 12)
+
+  return Buffer.concat([header, entry, png])
+}
+
 function writeIcon(name, image) {
   fs.writeFileSync(path.join(PUBLIC_DIR, name), encodeRgbPng(image))
 }
@@ -218,10 +237,12 @@ fs.mkdirSync(PUBLIC_DIR, { recursive: true })
 
 const sourceBuffer = Buffer.from(readSourceBase64("pwa-icon-192"), "base64")
 const source = decodeIndexedPng(sourceBuffer)
+const faviconPng = encodeRgbPng(resizeImage(source, 32, 32))
 
 fs.writeFileSync(path.join(PUBLIC_DIR, "pwa-icon-192.png"), sourceBuffer)
 fs.writeFileSync(path.join(PUBLIC_DIR, "apple-touch-icon.png"), sourceBuffer)
+fs.writeFileSync(path.join(PUBLIC_DIR, "favicon.ico"), encodeIco(faviconPng, 32))
 writeIcon("pwa-icon-512.png", resizeImage(source, 512, 512))
 writeIcon("pwa-icon-maskable-512.png", makeMaskable(source))
 
-console.log("Generated LEIGHPOGO PWA release icons.")
+console.log("Generated LEIGHPOGO release icon set.")
