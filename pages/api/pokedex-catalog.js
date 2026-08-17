@@ -69,7 +69,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       ...catalog.data,
-      catalogVersion: 4,
+      catalogVersion: 5,
       pogoApiReleasedDexNumbers,
       releasedDexNumbers,
       availabilityKnown,
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
       overrideWarning,
       stale: catalog.stale || releaseDataStale,
       checkedAt: catalog.checkedAt,
-      source: "PvPoke + POGOAPI + admin overrides",
+      source: "Site Pokédex + PvPoke/POGOAPI metadata + admin availability overrides",
     })
   } catch (error) {
     console.error("Unable to load the Pokédex catalog", error)

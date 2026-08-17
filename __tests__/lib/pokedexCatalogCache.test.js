@@ -1,4 +1,8 @@
-const { validateCache } = require("../../lib/pokedexCatalogCache");
+const {
+  buildAuthoritativeNamesPayload,
+  sitePokedexHash,
+  validateCache,
+} = require("../../lib/pokedexCatalogCache");
 
 function makePokemon(count, includeResources = true) {
   return Object.fromEntries(
@@ -33,11 +37,11 @@ function makePokemon(count, includeResources = true) {
   );
 }
 
-function makeCache(version = 5, includeResources = true) {
+function makeCache(version = 6, includeResources = true) {
   return {
     version,
     checkedAt: "2026-08-02T20:00:00.000Z",
-    sourceHashes: { source: "hash" },
+    sourceHashes: { site_pokedex: sitePokedexHash(), source: "hash" },
     data: {
       regions: [],
       pokemon: makePokemon(135, includeResources),
@@ -46,15 +50,29 @@ function makeCache(version = 5, includeResources = true) {
 }
 
 describe("Pokédex catalog cache validation", () => {
-  test("accepts a complete version 5 catalog", () => {
+  test("accepts a complete version 6 catalog", () => {
     expect(validateCache(makeCache())).not.toBeNull();
   });
 
   test("rejects the previous cache version", () => {
-    expect(validateCache(makeCache(4))).toBeNull();
+    expect(validateCache(makeCache(5))).toBeNull();
+  });
+
+  test("rejects a cache built from a different site Pokédex list", () => {
+    const cache = makeCache();
+    cache.sourceHashes.site_pokedex = "stale-site-list";
+    expect(validateCache(cache)).toBeNull();
+  });
+
+  test("uses the maintained site Pokédex for authoritative names", () => {
+    const names = buildAuthoritativeNamesPayload();
+
+    expect(names[1]).toEqual({ id: 1, name: "Bulbasaur" });
+    expect(names[1025]).toEqual({ id: 1025, name: "Pecharunt" });
+    expect(Object.keys(names)).toHaveLength(1025);
   });
 
   test("rejects a catalog whose resource fields are all missing", () => {
-    expect(validateCache(makeCache(5, false))).toBeNull();
+    expect(validateCache(makeCache(6, false))).toBeNull();
   });
 });
