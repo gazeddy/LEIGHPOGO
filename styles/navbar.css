@@ -12,15 +12,22 @@
   white-space: nowrap;
 }
 
+.nav-logo::before {
+  content: "";
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  background: url("/favicon.ico") center / contain no-repeat;
+}
+
 .nav-logo span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .nav-favicon {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 auto;
+  display: none;
 }
 
 .nav-links {
