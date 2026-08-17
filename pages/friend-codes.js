@@ -1,6 +1,6 @@
 import Head from "next/head"
 import { useSession } from "next-auth/react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
 import { openPokemonGo } from "../components/OpenPokemonGoButton"
@@ -28,6 +28,17 @@ function copyTextSynchronously(value) {
   }
 }
 
+function isMobileDevice() {
+  if (typeof navigator === "undefined") return false
+
+  const userAgent = navigator.userAgent || ""
+  const appleMobile =
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+
+  return /Android/i.test(userAgent) || appleMobile
+}
+
 export default function FriendCodes({ entries }) {
   const { data: session } = useSession()
   const [trainerName, setTrainerName] = useState("")
@@ -37,6 +48,11 @@ export default function FriendCodes({ entries }) {
   const [entryList, setEntryList] = useState(entries)
   const [copiedEntryId, setCopiedEntryId] = useState(null)
   const [copyError, setCopyError] = useState("")
+  const [mobileDevice, setMobileDevice] = useState(false)
+
+  useEffect(() => {
+    setMobileDevice(isMobileDevice())
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -90,14 +106,16 @@ export default function FriendCodes({ entries }) {
     }
 
     try {
-      // Keep the copy synchronous so the Pokémon GO deep-link navigation remains
+      // Keep the copy synchronous so a mobile Pokémon GO deep-link navigation stays
       // directly associated with the user's tap in Chromium/PWA mode.
       copyTextSynchronously(code)
       setCopiedEntryId(entry.id)
       setCopyError("")
 
-      // `pokemongo:` is registered by Pokémon GO as a BROWSABLE VIEW deep link.
-      openPokemonGo()
+      if (mobileDevice) {
+        openPokemonGo()
+      }
+
       recordFriendCodeGrab(entry.id)
     } catch (error) {
       console.error("Failed to copy friend code", error)
@@ -178,6 +196,10 @@ export default function FriendCodes({ entries }) {
                 const formattedCode = formatFriendCodeInput(entry.code)
                 const hasCode = Boolean(normalizeFriendCode(entry.code))
                 const copied = copiedEntryId === entry.id
+                const idleLabel = mobileDevice ? "Copy & Open" : "Copy"
+                const actionDescription = mobileDevice
+                  ? "Copy and open Pokémon GO for"
+                  : "Copy friend code for"
 
                 return (
                   <li key={entry.id} className="entry-row">
@@ -194,9 +216,9 @@ export default function FriendCodes({ entries }) {
                           type="button"
                           className={`copy-code-button${copied ? " copied" : ""}`}
                           onClick={() => handleCopyFriendCode(entry)}
-                          aria-label={`${copied ? "Copied and opened Pokémon GO for" : "Copy and open Pokémon GO for"} ${entry.trainerName || entry.owner.ign}'s friend code`}
+                          aria-label={`${copied ? "Copied friend code for" : actionDescription} ${entry.trainerName || entry.owner.ign}`}
                         >
-                          {copied ? "Copied" : "Copy & Open"}
+                          {copied ? "Copied" : idleLabel}
                         </button>
                       )}
                     </div>
