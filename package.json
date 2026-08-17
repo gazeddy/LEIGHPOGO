@@ -3,16 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/generatePwaIcons.js",
     "dev": "next dev --turbo -p 3000 -H 0.0.0.0",
+    "prebuild": "node scripts/generatePwaIcons.js",
     "build": "next build",
     "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "eslint .",
+    "pretest": "node scripts/generatePwaIcons.js",
     "test": "jest",
     "postinstall": "prisma generate",
     "db:status": "prisma migrate status",
     "db:deploy": "prisma migrate deploy",
     "pogoapi:update": "node scripts/updateReleasedPokemonCache.js",
-    "push:keys": "node scripts/generateVapidKeys.js"
+    "push:keys": "node scripts/generateVapidKeys.js",
+    "pwa:icons": "node scripts/generatePwaIcons.js"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
