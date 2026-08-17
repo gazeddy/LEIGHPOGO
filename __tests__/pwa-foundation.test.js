@@ -19,7 +19,7 @@ describe("PWA foundation", () => {
           type: "image/png",
         }),
         expect.objectContaining({
-          src: "/pwa-icon-512.png",
+          src: "/pwa-icon-maskable-512.png",
           sizes: "512x512",
           type: "image/png",
           purpose: "maskable",
@@ -27,7 +27,12 @@ describe("PWA foundation", () => {
       ]),
     )
     expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual(
-      expect.arrayContaining(["/friend-codes", "/gyms", "/trades"]),
+      expect.arrayContaining([
+        "/gyms?add=1#add-gym",
+        "/friend-codes",
+        "/gyms",
+        "/trades",
+      ]),
     )
   })
 
@@ -37,28 +42,39 @@ describe("PWA foundation", () => {
       "utf8",
     )
 
+    expect(serviceWorker).toContain('const STATIC_CACHE = "leighpogo-static-v3"')
     expect(serviceWorker).toContain('const OFFLINE_URL = "/offline.html"')
     expect(serviceWorker).toContain('url.pathname.startsWith("/api/")')
     expect(serviceWorker).toContain('url.pathname.startsWith("/_next/data/")')
     expect(serviceWorker).toContain('request.mode === "navigate"')
     expect(serviceWorker).toContain("caches.match(OFFLINE_URL)")
     expect(serviceWorker).toContain('const DEFAULT_ICON = "/pwa-icon-192.png"')
+    expect(serviceWorker).toContain('"/pwa-icon-maskable-512.png"')
   })
 
-  it("publishes mobile and Apple PWA metadata", () => {
+  it("publishes mobile and Apple PWA metadata using the release artwork", () => {
     const app = fs.readFileSync(path.join(process.cwd(), "pages/_app.js"), "utf8")
 
     expect(app).toContain('name="mobile-web-app-capable"')
     expect(app).toContain('name="apple-mobile-web-app-capable"')
     expect(app).toContain('rel="manifest" href="/manifest.webmanifest"')
-    expect(app).toContain('rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"')
+    expect(app).toContain(
+      'rel="icon" href="/pwa-icon-192.png" type="image/png" sizes="192x192"',
+    )
+    expect(app).toContain(
+      'rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png"',
+    )
+    expect(app).not.toContain("/pwa-icon.svg")
     expect(app).toContain('import "../styles/pwa.css"')
   })
 
-  it("ships the icon and offline assets referenced by the manifest and metadata", () => {
+  it("generates the release icon assets from the checked-in Leigh artwork source", () => {
     for (const asset of [
+      "assets/pwa-icons/pwa-icon-192.b64.part01",
+      "scripts/generatePwaIcons.js",
       "public/pwa-icon-192.png",
       "public/pwa-icon-512.png",
+      "public/pwa-icon-maskable-512.png",
       "public/apple-touch-icon.png",
       "public/offline.html",
     ]) {
@@ -103,5 +119,7 @@ describe("PWA foundation", () => {
     expect(gitignore).toContain("next-env.d.ts")
     expect(gitignore).toContain(".env*")
     expect(gitignore).toContain("!.env.example")
+    expect(gitignore).toContain("/public/pwa-icon-192.png")
+    expect(gitignore).toContain("/public/pwa-icon-maskable-512.png")
   })
 })
