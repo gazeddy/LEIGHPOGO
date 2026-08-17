@@ -1,5 +1,4 @@
-const ANDROID_PACKAGE = "com.nianticlabs.pokemongo"
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.nianticlabs.pokemongo"
+const POKEMON_GO_SCHEME = "pokemongo:"
 const APP_STORE_URL = "https://apps.apple.com/gb/app/pok%C3%A9mon-go/id1094591345"
 
 const isAppleMobile = () => {
@@ -31,15 +30,16 @@ const recordPokemonGoLaunch = () => {
 export const openPokemonGo = () => {
   if (typeof window === "undefined") return
 
-  recordPokemonGoLaunch()
-
   if (isAndroid()) {
-    const fallback = encodeURIComponent(PLAY_STORE_URL)
-    window.location.href =
-      `intent:#Intent;action=android.intent.action.MAIN;package=${ANDROID_PACKAGE};` +
-      `S.browser_fallback_url=${fallback};end`
+    // Pokémon GO exposes this as a VIEW + BROWSABLE deep link on Android.
+    // Keep the navigation directly inside the user's tap so Chromium can
+    // hand off to the installed app without falling back to Google Play.
+    window.location.href = POKEMON_GO_SCHEME
+    recordPokemonGoLaunch()
     return
   }
+
+  recordPokemonGoLaunch()
 
   if (isAppleMobile()) {
     window.location.href = APP_STORE_URL
