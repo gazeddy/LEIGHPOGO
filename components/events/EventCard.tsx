@@ -1,7 +1,30 @@
+import Image, { type ImageLoaderProps } from "next/image";
 import type { PokemonGoEventSummary } from "../../lib/events";
 
 interface EventCardProps {
   event: PokemonGoEventSummary;
+}
+
+function passthroughImageLoader({ src }: ImageLoaderProps): string {
+  return src;
+}
+
+function canOptimizeEventImage(src: string): boolean {
+  if (src.startsWith("/") && !src.startsWith("//")) {
+    return true;
+  }
+
+  try {
+    const url = new URL(src);
+
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "cdn.leekduck.com" &&
+      url.pathname.startsWith("/assets/img/events/")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function dateForDisplay(value: string): {
@@ -52,16 +75,23 @@ export default function EventCard({ event }: EventCardProps) {
   const tags = event.tags ?? [];
   const leekDuckUrl = event.link?.trim() || null;
   const campfireUrl = event.campfireUrl?.trim() || null;
+  const optimizeEventImage = event.image
+    ? canOptimizeEventImage(event.image)
+    : false;
 
   return (
     <article className="event-card">
       {event.image && (
         <div className="event-image-wrapper">
-          <img
+          <Image
             src={event.image}
             alt=""
             className="event-image"
+            fill
+            sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
             loading="lazy"
+            loader={optimizeEventImage ? undefined : passthroughImageLoader}
+            unoptimized={!optimizeEventImage}
           />
         </div>
       )}
@@ -129,6 +159,7 @@ export default function EventCard({ event }: EventCardProps) {
         }
 
         .event-image-wrapper {
+          position: relative;
           overflow: hidden;
           aspect-ratio: 16 / 9;
           background: #0d1117;

@@ -1,3 +1,4 @@
+import Image, { type ImageLoaderProps } from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type {
@@ -27,6 +28,14 @@ interface GuidePageProps {
 
 interface GuidePageParams extends ParsedUrlQuery {
   slug: string;
+}
+
+function passthroughImageLoader({ src }: ImageLoaderProps): string {
+  return src;
+}
+
+function canOptimizeGuideImage(src: string): boolean {
+  return src.startsWith("/") && !src.startsWith("//");
 }
 
 export const getServerSideProps: GetServerSideProps<
@@ -62,6 +71,9 @@ export default function GuidePage({
   const isAdmin =
     (session?.user as { role?: string } | undefined)?.role === "admin";
   const hasSequence = previousGuide || nextGuide;
+  const optimizeCoverImage = guide.coverImage
+    ? canOptimizeGuideImage(guide.coverImage)
+    : false;
 
   return (
     <GuideLayout
@@ -98,11 +110,16 @@ export default function GuidePage({
 
       {guide.coverImage && (
         <figure className="guide-cover">
-          <img
+          <Image
             src={guide.coverImage}
             alt={guide.coverImageAlt || guide.title}
-            loading="eager"
-            decoding="async"
+            width={1600}
+            height={900}
+            sizes="(max-width: 900px) 100vw, 900px"
+            className="guide-cover-image"
+            priority
+            loader={optimizeCoverImage ? undefined : passthroughImageLoader}
+            unoptimized={!optimizeCoverImage}
           />
         </figure>
       )}
@@ -175,9 +192,10 @@ outline: none;
           background: #0d1117;
         }
 
-        .guide-cover img {
+        .guide-cover-image {
           display: block;
           width: 100%;
+          height: auto;
           max-height: 540px;
           object-fit: cover;
         }

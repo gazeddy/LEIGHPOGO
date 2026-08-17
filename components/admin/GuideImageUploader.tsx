@@ -1,3 +1,4 @@
+import Image, { type ImageLoaderProps } from "next/image";
 import { useState, type RefObject } from "react";
 
 interface GuideImageUploaderProps {
@@ -16,6 +17,14 @@ interface UploadResponse {
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function passthroughImageLoader({ src }: ImageLoaderProps): string {
+  return src;
+}
+
+function canOptimizeGuideImage(src: string): boolean {
+  return src.startsWith("/") && !src.startsWith("//");
+}
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -120,6 +129,10 @@ export default function GuideImageUploader({
     }
   }
 
+  const optimizeCoverImage = coverImage
+    ? canOptimizeGuideImage(coverImage)
+    : false;
+
   return (
     <fieldset className="guide-image-uploader">
       <legend>Guide pictures</legend>
@@ -179,7 +192,16 @@ export default function GuideImageUploader({
 
       {coverImage && (
         <div className="cover-preview">
-          <img src={coverImage} alt={coverImageAlt || "Current guide cover"} />
+          <Image
+            src={coverImage}
+            alt={coverImageAlt || "Current guide cover"}
+            width={1200}
+            height={675}
+            sizes="(max-width: 600px) 100vw, 220px"
+            className="cover-preview-image"
+            loader={optimizeCoverImage ? undefined : passthroughImageLoader}
+            unoptimized={!optimizeCoverImage}
+          />
           <div>
             <strong>Current cover image</strong>
             <small>{coverImageAlt || "No alternative text set"}</small>
@@ -202,7 +224,7 @@ export default function GuideImageUploader({
         .image-actions .primary { border-color: #238636; background: #238636; }
         .image-actions button:disabled { opacity: .6; cursor: wait; }
         .cover-preview { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 12px; align-items: center; padding: 12px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; }
-        .cover-preview img { width: 100%; max-height: 150px; object-fit: cover; border-radius: 7px; }
+        .cover-preview-image { width: 100%; height: auto; max-height: 150px; object-fit: cover; border-radius: 7px; }
         .cover-preview div { display: grid; gap: 7px; justify-items: start; min-width: 0; }
         .cover-preview small { color: #8b949e; overflow-wrap: anywhere; }
         .upload-message { margin: 0; padding: 9px 11px; border-radius: 7px; }

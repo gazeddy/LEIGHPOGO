@@ -11,6 +11,19 @@ const nextConfig = {
         pathname: "/nileplumb/PkmnHomeIcons/master/UICONS_OS_128/team/**",
         search: "",
       },
+      {
+        protocol: "https",
+        hostname: "raw.githubusercontent.com",
+        port: "",
+        pathname: "/nileplumb/PkmnHomeIcons/master/UICONS_OS/pokemon/**",
+        search: "",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.leekduck.com",
+        port: "",
+        pathname: "/assets/img/events/**",
+      },
     ],
   },
 

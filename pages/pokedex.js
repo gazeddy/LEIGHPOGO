@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 
@@ -76,7 +77,7 @@ function PokedexStyles() {
     .pokemon-evolution-link { display: grid; grid-template-columns: auto 42px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #30363d; border-radius: 8px; background: #161b22; color: #fff; text-decoration: none; }
     .pokemon-evolution-link:hover { border-color: #58a6ff; background: #1c2128; }
     .pokemon-evolution-direction { color: #9ecbff; font-size: 1.1rem; font-weight: 800; }
-    .pokemon-evolution-link img { width: 42px; height: 42px; object-fit: contain; padding: 3px; border-radius: 7px; background: #070b10; }
+    .pokemon-evolution-sprite { width: 42px; height: 42px; object-fit: contain; padding: 3px; border-radius: 7px; background: #070b10; }
     .pokemon-evolution-name { display: grid; gap: 2px; min-width: 0; }
     .pokemon-evolution-name strong { overflow-wrap: anywhere; }
     .pokemon-evolution-name small { color: #8b949e; font-family: monospace; }
@@ -203,10 +204,12 @@ function EvolutionLink({ relationship, direction, onNavigate }) {
       <span className="pokemon-evolution-direction" aria-hidden="true">
         {direction === "previous" ? "←" : "→"}
       </span>
-      <img
+      <Image
         src={buildSpriteUrl(relationship.pokemonId)}
         alt=""
-        loading="lazy"
+        width={42}
+        height={42}
+        className="pokemon-evolution-sprite"
       />
       <span className="pokemon-evolution-name">
         <strong>{relationship.pokemonName}</strong>
@@ -296,11 +299,12 @@ function PokemonCard({
           aria-expanded={expanded}
           aria-controls={`pokemon-details-${pokemon.dexNumber}`}
         >
-          <img
+          <Image
             src={buildSpriteUrl(pokemon.dexNumber)}
             alt={pokemon.name}
+            width={72}
+            height={72}
             className="pokemon-card-sprite"
-            loading="lazy"
           />
           <div className="pokemon-card-name">
             <span className="dex-number">
