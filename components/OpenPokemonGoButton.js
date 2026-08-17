@@ -1,5 +1,4 @@
 const POKEMON_GO_SCHEME = "pokemongo:"
-const APP_STORE_URL = "https://apps.apple.com/gb/app/pok%C3%A9mon-go/id1094591345"
 
 const isAppleMobile = () => {
   if (typeof navigator === "undefined") return false
@@ -30,22 +29,16 @@ const recordPokemonGoLaunch = () => {
 export const openPokemonGo = () => {
   if (typeof window === "undefined") return
 
-  if (isAndroid()) {
-    // Pokémon GO exposes this as a VIEW + BROWSABLE deep link on Android.
-    // Keep the navigation directly inside the user's tap so Chromium can
-    // hand off to the installed app without falling back to Google Play.
+  if (isAndroid() || isAppleMobile()) {
+    // Android is confirmed to expose pokemongo: as a browser-launchable deep link.
+    // iOS uses the same scheme here so it can be verified on a real iPhone/iPad.
+    // Keep navigation directly inside the user's tap for reliable app hand-off.
     window.location.href = POKEMON_GO_SCHEME
     recordPokemonGoLaunch()
     return
   }
 
   recordPokemonGoLaunch()
-
-  if (isAppleMobile()) {
-    window.location.href = APP_STORE_URL
-    return
-  }
-
   window.open("https://pokemongolive.com/", "_blank", "noopener,noreferrer")
 }
 
