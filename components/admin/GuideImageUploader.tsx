@@ -1,5 +1,6 @@
 import Image, { type ImageLoaderProps } from "next/image";
 import { useState, type RefObject } from "react";
+import { normalizeYouTubeUrl } from "../../lib/youtube";
 
 interface GuideImageUploaderProps {
   body: string;
@@ -49,9 +50,38 @@ export default function GuideImageUploader({
   const [file, setFile] = useState<File | null>(null);
   const [alt, setAlt] = useState("");
   const [caption, setCaption] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [uploading, setUploading] = useState<"inline" | "cover" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function insertMarkdownAtCursor(markdown: string) {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? body.length;
+    const end = textarea?.selectionEnd ?? start;
+    const before = body.slice(0, start);
+    const after = body.slice(end);
+    const prefix = before.length > 0 && !before.endsWith("\n\n")
+      ? before.endsWith("\n")
+        ? "\n"
+        : "\n\n"
+      : "";
+    const suffix = after.length > 0 && !after.startsWith("\n\n")
+      ? after.startsWith("\n")
+        ? "\n"
+        : "\n\n"
+      : "";
+    const inserted = `${prefix}${markdown}${suffix}`;
+    const nextBody = `${before}${inserted}${after}`;
+
+    onBodyChange(nextBody);
+
+    requestAnimationFrame(() => {
+      const nextPosition = start + inserted.length;
+      textarea?.focus();
+      textarea?.setSelectionRange(nextPosition, nextPosition);
+    });
+  }
 
   async function uploadImage(mode: "inline" | "cover") {
     setMessage(null);
@@ -99,22 +129,9 @@ export default function GuideImageUploader({
         const markdown = caption.trim()
           ? `${imageMarkdown}\n\n*${caption.trim()}*`
           : imageMarkdown;
-        const textarea = textareaRef.current;
-        const start = textarea?.selectionStart ?? body.length;
-        const end = textarea?.selectionEnd ?? start;
-        const prefix = start > 0 && !body.slice(0, start).endsWith("\n") ? "\n\n" : "";
-        const suffix = end < body.length && !body.slice(end).startsWith("\n") ? "\n\n" : "";
-        const inserted = `${prefix}${markdown}${suffix}`;
-        const nextBody = `${body.slice(0, start)}${inserted}${body.slice(end)}`;
 
-        onBodyChange(nextBody);
+        insertMarkdownAtCursor(markdown);
         setMessage("Image uploaded and inserted into the guide.");
-
-        requestAnimationFrame(() => {
-          const nextPosition = start + inserted.length;
-          textarea?.focus();
-          textarea?.setSelectionRange(nextPosition, nextPosition);
-        });
       }
 
       setFile(null);
@@ -129,66 +146,121 @@ export default function GuideImageUploader({
     }
   }
 
+  function insertYouTubeVideo() {
+    setMessage(null);
+    setError(null);
+
+    const normalizedUrl = normalizeYouTubeUrl(youtubeUrl);
+
+    if (!normalizedUrl) {
+      setError("Paste a valid YouTube video link first.");
+      return;
+    }
+
+    insertMarkdownAtCursor(normalizedUrl);
+    setYoutubeUrl("");
+    setMessage("YouTube video inserted into the guide.");
+  }
+
   const optimizeCoverImage = coverImage
     ? canOptimizeGuideImage(coverImage)
     : false;
 
   return (
-    <fieldset className="guide-image-uploader">
-      <legend>Guide pictures</legend>
-      <p className="field-help">
-        Upload JPEG, PNG or WebP images up to 5 MB. Inline images are inserted at
-        the current cursor position in the Markdown editor.
-      </p>
+    <fieldset className="guide-media-uploader">
+      <legend>Guide media</legend>
 
-      <label>
-        Image file
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(event) => {
-            setFile(event.target.files?.[0] ?? null);
-            setMessage(null);
-            setError(null);
-          }}
-        />
-      </label>
+      <section className="media-section">
+        <h3>Pictures</h3>
+        <p className="field-help">
+          Upload JPEG, PNG or WebP images up to 5 MB. Inline images are inserted at
+          the current cursor position in the Markdown editor.
+        </p>
 
-      <label>
-        Alternative text
-        <input
-          value={alt}
-          placeholder="Describe what the picture shows"
-          onChange={(event) => setAlt(event.target.value)}
-        />
-      </label>
+        <label>
+          Image file
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setMessage(null);
+              setError(null);
+            }}
+          />
+        </label>
 
-      <label>
-        Caption (optional, inline images only)
-        <input
-          value={caption}
-          placeholder="A short explanation shown below the picture"
-          onChange={(event) => setCaption(event.target.value)}
-        />
-      </label>
+        <label>
+          Alternative text
+          <input
+            value={alt}
+            placeholder="Describe what the picture shows"
+            onChange={(event) => setAlt(event.target.value)}
+          />
+        </label>
 
-      <div className="image-actions">
-        <button
-          type="button"
-          className="primary"
-          disabled={uploading !== null}
-          onClick={() => uploadImage("inline")}
-        >
-          {uploading === "inline" ? "Uploading…" : "Upload & insert at cursor"}
-        </button>
-        <button
-          type="button"
-          disabled={uploading !== null}
-          onClick={() => uploadImage("cover")}
-        >
-          {uploading === "cover" ? "Uploading…" : "Upload as cover"}
-        </button>
-      </div>
+        <label>
+          Caption (optional, inline images only)
+          <input
+            value={caption}
+            placeholder="A short explanation shown below the picture"
+            onChange={(event) => setCaption(event.target.value)}
+          />
+        </label>
+
+        <div className="media-actions">
+          <button
+            type="button"
+            className="primary"
+            disabled={uploading !== null}
+            onClick={() => uploadImage("inline")}
+          >
+            {uploading === "inline" ? "Uploading…" : "Upload & insert at cursor"}
+          </button>
+          <button
+            type="button"
+            disabled={uploading !== null}
+            onClick={() => uploadImage("cover")}
+          >
+            {uploading === "cover" ? "Uploading…" : "Upload as cover"}
+          </button>
+        </div>
+      </section>
+
+      <section className="media-section youtube-section">
+        <h3>YouTube video</h3>
+        <p className="field-help">
+          Paste a YouTube, youtu.be, Shorts or Live video link. The published guide
+          turns it into a responsive 16:9 player. Autoplay starts muted so modern
+          browsers allow it where autoplay is permitted.
+        </p>
+
+        <label>
+          YouTube link
+          <input
+            type="url"
+            value={youtubeUrl}
+            placeholder="https://www.youtube.com/watch?v=..."
+            onChange={(event) => {
+              setYoutubeUrl(event.target.value);
+              setMessage(null);
+              setError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                insertYouTubeVideo();
+              }
+            }}
+          />
+        </label>
+
+        <div className="media-actions">
+          <button type="button" className="primary" onClick={insertYouTubeVideo}>
+            Insert YouTube video at cursor
+          </button>
+        </div>
+      </section>
 
       {coverImage && (
         <div className="cover-preview">
@@ -214,15 +286,18 @@ export default function GuideImageUploader({
       {error && <p className="upload-message error">{error}</p>}
 
       <style jsx>{`
-        .guide-image-uploader { display: grid; gap: 12px; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
-        .guide-image-uploader label { display: grid; gap: 7px; color: #f0f6fc; font-weight: 700; }
-        .guide-image-uploader input { width: 100%; box-sizing: border-box; border: 1px solid #30363d; border-radius: 7px; padding: 10px; background: #0d1117; color: #f0f6fc; font: inherit; }
+        .guide-media-uploader { display: grid; gap: 16px; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+        .media-section { display: grid; gap: 12px; }
+        .media-section + .media-section { padding-top: 16px; border-top: 1px solid #30363d; }
+        .media-section h3 { margin: 0; color: #f0f6fc; font-size: 1rem; }
+        .guide-media-uploader label { display: grid; gap: 7px; color: #f0f6fc; font-weight: 700; }
+        .guide-media-uploader input { width: 100%; box-sizing: border-box; border: 1px solid #30363d; border-radius: 7px; padding: 10px; background: #0d1117; color: #f0f6fc; font: inherit; }
         .field-help { margin: 0 0 4px; color: #8b949e; font-size: .86rem; font-weight: 400; line-height: 1.5; }
-        .image-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-        .image-actions button,
+        .media-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .media-actions button,
         .cover-preview button { border: 1px solid #30363d; border-radius: 7px; padding: 9px 12px; background: #21262d; color: #f0f6fc; font-weight: 800; cursor: pointer; }
-        .image-actions .primary { border-color: #238636; background: #238636; }
-        .image-actions button:disabled { opacity: .6; cursor: wait; }
+        .media-actions .primary { border-color: #238636; background: #238636; }
+        .media-actions button:disabled { opacity: .6; cursor: wait; }
         .cover-preview { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 12px; align-items: center; padding: 12px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; }
         .cover-preview-image { width: 100%; height: auto; max-height: 150px; object-fit: cover; border-radius: 7px; }
         .cover-preview div { display: grid; gap: 7px; justify-items: start; min-width: 0; }
