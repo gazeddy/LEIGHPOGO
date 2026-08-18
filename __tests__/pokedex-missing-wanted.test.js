@@ -27,12 +27,17 @@ describe("Pokédex missing and wanted integration", () => {
     expect(wantedApi).toContain("where: onlyCurrentUser ? { ownerId: currentUser.id } : undefined")
   })
 
-  test("removes wanted listings only when a Pokémon changes from missing to caught", () => {
+  test("removes only plain wanted listings when a Pokémon changes from missing to caught", () => {
     expect(pokedexApi).toContain("const previousEntries = await tx.pokedexEntry.findMany")
     expect(pokedexApi).toContain("const newlyCaughtDexNumbers = dexNumbers.filter")
     expect(pokedexApi).toContain("!previouslyCaught.has(dexNumber)")
     expect(pokedexApi).toContain("for (const chunk of chunkDexNumbers(newlyCaughtDexNumbers))")
     expect(pokedexApi).toContain("await tx.wantedTrade.deleteMany")
+    expect(pokedexApi).toContain("shiny: false")
+    expect(pokedexApi).toContain("lucky: false")
+    expect(pokedexApi).toContain("xxl: false")
+    expect(pokedexApi).toContain("costume: false")
+    expect(pokedexApi).toContain("gigantamax: false")
     expect(pokedexApi).toContain("removedWantedCount += removed.count")
     expect(pokedexPage).toContain("data.newlyCaughtDexNumbers")
     expect(pokedexPage).toContain("data.removedWantedCount")
