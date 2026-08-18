@@ -9,8 +9,10 @@ jest.mock("../../pages/api/auth/[...nextauth]", () => ({
   authOptions: {},
 }))
 
-const mockDeleteMany = jest.fn()
+const mockPreviousCaughtFindMany = jest.fn()
+const mockPokedexDeleteMany = jest.fn()
 const mockCreateMany = jest.fn()
+const mockWantedDeleteMany = jest.fn()
 
 jest.mock("../../lib/prisma", () => ({
   __esModule: true,
@@ -21,8 +23,12 @@ jest.mock("../../lib/prisma", () => ({
     $transaction: jest.fn(async (callback) =>
       callback({
         pokedexEntry: {
-          deleteMany: mockDeleteMany,
+          findMany: mockPreviousCaughtFindMany,
+          deleteMany: mockPokedexDeleteMany,
           createMany: mockCreateMany,
+        },
+        wantedTrade: {
+          deleteMany: mockWantedDeleteMany,
         },
       })
     ),
@@ -54,8 +60,10 @@ const handler = require("../../pages/api/pokedex").default
 describe("PUT /api/pokedex", () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockDeleteMany.mockResolvedValue({ count: 0 })
+    mockPreviousCaughtFindMany.mockResolvedValue([])
+    mockPokedexDeleteMany.mockResolvedValue({ count: 0 })
     mockCreateMany.mockResolvedValue({ count: 0 })
+    mockWantedDeleteMany.mockResolvedValue({ count: 0 })
     getServerSession.mockResolvedValue({
       user: { id: 42, ign: "gaz", role: "user" },
     })
@@ -71,9 +79,10 @@ describe("PUT /api/pokedex", () => {
     await handler(req, res)
 
     expect(res._getStatusCode()).toBe(200)
-    expect(mockDeleteMany).toHaveBeenCalledTimes(1)
-    expect(mockDeleteMany).toHaveBeenCalledWith({ where: { ownerId: 42 } })
+    expect(mockPokedexDeleteMany).toHaveBeenCalledTimes(1)
+    expect(mockPokedexDeleteMany).toHaveBeenCalledWith({ where: { ownerId: 42 } })
     expect(mockCreateMany).toHaveBeenCalledTimes(5)
+    expect(mockWantedDeleteMany).toHaveBeenCalledTimes(5)
 
     const writtenDexNumbers = mockCreateMany.mock.calls.flatMap(
       ([call]) => call.data.map((entry) => entry.dexNumber)
@@ -82,5 +91,41 @@ describe("PUT /api/pokedex", () => {
     expect(
       Math.max(...mockCreateMany.mock.calls.map(([call]) => call.data.length))
     ).toBeLessThanOrEqual(250)
+    expect(
+      Math.max(
+        ...mockWantedDeleteMany.mock.calls.map(
+          ([call]) => call.where.dexNumber.in.length
+        )
+      )
+    ).toBeLessThanOrEqual(250)
+  })
+
+  test("removes wanted listings only for Pokémon newly marked caught", async () => {
+    mockPreviousCaughtFindMany.mockResolvedValue([
+      { dexNumber: 1 },
+      { dexNumber: 2 },
+    ])
+    mockWantedDeleteMany.mockResolvedValue({ count: 3 })
+
+    const { req, res } = createMocks({
+      method: "PUT",
+      body: { dexNumbers: [1, 2, 3, 4] },
+    })
+
+    await handler(req, res)
+
+    expect(res._getStatusCode()).toBe(200)
+    expect(mockWantedDeleteMany).toHaveBeenCalledTimes(1)
+    expect(mockWantedDeleteMany).toHaveBeenCalledWith({
+      where: {
+        ownerId: 42,
+        dexNumber: { in: [3, 4] },
+      },
+    })
+    expect(JSON.parse(res._getData())).toMatchObject({
+      dexNumbers: [1, 2, 3, 4],
+      newlyCaughtDexNumbers: [3, 4],
+      removedWantedCount: 3,
+    })
   })
 })
