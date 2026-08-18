@@ -231,8 +231,8 @@ export default function GuideImageUploader({
         <h3>YouTube video</h3>
         <p className="field-help">
           Paste a YouTube, youtu.be, Shorts or Live video link. The published guide
-          turns it into a responsive 16:9 player. Autoplay starts muted so modern
-          browsers allow it where autoplay is permitted.
+          turns it into a responsive 16:9 player. Videos start when the reader presses
+          play, with normal YouTube sound and controls.
         </p>
 
         <label>
