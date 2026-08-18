@@ -100,12 +100,12 @@ describe("PUT /api/pokedex", () => {
     ).toBeLessThanOrEqual(250)
   })
 
-  test("removes wanted listings only for Pokémon newly marked caught", async () => {
+  test("removes only plain wanted listings for Pokémon newly marked caught", async () => {
     mockPreviousCaughtFindMany.mockResolvedValue([
       { dexNumber: 1 },
       { dexNumber: 2 },
     ])
-    mockWantedDeleteMany.mockResolvedValue({ count: 3 })
+    mockWantedDeleteMany.mockResolvedValue({ count: 1 })
 
     const { req, res } = createMocks({
       method: "PUT",
@@ -120,12 +120,20 @@ describe("PUT /api/pokedex", () => {
       where: {
         ownerId: 42,
         dexNumber: { in: [3, 4] },
+        shiny: false,
+        lucky: false,
+        xxl: false,
+        xxs: false,
+        costume: false,
+        background: false,
+        dynamax: false,
+        gigantamax: false,
       },
     })
     expect(JSON.parse(res._getData())).toMatchObject({
       dexNumbers: [1, 2, 3, 4],
       newlyCaughtDexNumbers: [3, 4],
-      removedWantedCount: 3,
+      removedWantedCount: 1,
     })
   })
 })
