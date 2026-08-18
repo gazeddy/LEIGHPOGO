@@ -69,10 +69,7 @@ export function getYouTubeEmbedUrl(value: string): string | null {
   }
 
   const params = new URLSearchParams({
-    autoplay: "1",
-    mute: "1",
     playsinline: "1",
-    enablejsapi: "1",
     rel: "0",
   });
 
