@@ -72,6 +72,12 @@ model PokemonRegionalOverride {
   updatedAt  DateTime @updatedAt
 }
 
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model TradeListing {
   id                    Int                 @id @default(autoincrement())
   ownerId               Int
