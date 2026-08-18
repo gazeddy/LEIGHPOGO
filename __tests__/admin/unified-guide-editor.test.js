@@ -8,6 +8,9 @@ function readSource(relativePath) {
 describe("unified guide creator and editor", () => {
   const navbar = readSource("components/Navbar.js");
   const editor = readSource("pages/admin/content.tsx");
+  const guideMedia = readSource("components/admin/GuideImageUploader.tsx");
+  const markdownContent = readSource("components/guides/MarkdownContent.tsx");
+  const youtubeHelper = readSource("lib/youtube.ts");
   const oldEditor = readSource("pages/admin/guide-images.tsx");
   const oldLinks = readSource("pages/admin/guide-links.tsx");
   const publishedGuide = readSource("pages/guides/[slug].tsx");
@@ -30,11 +33,22 @@ describe("unified guide creator and editor", () => {
     expect(editor).toContain("Series position");
   });
 
+  it("inserts YouTube links and renders responsive autoplay embeds", () => {
+    expect(guideMedia).toContain("YouTube link");
+    expect(guideMedia).toContain("Insert YouTube video at cursor");
+    expect(guideMedia).toContain("normalizeYouTubeUrl");
+    expect(markdownContent).toContain("getYouTubeEmbedUrl");
+    expect(markdownContent).toContain("aspect-ratio: 16 / 9");
+    expect(markdownContent).toContain("allowFullScreen");
+    expect(youtubeHelper).toContain('autoplay: "1"');
+    expect(youtubeHelper).toContain('mute: "1"');
+    expect(youtubeHelper).toContain('playsinline: "1"');
+  });
+
   it("redirects the two superseded guide tools", () => {
     expect(oldEditor).toContain('destination: "/admin/content"');
     expect(oldLinks).toContain('destination: "/admin/content"');
   });
-
 
   it("opens published guides directly in the unified editor", () => {
     expect(editor).toContain("getGuideBySlug");
