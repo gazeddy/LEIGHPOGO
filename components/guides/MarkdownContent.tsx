@@ -1,13 +1,84 @@
 import ReactMarkdown from "react-markdown";
+import { getYouTubeEmbedUrl } from "../../lib/youtube";
 
 interface MarkdownContentProps {
   content: string;
 }
 
+type GuideContentBlock =
+  | { type: "markdown"; content: string }
+  | { type: "youtube"; embedUrl: string };
+
+function splitGuideContent(content: string): GuideContentBlock[] {
+  const blocks: GuideContentBlock[] = [];
+  const markdownLines: string[] = [];
+  let fenceCharacter: "`" | "~" | null = null;
+
+  function flushMarkdown() {
+    if (markdownLines.length === 0) {
+      return;
+    }
+
+    const markdown = markdownLines.join("\n");
+
+    if (markdown.trim()) {
+      blocks.push({ type: "markdown", content: markdown });
+    }
+
+    markdownLines.length = 0;
+  }
+
+  for (const line of content.split("\n")) {
+    const candidate = line.trim();
+    const fenceMatch = candidate.match(/^(```+|~~~+)/);
+    const isFenceLine = Boolean(fenceMatch);
+    const embedUrl = !fenceCharacter && !isFenceLine && candidate
+      ? getYouTubeEmbedUrl(candidate)
+      : null;
+
+    if (embedUrl) {
+      flushMarkdown();
+      blocks.push({ type: "youtube", embedUrl });
+      continue;
+    }
+
+    markdownLines.push(line);
+
+    if (fenceMatch) {
+      const character = fenceMatch[1][0] as "`" | "~";
+
+      if (!fenceCharacter) {
+        fenceCharacter = character;
+      } else if (fenceCharacter === character) {
+        fenceCharacter = null;
+      }
+    }
+  }
+
+  flushMarkdown();
+  return blocks;
+}
+
 export default function MarkdownContent({ content }: MarkdownContentProps) {
+  const blocks = splitGuideContent(content);
+
   return (
     <div className="guide-markdown">
-      <ReactMarkdown>{content}</ReactMarkdown>
+      {blocks.map((block, index) =>
+        block.type === "youtube" ? (
+          <div className="guide-youtube" key={`youtube-${index}`}>
+            <iframe
+              src={block.embedUrl}
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <ReactMarkdown key={`markdown-${index}`}>{block.content}</ReactMarkdown>
+        ),
+      )}
 
       <style jsx global>{`
         .guide-markdown {
@@ -94,9 +165,30 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
           border-radius: 8px;
         }
 
+        .guide-youtube {
+          width: 100%;
+          max-width: 960px;
+          aspect-ratio: 16 / 9;
+          margin: 1.5rem auto;
+          overflow: hidden;
+          border-radius: 10px;
+          background: #000;
+        }
+
+        .guide-youtube iframe {
+          display: block;
+          width: 100%;
+          height: 100%;
+          border: 0;
+        }
+
         @media (max-width: 600px) {
           .guide-markdown {
             padding: 22px;
+          }
+
+          .guide-youtube {
+            border-radius: 8px;
           }
         }
       `}</style>
