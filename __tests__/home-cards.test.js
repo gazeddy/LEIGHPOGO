@@ -8,9 +8,24 @@ function tradeCard(options) {
   return getHomeCards(options).find((card) => card.title === "Trade Listings")
 }
 
+function campfireCard(options) {
+  return getHomeCards(options).find((card) => card.title === "Campfire")
+}
+
 describe("role-aware homepage cards", () => {
-  it("shows only friend codes and events to logged-out visitors", () => {
+  it("shows only friend codes and events to logged-out visitors by default", () => {
     expect(cardTitles()).toEqual(["Friend Codes", "Events"])
+  })
+
+  it("adds the public Campfire card when its site setting is configured", () => {
+    const campfireUrl = "https://campfire.example/community"
+
+    expect(cardTitles({ campfireUrl })).toEqual(["Friend Codes", "Events", "Campfire"])
+    expect(campfireCard({ campfireUrl })).toMatchObject({
+      href: campfireUrl,
+      external: true,
+      cta: "Open Campfire",
+    })
   })
 
   it("adds member tools and trade listings for logged-in members", () => {
