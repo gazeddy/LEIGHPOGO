@@ -14,16 +14,21 @@ describe("Pokédex folding and search", () => {
     expect(page).toContain("aria-expanded={expanded}")
   })
 
-  test("search filters by name or National Dex number and opens result regions", () => {
+  test("search and Pokédex views filter results and open matching regions", () => {
     expect(page).toContain('type="search"')
     expect(page).toContain("pokemon.name.toLowerCase().includes(query)")
     expect(page).toContain('query.replace(/^#/, "")')
-    expect(page).toContain("forceOpen={Boolean(searchQuery.trim())}")
-    expect(page).toContain("No Pokémon match that search.")
+    expect(page).toContain('viewMode === "MISSING"')
+    expect(page).toContain('viewMode === "CAUGHT"')
+    expect(page).toContain(
+      'forceOpen={Boolean(searchQuery.trim()) || viewMode !== "ALL"}'
+    )
+    expect(page).toContain("No Pokémon match the current Pokédex view.")
   })
 
-  test("evolution navigation clears search and expands the destination", () => {
+  test("evolution navigation clears filters and expands the destination", () => {
     expect(page).toContain('setSearchQuery("")')
+    expect(page).toContain('setViewMode("ALL")')
     expect(page).toContain("setExpandedDex(dexNumber)")
   })
 
