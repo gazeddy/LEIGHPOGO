@@ -26,7 +26,9 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "GET") {
+    const onlyCurrentUser = String(req.query?.mine || "") === "1"
     const entries = await prisma.wantedTrade.findMany({
+      where: onlyCurrentUser ? { ownerId: currentUser.id } : undefined,
       include: wantedTradeInclude,
       orderBy: { createdAt: "desc" },
     })
