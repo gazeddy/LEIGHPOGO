@@ -65,6 +65,14 @@ export async function replacePokedexEntries(ownerId, dexNumbers) {
         where: {
           ownerId,
           dexNumber: { in: chunk },
+          shiny: false,
+          lucky: false,
+          xxl: false,
+          xxs: false,
+          costume: false,
+          background: false,
+          dynamax: false,
+          gigantamax: false,
         },
       })
       removedWantedCount += removed.count
@@ -88,7 +96,7 @@ export async function replacePokedexEntries(ownerId, dexNumbers) {
 export default async function handler(req, res) {
   disableCaching(res)
 
-  const session = await ensureSession(req, res)
+  const session = await ensureSession(req, res, authOptions)
   if (!session) return
 
   const ownerId = Number(session.user.id)
