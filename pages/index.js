@@ -2,12 +2,13 @@ import Head from "next/head"
 import Link from "next/link"
 import { getServerSession } from "next-auth/next"
 import { getHomeCards } from "../lib/homeCards"
+import { getCampfireUrl } from "../lib/siteSettings"
 import { getEligibleTradeUser } from "../lib/tradeServer"
 import styles from "../styles/HomeDashboard.module.css"
 import { authOptions } from "./api/auth/[...nextauth]"
 
-export default function Home({ isLoggedIn, isAdmin, hasFriendCode }) {
-  const cards = getHomeCards({ isLoggedIn, isAdmin, hasFriendCode })
+export default function Home({ isLoggedIn, isAdmin, hasFriendCode, campfireUrl }) {
+  const cards = getHomeCards({ isLoggedIn, isAdmin, hasFriendCode, campfireUrl })
 
   return (
     <>
@@ -34,6 +35,8 @@ export default function Home({ isLoggedIn, isAdmin, hasFriendCode }) {
               key={card.title}
               href={card.href}
               className={`${styles.card} ${styles[card.tone]}`}
+              target={card.external ? "_blank" : undefined}
+              rel={card.external ? "noopener noreferrer" : undefined}
             >
               <div>
                 <div className={styles.cardHeader}>
@@ -42,7 +45,9 @@ export default function Home({ isLoggedIn, isAdmin, hasFriendCode }) {
                 <h2>{card.title}</h2>
                 <p>{card.description}</p>
               </div>
-              <span className={styles.open}>Open section <span aria-hidden="true">→</span></span>
+              <span className={styles.open}>
+                {card.cta || "Open section"} <span aria-hidden="true">→</span>
+              </span>
             </Link>
           ))}
         </section>
@@ -58,7 +63,10 @@ export default function Home({ isLoggedIn, isAdmin, hasFriendCode }) {
 }
 
 export async function getServerSideProps(context) {
-  const session = await getServerSession(context.req, context.res, authOptions)
+  const [session, campfireUrl] = await Promise.all([
+    getServerSession(context.req, context.res, authOptions),
+    getCampfireUrl(),
+  ])
   const role = session?.user?.role
   const tradeUser = session ? await getEligibleTradeUser(session) : null
 
@@ -67,6 +75,7 @@ export async function getServerSideProps(context) {
       isLoggedIn: Boolean(session),
       isAdmin: role === "admin",
       hasFriendCode: Boolean(tradeUser),
+      campfireUrl,
     },
   }
 }
