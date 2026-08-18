@@ -38,16 +38,19 @@ function PokedexStyles() {
       100% { border-color: #484f58; background: #30363d; box-shadow: none; }
     }
     .pokemon-dex-card.unavailable { border-style: dashed; border-color: #6e7681; }
-    .pokemon-card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
+    .pokemon-card-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px; }
     .pokemon-card-summary { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
     .pokemon-card-summary:hover .pokemon-card-name h3 { color: #58a6ff; }
     .pokemon-card-summary:focus-visible { outline: 2px solid #58a6ff; outline-offset: 4px; border-radius: 8px; }
     .pokemon-card-chevron { color: #8b949e; font-size: 1rem; transition: transform 0.18s ease; }
     .pokemon-card-chevron.open { transform: rotate(180deg); }
     .pokemon-card-details { display: grid; gap: 12px; }
-    .pokedex-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
-    .pokedex-search label { display: grid; gap: 6px; font-weight: 700; }
-    .pokedex-search input { min-width: 0; }
+    .pokemon-wanted-button { min-width: 84px; padding: 7px 9px; font-size: 0.76rem; }
+    .pokemon-wanted-button.already-wanted { border-color: #1f6feb; color: #9ecbff; }
+    .pokedex-search-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, auto) auto; gap: 10px; align-items: end; }
+    .pokedex-search-tools label { display: grid; gap: 6px; font-weight: 700; }
+    .pokedex-search-tools input,
+    .pokedex-search-tools select { min-width: 0; }
     .pokedex-search-summary { margin: 8px 0 0; }
     .pokemon-card-sprite { width: 72px; height: 72px; object-fit: contain; padding: 6px; border: 1px solid #21262d; border-radius: 10px; background: #070b10; }
     .pokemon-card-name { display: grid; justify-items: start; gap: 4px; min-width: 0; }
@@ -85,17 +88,21 @@ function PokedexStyles() {
     .pokemon-evolution-cost small { max-width: 130px; color: #8b949e; font-size: 0.68rem; font-weight: 600; }
     .pokemon-evolution-cost .pokemon-trade-cost { color: #7ee787; font-weight: 800; }
     .pokemon-no-evolutions { margin: 0; padding-top: 10px; border-top: 1px solid #21262d; font-size: 0.82rem; }
-    @media (max-width: 700px) {
+    @media (max-width: 760px) {
       .pokemon-card-grid { grid-template-columns: 1fr; }
+      .pokedex-search-tools { grid-template-columns: 1fr; }
       .pokemon-evolution-link { grid-template-columns: auto 42px minmax(0, 1fr); }
       .pokemon-evolution-cost { grid-column: 2 / -1; justify-items: start; text-align: left; }
     }
-    @media (max-width: 430px) {
-      .pokemon-card-summary { grid-template-columns: 62px minmax(0, 1fr); }
+    @media (max-width: 520px) {
+      .pokemon-card-heading { grid-template-columns: minmax(0, 1fr) auto auto; }
+      .pokemon-card-summary { grid-column: 1 / -1; grid-template-columns: 62px minmax(0, 1fr); }
       .pokemon-card-sprite { width: 62px; height: 62px; }
+      .pokemon-wanted-button { grid-column: 1; justify-self: start; }
+      .pokemon-caught-toggle { grid-column: 2; }
+      .pokemon-card-chevron { grid-column: 3; }
       .pokemon-caught-toggle span { display: none; }
       .pokemon-resource-grid { grid-template-columns: 1fr; }
-      .pokedex-search { grid-template-columns: 1fr; }
       .region-meta p { display: none; }
     }
   `}</style>
@@ -117,9 +124,7 @@ function candyCostLabel(candyRequired) {
     return "Candy cost unavailable"
   }
   if (Number(candyRequired) === 0) return "No Candy required"
-  if (Number.isFinite(Number(candyRequired))) {
-    return `${Number(candyRequired)} Candy`
-  }
+  if (Number.isFinite(Number(candyRequired))) return `${Number(candyRequired)} Candy`
   return "Candy cost unavailable"
 }
 
@@ -172,12 +177,8 @@ function PokemonResourceDetails({ details }) {
                 key={`${megaEvolution.megaName}-${megaEvolution.form || index}`}
               >
                 <strong>{megaEvolution.megaName}</strong>
-                <small>
-                  First: {formatNumber(megaEvolution.firstTimeEnergy)} Mega Energy
-                </small>
-                <small>
-                  Repeat: {formatNumber(megaEvolution.repeatEnergy)} Mega Energy
-                </small>
+                <small>First: {formatNumber(megaEvolution.firstTimeEnergy)} Mega Energy</small>
+                <small>Repeat: {formatNumber(megaEvolution.repeatEnergy)} Mega Energy</small>
               </div>
             ))}
           </div>
@@ -251,7 +252,6 @@ function EvolutionStageLinks({ details, onNavigate }) {
           </div>
         </section>
       )}
-
       {next.length > 0 && (
         <section className="pokemon-evolution-section">
           <h4>Next evolution</h4>
@@ -277,12 +277,16 @@ function PokemonCard({
   caught,
   released,
   availabilityKnown,
+  wanted,
+  addingWanted,
+  onAddWanted,
   onToggle,
   onNavigate,
   expanded,
   onExpand,
 }) {
   const unavailable = availabilityKnown && !released
+  const canAddWanted = availabilityKnown && released && !caught
 
   return (
     <article
@@ -320,6 +324,18 @@ function PokemonCard({
             </div>
           </div>
         </button>
+
+        {canAddWanted && (
+          <button
+            type="button"
+            className={`pokemon-wanted-button ${wanted ? "already-wanted" : ""}`}
+            disabled={wanted || addingWanted}
+            onClick={() => onAddWanted(pokemon)}
+          >
+            {addingWanted ? "Adding…" : wanted ? "Wanted ✓" : "+ Wanted"}
+          </button>
+        )}
+
         <label className="pokemon-caught-toggle">
           <input
             type="checkbox"
@@ -338,16 +354,10 @@ function PokemonCard({
       </div>
 
       {expanded && (
-        <div
-          id={`pokemon-details-${pokemon.dexNumber}`}
-          className="pokemon-card-details"
-        >
+        <div id={`pokemon-details-${pokemon.dexNumber}`} className="pokemon-card-details">
           {unavailable && (
-            <p className="pokemon-unavailable-note">
-              Not available in Pokémon GO yet
-            </p>
+            <p className="pokemon-unavailable-note">Not available in Pokémon GO yet</p>
           )}
-
           <PokemonResourceDetails details={details} />
           <EvolutionStageLinks details={details} onNavigate={onNavigate} />
         </div>
@@ -362,6 +372,9 @@ function PokedexRegion({
   caughtSet,
   releasedSet,
   availabilityKnown,
+  wantedDexSet,
+  addingWantedDex,
+  onAddWanted,
   onToggle,
   onNavigate,
   focusedDex,
@@ -374,8 +387,7 @@ function PokedexRegion({
   useEffect(() => {
     if (
       forceOpen ||
-      (focusedDex &&
-        region.pokemon.some((pokemon) => pokemon.dexNumber === focusedDex))
+      (focusedDex && region.pokemon.some((pokemon) => pokemon.dexNumber === focusedDex))
     ) {
       setIsOpen(true)
     }
@@ -399,26 +411,21 @@ function PokedexRegion({
         <div>
           <h2>{region.region}</h2>
           <p className="muted region-count">
-            {caughtCount}/{releasedPokemon.length} caught · {region.pokemon.length} in National Dex
+            {caughtCount}/{releasedPokemon.length} caught · {region.pokemon.length} shown
           </p>
         </div>
         <div className="region-meta">
           <p className="muted">
-            #{region.pokemon[0].dexNumber} – #{
-              region.pokemon[region.pokemon.length - 1].dexNumber
-            }
+            #{region.pokemon[0].dexNumber} – #{region.pokemon[region.pokemon.length - 1].dexNumber}
           </p>
-          <span className={`chevron ${isOpen ? "open" : ""}`} aria-hidden="true">
-            ▾
-          </span>
+          <span className={`chevron ${isOpen ? "open" : ""}`} aria-hidden="true">▾</span>
         </div>
       </button>
 
       {isOpen && (
         <div className="pokemon-card-grid">
           {region.pokemon.map((pokemon) => {
-            const released =
-              !availabilityKnown || releasedSet.has(pokemon.dexNumber)
+            const released = !availabilityKnown || releasedSet.has(pokemon.dexNumber)
             return (
               <PokemonCard
                 key={pokemon.dexNumber}
@@ -427,6 +434,9 @@ function PokedexRegion({
                 caught={caughtSet.has(pokemon.dexNumber)}
                 released={released}
                 availabilityKnown={availabilityKnown}
+                wanted={wantedDexSet.has(pokemon.dexNumber)}
+                addingWanted={addingWantedDex === pokemon.dexNumber}
+                onAddWanted={onAddWanted}
                 onToggle={onToggle}
                 onNavigate={onNavigate}
                 expanded={expandedDex === pokemon.dexNumber}
@@ -446,6 +456,8 @@ export default function PokedexPage() {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState("")
   const [caughtSet, setCaughtSet] = useState(new Set())
+  const [wantedDexSet, setWantedDexSet] = useState(new Set())
+  const [addingWantedDex, setAddingWantedDex] = useState(null)
   const [isLoadingCaught, setIsLoadingCaught] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [statusMessage, setStatusMessage] = useState("")
@@ -453,6 +465,7 @@ export default function PokedexPage() {
   const [focusedDex, setFocusedDex] = useState(null)
   const [expandedDex, setExpandedDex] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState("ALL")
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -463,9 +476,7 @@ export default function PokedexPage() {
       try {
         const response = await fetch("/api/pokedex-catalog")
         const data = await response.json()
-        if (!response.ok) {
-          throw new Error(data.error || "Unable to load the Pokédex")
-        }
+        if (!response.ok) throw new Error(data.error || "Unable to load the Pokédex")
         setCatalog(data)
       } catch (error) {
         setCatalogError(error.message)
@@ -488,8 +499,20 @@ export default function PokedexPage() {
       }
     }
 
+    const fetchWanted = async () => {
+      try {
+        const response = await fetch("/api/trades/wanted?mine=1")
+        if (!response.ok) return
+        const data = await response.json()
+        setWantedDexSet(new Set((data.entries || []).map((entry) => Number(entry.dexNumber))))
+      } catch {
+        // Wanted status is a convenience on this page; the main Pokédex still works without it.
+      }
+    }
+
     fetchCatalog()
     fetchCaught()
+    fetchWanted()
   }, [status])
 
   const allDexNumbers = useMemo(
@@ -507,10 +530,12 @@ export default function PokedexPage() {
     [catalog]
   )
 
+  useEffect(() => {
+    if (!catalog?.availabilityKnown && viewMode === "MISSING") setViewMode("ALL")
+  }, [catalog?.availabilityKnown, viewMode])
+
   const filteredRegions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    if (!query) return catalog?.regions || []
-
     const dexQuery = query.replace(/^#/, "")
     const numericSearch = /^\d+$/.test(dexQuery)
     const normalisedDexQuery = numericSearch ? String(Number(dexQuery)) : ""
@@ -520,6 +545,14 @@ export default function PokedexPage() {
       .map((region) => ({
         ...region,
         pokemon: region.pokemon.filter((pokemon) => {
+          if (viewMode === "MISSING") {
+            if (!catalog?.availabilityKnown) return false
+            if (!releasedSet.has(pokemon.dexNumber) || caughtSet.has(pokemon.dexNumber)) return false
+          } else if (viewMode === "CAUGHT" && !caughtSet.has(pokemon.dexNumber)) {
+            return false
+          }
+
+          if (!query) return true
           const nameMatches = pokemon.name.toLowerCase().includes(query)
           if (!numericSearch) return nameMatches
 
@@ -532,7 +565,7 @@ export default function PokedexPage() {
         }),
       }))
       .filter((region) => region.pokemon.length > 0)
-  }, [catalog, searchQuery])
+  }, [catalog, caughtSet, releasedSet, searchQuery, viewMode])
 
   const searchResultCount = filteredRegions.reduce(
     (total, region) => total + region.pokemon.length,
@@ -544,18 +577,51 @@ export default function PokedexPage() {
     trackableSet.has(dexNumber)
   ).length
   const trackableCount = trackableSet.size
+  const missingCount = catalog?.availabilityKnown
+    ? Math.max(0, trackableCount - caughtCount)
+    : null
   const caughtPercentage = trackableCount
     ? Math.round((caughtCount / trackableCount) * 100)
     : 0
 
   const toggleCaught = (dexNumber) => {
     if (!trackableSet.has(dexNumber)) return
-
     setCaughtSet((previous) => {
       const next = new Set(previous)
       next.has(dexNumber) ? next.delete(dexNumber) : next.add(dexNumber)
       return next
     })
+  }
+
+  const addWanted = async (pokemon) => {
+    if (!catalog?.availabilityKnown || !releasedSet.has(pokemon.dexNumber)) return
+
+    setAddingWantedDex(pokemon.dexNumber)
+    setStatusMessage("")
+    try {
+      const response = await fetch("/api/trades/wanted", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dexNumber: pokemon.dexNumber }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setWantedDexSet((previous) => new Set(previous).add(pokemon.dexNumber))
+          setStatusMessage(`${pokemon.name} is already on your wanted list.`)
+          return
+        }
+        throw new Error(data.error || "Unable to add wanted Pokémon.")
+      }
+
+      setWantedDexSet((previous) => new Set(previous).add(pokemon.dexNumber))
+      setStatusMessage(`${pokemon.name} added to your wanted list.`)
+    } catch (error) {
+      setStatusMessage(error.message)
+    } finally {
+      setAddingWantedDex(null)
+    }
   }
 
   const handleSave = async () => {
@@ -571,11 +637,23 @@ export default function PokedexPage() {
         body: JSON.stringify({ dexNumbers }),
       })
 
-      if (!response.ok) throw new Error("Failed to save your Pokédex.")
       const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Failed to save your Pokédex.")
+
       setCaughtSet(new Set(data.dexNumbers.map(Number)))
+      if (Array.isArray(data.newlyCaughtDexNumbers)) {
+        setWantedDexSet((previous) => {
+          const next = new Set(previous)
+          data.newlyCaughtDexNumbers.forEach((dexNumber) => next.delete(Number(dexNumber)))
+          return next
+        })
+      }
       setLastSaved(new Date())
-      setStatusMessage("Pokédex saved successfully!")
+      setStatusMessage(
+        data.removedWantedCount
+          ? `Pokédex saved. Removed ${data.removedWantedCount} wanted ${data.removedWantedCount === 1 ? "listing" : "listings"} for newly caught Pokémon.`
+          : "Pokédex saved successfully!"
+      )
     } catch (error) {
       setStatusMessage(error.message)
     } finally {
@@ -590,6 +668,7 @@ export default function PokedexPage() {
 
   const navigateToPokemon = (dexNumber) => {
     setSearchQuery("")
+    setViewMode("ALL")
     setExpandedDex(dexNumber)
     setFocusedDex(dexNumber)
     window.setTimeout(() => {
@@ -632,12 +711,13 @@ export default function PokedexPage() {
           </p>
           <p className="muted">
             Progress: {caughtCount} / {trackableCount} released Pokémon ({caughtPercentage}%)
+            {missingCount !== null ? ` · ${missingCount} missing` : ""}
           </p>
           {catalog?.stale && (
             <p className="muted">Using the last locally cached data while an update check is unavailable.</p>
           )}
           {catalog && !catalog.availabilityKnown && (
-            <p className="status-text">Release status is temporarily unavailable, so availability labels are hidden.</p>
+            <p className="status-text">Release status is temporarily unavailable, so the Missing view and wanted shortcuts are disabled.</p>
           )}
           {catalog?.checkedAt && (
             <p className="muted">Data hashes last checked: {new Date(catalog.checkedAt).toLocaleString()}</p>
@@ -645,10 +725,7 @@ export default function PokedexPage() {
           {lastSaved && <p className="muted">Last saved: {lastSaved.toLocaleString()}</p>}
         </div>
         <div className="pokedex-actions">
-          <button
-            onClick={handleSave}
-            disabled={isSaving || isLoadingCaught || !catalog}
-          >
+          <button onClick={handleSave} disabled={isSaving || isLoadingCaught || !catalog}>
             {isSaving ? "Saving…" : "Save progress"}
           </button>
           {statusMessage && <p className="status-text">{statusMessage}</p>}
@@ -656,7 +733,7 @@ export default function PokedexPage() {
       </div>
 
       <div className="card">
-        <div className="pokedex-search">
+        <div className="pokedex-search-tools">
           <label htmlFor="pokedex-search">
             Search Pokémon
             <input
@@ -667,24 +744,48 @@ export default function PokedexPage() {
               placeholder="Name or National Dex number"
             />
           </label>
-          {searchQuery && (
-            <button type="button" onClick={() => setSearchQuery("")}>
+
+          <label htmlFor="pokedex-view">
+            Pokédex view
+            <select
+              id="pokedex-view"
+              value={viewMode}
+              onChange={(event) => setViewMode(event.target.value)}
+            >
+              <option value="ALL">All Pokémon</option>
+              <option value="MISSING" disabled={!catalog?.availabilityKnown}>
+                Missing (available only)
+              </option>
+              <option value="CAUGHT">Caught</option>
+            </select>
+          </label>
+
+          {(searchQuery || viewMode !== "ALL") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("")
+                setViewMode("ALL")
+              }}
+            >
               Clear
             </button>
           )}
         </div>
         <p className="muted pokedex-search-summary">
-          {searchQuery.trim()
-            ? `${searchResultCount} matching Pokémon`
-            : "Regions and Pokémon details are collapsed by default."}
+          {viewMode === "MISSING"
+            ? `${searchResultCount} available missing Pokémon shown`
+            : searchQuery.trim() || viewMode === "CAUGHT"
+              ? `${searchResultCount} Pokémon shown`
+              : "Regions and Pokémon details are collapsed by default."}
         </p>
       </div>
 
       {isLoadingCaught && <p className="muted">Loading your saved Pokédex progress…</p>}
 
-      {searchQuery.trim() && searchResultCount === 0 && (
+      {(searchQuery.trim() || viewMode !== "ALL") && searchResultCount === 0 && (
         <div className="card">
-          <p className="muted">No Pokémon match that search.</p>
+          <p className="muted">No Pokémon match the current Pokédex view.</p>
         </div>
       )}
 
@@ -696,12 +797,15 @@ export default function PokedexPage() {
           caughtSet={caughtSet}
           releasedSet={releasedSet}
           availabilityKnown={catalog.availabilityKnown}
+          wantedDexSet={wantedDexSet}
+          addingWantedDex={addingWantedDex}
+          onAddWanted={addWanted}
           onToggle={toggleCaught}
           onNavigate={navigateToPokemon}
           focusedDex={focusedDex}
           expandedDex={expandedDex}
           onExpand={togglePokemonDetails}
-          forceOpen={Boolean(searchQuery.trim())}
+          forceOpen={Boolean(searchQuery.trim()) || viewMode !== "ALL"}
         />
       ))}
       <PokedexStyles />
