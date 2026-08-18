@@ -33,16 +33,18 @@ describe("unified guide creator and editor", () => {
     expect(editor).toContain("Series position");
   });
 
-  it("inserts YouTube links and renders responsive autoplay embeds", () => {
+  it("inserts YouTube links and renders responsive click-to-play embeds", () => {
     expect(guideMedia).toContain("YouTube link");
     expect(guideMedia).toContain("Insert YouTube video at cursor");
     expect(guideMedia).toContain("normalizeYouTubeUrl");
+    expect(guideMedia).toContain("Videos start when the reader presses");
     expect(markdownContent).toContain("getYouTubeEmbedUrl");
     expect(markdownContent).toContain("aspect-ratio: 16 / 9");
     expect(markdownContent).toContain("allowFullScreen");
-    expect(youtubeHelper).toContain('autoplay: "1"');
-    expect(youtubeHelper).toContain('mute: "1"');
     expect(youtubeHelper).toContain('playsinline: "1"');
+    expect(youtubeHelper).not.toContain('autoplay: "1"');
+    expect(youtubeHelper).not.toContain('mute: "1"');
+    expect(youtubeHelper).not.toContain('enablejsapi: "1"');
   });
 
   it("redirects the two superseded guide tools", () => {
