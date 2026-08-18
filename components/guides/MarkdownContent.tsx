@@ -1,8 +1,13 @@
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { getYouTubeEmbedUrl } from "../../lib/youtube";
 
 interface MarkdownContentProps {
   content: string;
+}
+
+interface YouTubeGuideEmbedProps {
+  embedUrl: string;
 }
 
 type GuideContentBlock =
@@ -59,6 +64,56 @@ function splitGuideContent(content: string): GuideContentBlock[] {
   return blocks;
 }
 
+function YouTubeGuideEmbed({ embedUrl }: YouTubeGuideEmbedProps) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [playerLoaded, setPlayerLoaded] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
+  function sendPlayerCommand(func: "unMute" | "playVideo") {
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func, args: [] }),
+      "https://www.youtube.com",
+    );
+  }
+
+  function enableSound() {
+    sendPlayerCommand("unMute");
+    sendPlayerCommand("playVideo");
+    setSoundEnabled(true);
+  }
+
+  return (
+    <div className="guide-youtube">
+      <iframe
+        ref={iframeRef}
+        src={embedUrl}
+        title="YouTube video player"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+        onLoad={() => setPlayerLoaded(true)}
+      />
+      {!soundEnabled && (
+        <button
+          type="button"
+          className="guide-youtube-sound"
+          disabled={!playerLoaded}
+          onClick={enableSound}
+          aria-label="Turn on sound for this video"
+        >
+          {playerLoaded ? (
+            <>
+              Tap for sound <span aria-hidden="true">🔊</span>
+            </>
+          ) : (
+            "Loading video…"
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function MarkdownContent({ content }: MarkdownContentProps) {
   const blocks = splitGuideContent(content);
 
@@ -66,15 +121,10 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
     <div className="guide-markdown">
       {blocks.map((block, index) =>
         block.type === "youtube" ? (
-          <div className="guide-youtube" key={`youtube-${index}`}>
-            <iframe
-              src={block.embedUrl}
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-            />
-          </div>
+          <YouTubeGuideEmbed
+            key={`youtube-${index}`}
+            embedUrl={block.embedUrl}
+          />
         ) : (
           <ReactMarkdown key={`markdown-${index}`}>{block.content}</ReactMarkdown>
         ),
@@ -166,6 +216,7 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
         }
 
         .guide-youtube {
+          position: relative;
           width: 100%;
           max-width: 960px;
           aspect-ratio: 16 / 9;
@@ -182,6 +233,40 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
           border: 0;
         }
 
+        .guide-youtube-sound {
+          position: absolute;
+          z-index: 2;
+          top: 14px;
+          right: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          border-radius: 999px;
+          padding: 9px 14px;
+          background: rgba(13, 17, 23, 0.88);
+          color: #fff;
+          font: inherit;
+          font-size: 0.9rem;
+          font-weight: 800;
+          line-height: 1.2;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(4px);
+        }
+
+        .guide-youtube-sound:disabled {
+          opacity: 0.7;
+          cursor: wait;
+        }
+
+        .guide-youtube-sound:not(:disabled):hover,
+        .guide-youtube-sound:not(:disabled):focus-visible {
+          background: rgba(33, 38, 45, 0.96);
+        }
+
+        .guide-youtube-sound:focus-visible {
+          outline: 2px solid #58a6ff;
+          outline-offset: 2px;
+        }
+
         @media (max-width: 600px) {
           .guide-markdown {
             padding: 22px;
@@ -189,6 +274,13 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
 
           .guide-youtube {
             border-radius: 8px;
+          }
+
+          .guide-youtube-sound {
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
           }
         }
       `}</style>
