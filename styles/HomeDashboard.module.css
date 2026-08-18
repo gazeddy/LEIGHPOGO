@@ -112,6 +112,12 @@
     #161b22;
 }
 
+.campfire {
+  background:
+    radial-gradient(circle at top right, rgba(255, 122, 51, 0.24), transparent 42%),
+    #161b22;
+}
+
 .guides {
   background:
     radial-gradient(circle at top right, rgba(56, 139, 253, 0.22), transparent 42%),
