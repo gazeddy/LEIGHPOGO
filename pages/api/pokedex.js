@@ -96,7 +96,7 @@ export async function replacePokedexEntries(ownerId, dexNumbers) {
 export default async function handler(req, res) {
   disableCaching(res)
 
-  const session = await ensureSession(req, res, authOptions)
+  const session = await ensureSession(req, res)
   if (!session) return
 
   const ownerId = Number(session.user.id)
