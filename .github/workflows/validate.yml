@@ -39,7 +39,11 @@ jobs:
       - name: Validate migration scripts
         run: |
           python3 -m py_compile scripts/merge-dev-data.py
+          python3 -m py_compile scripts/merge-v3-cutover-state.py
+          python3 -m py_compile scripts/test-v3-cutover-merge.py
           python3 scripts/merge-dev-data.py --help >/dev/null
+          python3 scripts/merge-v3-cutover-state.py --help >/dev/null
+          python3 scripts/test-v3-cutover-merge.py
           bash -n deploy/migrate-v2-to-live.sh
           bash -n deploy/promote-v3-to-live.sh
 
