@@ -39,32 +39,48 @@ async function recoverStaleJobs() {
     },
   })
 
-  await prisma.pokedexImportJob.updateMany({
+  const staleUploads = await prisma.pokedexImportJob.findMany({
     where: {
       status: "UPLOADING",
       createdAt: { lt: staleBefore },
     },
-    data: {
-      status: "FAILED",
-      error: "The screenshot upload did not finish. Please queue the import again.",
-      completedAt: new Date(),
-    },
+    select: { id: true },
   })
+
+  if (staleUploads.length > 0) {
+    await prisma.pokedexImportJob.updateMany({
+      where: { id: { in: staleUploads.map((job) => job.id) } },
+      data: {
+        status: "FAILED",
+        error: "The screenshot upload did not finish. Please queue the import again.",
+        completedAt: new Date(),
+      },
+    })
+
+    await Promise.all(
+      staleUploads.map((job) => removeStoredPokedexImport(job.id).catch(() => {})),
+    )
+  }
 }
 
 async function claimNextJob() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const candidate = await prisma.pokedexImportJob.findFirst({
-      where: { status: "QUEUED" },
+      where: { status: { in: ["UPLOADING", "QUEUED"] } },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: {
         id: true,
         ownerId: true,
+        status: true,
         totalImages: true,
       },
     })
 
     if (!candidate) return null
+
+    // Strict first-come-first-served ordering: do not jump an earlier upload
+    // that is still being written to disk. The next timer run will try again.
+    if (candidate.status === "UPLOADING") return null
 
     const claimed = await prisma.pokedexImportJob.updateMany({
       where: {
@@ -151,13 +167,15 @@ export default async function handler(req, res) {
       },
     })
 
-    await removeStoredPokedexImport(job.id)
+    // Keep the original screenshots until the user reviews and accepts the OCR
+    // result. The ACCEPT action removes them immediately after confirmation.
     const push = await sendCompletionPush(job, true)
 
     return res.status(200).json({
       processed: true,
       jobId: job.id,
       status: "COMPLETE",
+      screenshotsRetainedForReview: true,
       push,
     })
   } catch (error) {
