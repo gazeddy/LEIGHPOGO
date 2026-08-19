@@ -139,6 +139,23 @@ function parseImportResult(resultJson) {
   return parsed
 }
 
+function importJobIdFromRequest(req) {
+  if (req.body?.importJobId != null) {
+    return Number(req.body.importJobId)
+  }
+
+  try {
+    const referer = String(req.headers?.referer || "")
+    if (!referer) return null
+    const url = new URL(referer)
+    if (url.pathname !== "/pokedex-import") return null
+    const jobId = Number(url.searchParams.get("job"))
+    return Number.isInteger(jobId) && jobId > 0 ? jobId : null
+  } catch {
+    return null
+  }
+}
+
 async function applyPokedexImport(ownerId, importJobId, dexNumbers) {
   return prisma.$transaction(async (tx) => {
     const job = await tx.pokedexImportJob.findFirst({
@@ -236,10 +253,9 @@ export default async function handler(req, res) {
       return
     }
 
-    const rawImportJobId = req.body?.importJobId
-    const importJobId = rawImportJobId == null ? null : Number(rawImportJobId)
+    const importJobId = importJobIdFromRequest(req)
     if (
-      rawImportJobId != null &&
+      req.body?.importJobId != null &&
       (!Number.isInteger(importJobId) || importJobId <= 0)
     ) {
       res.status(400).json({ error: "importJobId must be a positive integer." })
