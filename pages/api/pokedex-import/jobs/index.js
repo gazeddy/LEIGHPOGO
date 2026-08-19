@@ -66,7 +66,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "GET") {
-    const [jobs, queue] = await Promise.all([
+    const [jobs, queue, queueAlert] = await Promise.all([
       prisma.pokedexImportJob.findMany({
         where: { ownerId },
         orderBy: { createdAt: "desc" },
@@ -86,6 +86,10 @@ export default async function handler(req, res) {
         },
       }),
       getPokedexImportQueueEstimate(),
+      prisma.pokedexQueueAlert.findUnique({
+        where: { ownerId },
+        select: { id: true },
+      }),
     ])
 
     return res.status(200).json({
@@ -94,6 +98,7 @@ export default async function handler(req, res) {
         ...queue,
         maxWaitSeconds: MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
       },
+      queueAlertRegistered: Boolean(queueAlert),
     })
   }
 
@@ -164,6 +169,10 @@ export default async function handler(req, res) {
     },
   })
 
+  // If the user managed to upload before a requested queue-availability push was
+  // sent, the alert has served its purpose and should not fire later.
+  await prisma.pokedexQueueAlert.deleteMany({ where: { ownerId } })
+
   const [position, estimatedWait, pushSubscriptions] = await Promise.all([
     getPokedexImportQueuePosition(queuedJob),
     getPokedexImportQueueEstimate({ beforeJobId: queuedJob.id }),
@@ -185,5 +194,6 @@ export default async function handler(req, res) {
       maxWaitSeconds: MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
     },
     pushEnabled: pushSubscriptions > 0,
+    queueAlertRegistered: false,
   })
 }
