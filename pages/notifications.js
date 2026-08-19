@@ -16,6 +16,7 @@ import {
 } from "../lib/friendCodeNotifications"
 
 const POKEDEX_NOTIFICATION_STATUSES = ["COMPLETE", "FAILED", "ACCEPTED"]
+const NOTIFICATION_LIST_LIMIT = 20
 
 const serializePokedexImportNotification = (job) => ({
   kind: "POKEDEX_IMPORT",
@@ -83,6 +84,7 @@ const notificationTitle = (notification) => {
 export default function NotificationsPage({ initialNotifications, renderedAt }) {
   const router = useRouter()
   const [notifications, setNotifications] = useState(initialNotifications)
+  const [isClearing, setIsClearing] = useState(false)
   const unreadCount = notifications.filter((notification) => !notification.readAt).length
 
   const notifyNavbar = () => {
@@ -105,6 +107,43 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
       })),
     )
     notifyNavbar()
+  }
+
+  const clearNotifications = async () => {
+    if (
+      !window.confirm(
+        "Clear all notifications? Pokédex import history will be kept, but these alerts will disappear from your inbox.",
+      )
+    ) {
+      return
+    }
+
+    setIsClearing(true)
+
+    try {
+      const response = await fetch("/api/notifications", { method: "DELETE" })
+
+      if (!response.ok) {
+        window.alert("Unable to clear notifications.")
+        return
+      }
+
+      setNotifications([])
+
+      try {
+        if (typeof navigator.clearAppBadge === "function") {
+          await navigator.clearAppBadge()
+        } else if (typeof navigator.setAppBadge === "function") {
+          await navigator.setAppBadge(0)
+        }
+      } catch {
+        // App badging is optional and must not block clearing the inbox.
+      }
+
+      notifyNavbar()
+    } finally {
+      setIsClearing(false)
+    }
   }
 
   const markNotificationRead = async (notification) => {
@@ -178,13 +217,25 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
         <div>
           <h1>Notifications</h1>
           <p className="muted">
-            Private alerts for Pokédex imports, trade matches and when another logged-in trainer copies your friend code. Friend-code copy alerts stay in-app only and are not sent as push notifications.
+            Private alerts for Pokédex imports, trade matches and when another logged-in trainer copies your friend code. Friend-code copy alerts stay in-app only and are not sent as push notifications. Up to the 20 most recent notifications are shown.
           </p>
         </div>
-        {unreadCount > 0 && (
-          <button type="button" className="secondary-button" onClick={markAllRead}>
-            Mark all read
-          </button>
+        {notifications.length > 0 && (
+          <div className="notifications-hero-actions">
+            {unreadCount > 0 && (
+              <button type="button" className="secondary-button" onClick={markAllRead}>
+                Mark all read
+              </button>
+            )}
+            <button
+              type="button"
+              className="notification-clear-button"
+              onClick={clearNotifications}
+              disabled={isClearing}
+            >
+              {isClearing ? "Clearing…" : "Clear notifications"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -276,21 +327,22 @@ export async function getServerSideProps(context) {
         where: { ownerId: userId },
         include: tradeNotificationInclude,
         orderBy: { createdAt: "desc" },
-        take: 50,
+        take: NOTIFICATION_LIST_LIMIT,
       }),
       prisma.friendCodeGrabNotification.findMany({
         where: { ownerId: userId },
         include: friendCodeGrabNotificationInclude,
         orderBy: { createdAt: "desc" },
-        take: 50,
+        take: NOTIFICATION_LIST_LIMIT,
       }),
       prisma.pokedexImportJob.findMany({
         where: {
           ownerId: userId,
           status: { in: POKEDEX_NOTIFICATION_STATUSES },
+          notificationDismissedAt: null,
         },
         orderBy: { completedAt: "desc" },
-        take: 50,
+        take: NOTIFICATION_LIST_LIMIT,
         select: {
           id: true,
           status: true,
@@ -313,7 +365,7 @@ export async function getServerSideProps(context) {
     ...pokedexImportJobs.map(serializePokedexImportNotification),
   ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 50)
+    .slice(0, NOTIFICATION_LIST_LIMIT)
 
   return {
     props: {
