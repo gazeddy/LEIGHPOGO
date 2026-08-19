@@ -51,22 +51,17 @@ export default async function handler(req, res) {
     const [tradeUnreadCount, friendCodeUnreadCount, pokedexImportUnreadCount] =
       await Promise.all([
         prisma.tradeNotification.count({
-          where: {
-            ownerId: userId,
-            readAt: null,
-          },
+          where: { ownerId: userId, readAt: null },
         }),
         prisma.friendCodeGrabNotification.count({
-          where: {
-            ownerId: userId,
-            readAt: null,
-          },
+          where: { ownerId: userId, readAt: null },
         }),
         prisma.pokedexImportJob.count({
           where: {
             ownerId: userId,
             status: { in: POKEDEX_UNREAD_STATUSES },
             notificationReadAt: null,
+            notificationDismissedAt: null,
           },
         }),
       ])
@@ -95,6 +90,7 @@ export default async function handler(req, res) {
           where: {
             ownerId: userId,
             status: { in: POKEDEX_NOTIFICATION_STATUSES },
+            notificationDismissedAt: null,
           },
           orderBy: { completedAt: "desc" },
           take: NOTIFICATION_LIST_LIMIT,
@@ -119,28 +115,18 @@ export default async function handler(req, res) {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, NOTIFICATION_LIST_LIMIT)
 
-    return res.status(200).json({
-      unreadCount,
-      notifications,
-      limit: NOTIFICATION_LIST_LIMIT,
-    })
+    return res.status(200).json({ unreadCount, notifications, limit: NOTIFICATION_LIST_LIMIT })
   }
 
   if (req.method === "PUT") {
     const readAt = new Date()
     const [tradeResult, friendCodeResult, pokedexImportResult] = await Promise.all([
       prisma.tradeNotification.updateMany({
-        where: {
-          ownerId: userId,
-          readAt: null,
-        },
+        where: { ownerId: userId, readAt: null },
         data: { readAt },
       }),
       prisma.friendCodeGrabNotification.updateMany({
-        where: {
-          ownerId: userId,
-          readAt: null,
-        },
+        where: { ownerId: userId, readAt: null },
         data: { readAt },
       }),
       prisma.pokedexImportJob.updateMany({
@@ -148,6 +134,7 @@ export default async function handler(req, res) {
           ownerId: userId,
           status: { in: POKEDEX_UNREAD_STATUSES },
           notificationReadAt: null,
+          notificationDismissedAt: null,
         },
         data: { notificationReadAt: readAt },
       }),
@@ -161,12 +148,13 @@ export default async function handler(req, res) {
 
   if (req.method === "DELETE") {
     try {
-      // Undo imports newest-first so multiple accepted imports unwind in the
-      // reverse order in which they affected the user's Pokédex.
+      // Only imports still present as notifications are destructive clears.
+      // Imports already clicked through are dismissed from the inbox and kept.
       const pokedexImportJobs = await prisma.pokedexImportJob.findMany({
         where: {
           ownerId: userId,
           status: { in: POKEDEX_NOTIFICATION_STATUSES },
+          notificationDismissedAt: null,
         },
         orderBy: [{ completedAt: "desc" }, { id: "desc" }],
         select: {
@@ -182,17 +170,12 @@ export default async function handler(req, res) {
       }
 
       const [tradeResult, friendCodeResult] = await Promise.all([
-        prisma.tradeNotification.deleteMany({
-          where: { ownerId: userId },
-        }),
-        prisma.friendCodeGrabNotification.deleteMany({
-          where: { ownerId: userId },
-        }),
+        prisma.tradeNotification.deleteMany({ where: { ownerId: userId } }),
+        prisma.friendCodeGrabNotification.deleteMany({ where: { ownerId: userId } }),
       ])
 
       return res.status(200).json({
-        cleared:
-          tradeResult.count + friendCodeResult.count + pokedexImportJobs.length,
+        cleared: tradeResult.count + friendCodeResult.count + pokedexImportJobs.length,
         deletedPokedexImports: pokedexImportJobs.length,
         unreadCount: 0,
       })
