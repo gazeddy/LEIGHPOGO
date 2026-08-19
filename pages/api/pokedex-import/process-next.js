@@ -8,6 +8,9 @@ import { notifyPokedexQueueAvailabilityIfOpen } from "../../../lib/pokedexQueueA
 import { sendPushToUser } from "../../../lib/pushServer"
 
 const STALE_JOB_MS = 30 * 60 * 1000
+const COMPLETED_SCREENSHOT_RETENTION_MS = 24 * 60 * 60 * 1000
+const EXPIRED_REVIEW_MESSAGE =
+  "The 24-hour review window expired. The uploaded screenshots were deleted; upload them again to create a new Pokédex import."
 
 function disableCaching(res) {
   res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate")
@@ -66,6 +69,43 @@ async function recoverStaleJobs() {
     await Promise.all(
       staleUploads.map((job) => removeStoredPokedexImport(job.id).catch(() => {})),
     )
+  }
+}
+
+async function expireUnapprovedCompletedJobs() {
+  const expiredBefore = new Date(Date.now() - COMPLETED_SCREENSHOT_RETENTION_MS)
+  const expiredJobs = await prisma.pokedexImportJob.findMany({
+    where: {
+      status: "COMPLETE",
+      completedAt: { lte: expiredBefore },
+    },
+    orderBy: { completedAt: "asc" },
+    select: { id: true },
+  })
+
+  for (const job of expiredJobs) {
+    try {
+      // Delete the private upload first. Only change the job state after the
+      // filesystem cleanup succeeds so a transient disk error is retried on
+      // the next worker pass instead of leaving abandoned screenshots behind.
+      await removeStoredPokedexImport(job.id)
+
+      await prisma.pokedexImportJob.updateMany({
+        where: {
+          id: job.id,
+          status: "COMPLETE",
+        },
+        data: {
+          status: "FAILED",
+          error: EXPIRED_REVIEW_MESSAGE,
+          // Surface the expiry in the in-app Notifications tab even if the
+          // original completion notification had already been read.
+          notificationReadAt: null,
+        },
+      })
+    } catch (error) {
+      console.error(`Unable to expire Pokédex import ${job.id}`, error)
+    }
   }
 }
 
@@ -186,6 +226,7 @@ export default async function handler(req, res) {
   }
 
   await recoverStaleJobs()
+  await expireUnapprovedCompletedJobs()
   const job = await claimNextJob()
 
   if (!job) {
@@ -219,7 +260,8 @@ export default async function handler(req, res) {
     })
 
     // The completed job itself is also the persistent in-app notification.
-    // Keep the screenshots until the user reviews and accepts the OCR result.
+    // Keep the screenshots until the user reviews and accepts the OCR result,
+    // or until the 24-hour review window expires.
     const push = await sendCompletionPush(job, true)
     const pushError = await recordPushResult(job.id, push)
     const queueAvailability = await notifyQueueAvailability()
@@ -229,6 +271,7 @@ export default async function handler(req, res) {
       jobId: job.id,
       status: "COMPLETE",
       screenshotsRetainedForReview: true,
+      screenshotRetentionHours: 24,
       push,
       pushError,
       queueAvailability,
