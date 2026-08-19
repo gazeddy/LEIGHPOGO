@@ -160,68 +160,47 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
     }
   }
 
-  const markNotificationRead = async (notification) => {
-    if (notification.readAt) return notification
+  const consumeNotification = async (notification) => {
+    let response
 
     if (notification.kind === "POKEDEX_IMPORT") {
-      const response = await fetch(`/api/pokedex-import/jobs/${notification.jobId}`, {
+      response = await fetch(`/api/pokedex-import/jobs/${notification.jobId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "MARK_READ" }),
+        body: JSON.stringify({ action: "DISMISS_NOTIFICATION" }),
       })
-
-      if (!response.ok) return notification
-
-      const readAt = new Date().toISOString()
-      const updated = { ...notification, readAt }
-      setNotifications((current) =>
-        current.map((item) =>
-          item.id === notification.id && item.kind === notification.kind
-            ? updated
-            : item,
-        ),
-      )
-      notifyNavbar()
-      return updated
+    } else {
+      const url =
+        notification.kind === "FRIEND_CODE_GRAB"
+          ? `/api/friend-code-grabs/${notification.id}`
+          : `/api/notifications/${notification.id}`
+      response = await fetch(url, { method: "DELETE" })
     }
 
-    const url =
-      notification.kind === "FRIEND_CODE_GRAB"
-        ? `/api/friend-code-grabs/${notification.id}`
-        : `/api/notifications/${notification.id}`
-    const response = await fetch(url, { method: "PUT" })
-
-    if (!response.ok) return notification
-
-    const updated = await response.json()
-    const nextNotification =
-      notification.kind === "FRIEND_CODE_GRAB"
-        ? updated
-        : { kind: "TRADE", ...updated }
+    if (!response.ok) return false
 
     setNotifications((current) =>
-      current.map((item) =>
-        item.id === notification.id && item.kind === notification.kind
-          ? nextNotification
-          : item,
+      current.filter(
+        (item) =>
+          !(item.id === notification.id && item.kind === notification.kind),
       ),
     )
     notifyNavbar()
-    return nextNotification
+    return true
   }
 
   const openTradeListing = async (notification) => {
-    await markNotificationRead(notification)
+    await consumeNotification(notification)
     router.push(`/trades/${notification.listingId}`)
   }
 
   const openFriendCodes = async (notification) => {
-    await markNotificationRead(notification)
+    await consumeNotification(notification)
     router.push("/friend-codes")
   }
 
   const openPokedexImport = async (notification) => {
-    await markNotificationRead(notification)
+    await consumeNotification(notification)
     router.push(`/pokedex-import?job=${notification.jobId}`)
   }
 
@@ -353,6 +332,7 @@ export async function getServerSideProps(context) {
         where: {
           ownerId: userId,
           status: { in: POKEDEX_NOTIFICATION_STATUSES },
+          notificationDismissedAt: null,
         },
         orderBy: { completedAt: "desc" },
         take: NOTIFICATION_LIST_LIMIT,
