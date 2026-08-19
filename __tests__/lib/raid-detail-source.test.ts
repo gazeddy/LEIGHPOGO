@@ -1,6 +1,8 @@
 import {
   calculateMegaEncounterCp,
+  calculatePokemonEncounterCp,
   matchMegaSupplementRecords,
+  matchPokemonSupplementRecords,
 } from "../../lib/raid-detail-source";
 import type { RaidBossTickerItem } from "../../lib/events";
 
@@ -25,6 +27,21 @@ const megaRecords = [
     mega_name: "Mega Charizard Y",
     form: "Y",
     type: ["Fire", "Flying"],
+  },
+];
+
+const pokemonRecords = [
+  {
+    pokemon_id: 792,
+    pokemon_name: "Lunala",
+    form: "Normal",
+    type: ["Psychic", "Ghost"],
+  },
+  {
+    pokemon_id: 791,
+    pokemon_name: "Solgaleo",
+    form: "Normal",
+    type: ["Psychic", "Steel"],
   },
 ];
 
@@ -91,6 +108,44 @@ describe("Mega raid detail fallback", () => {
     ).toEqual({
       maxUnboostedCp: 2264,
       maxBoostedCp: 2830,
+    });
+  });
+});
+
+describe("five-star raid detail fallback", () => {
+  it("matches Lunala from normal Pokémon data when the raid feed is missing it", () => {
+    expect(
+      matchPokemonSupplementRecords(tickerItem("Lunala", "five-star"), pokemonRecords),
+    ).toEqual([pokemonRecords[0]]);
+  });
+
+  it("does not use the normal five-star fallback for Mega raids", () => {
+    expect(
+      matchPokemonSupplementRecords(tickerItem("Lunala", "mega"), pokemonRecords),
+    ).toEqual([]);
+  });
+
+  it("calculates Lunala's level 20 and 25 perfect catch CP from its normal stats", () => {
+    const pokemonStats = [
+      {
+        pokemon_id: 792,
+        pokemon_name: "Lunala",
+        form: "Normal",
+        base_attack: 255,
+        base_defense: 191,
+        base_stamina: 264,
+      },
+    ];
+    const cpMultipliers = [
+      { level: 20, multiplier: 0.5974000096321106 },
+      { level: 25, multiplier: 0.667934000492096 },
+    ];
+
+    expect(
+      calculatePokemonEncounterCp(pokemonRecords[0], pokemonStats, cpMultipliers),
+    ).toEqual({
+      maxUnboostedCp: 2310,
+      maxBoostedCp: 2887,
     });
   });
 });
