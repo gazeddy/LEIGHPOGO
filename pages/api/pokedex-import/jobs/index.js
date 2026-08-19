@@ -3,9 +3,14 @@ import { authOptions } from "../../auth/[...nextauth]"
 import prisma from "../../../../lib/prisma"
 import {
   decodePokedexImportImages,
-  MAX_ACTIVE_POKEDEX_IMPORT_JOBS,
+  MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
   storePokedexImportImages,
 } from "../../../../lib/pokedexImportQueue"
+import {
+  getPokedexImportQueueEstimate,
+  getPokedexImportQueuePosition,
+  pokedexImportQueueRetryAfterSeconds,
+} from "../../../../lib/pokedexImportQueueEstimate"
 
 export const config = {
   api: {
@@ -27,20 +32,17 @@ function disableCaching(res) {
   res.setHeader("Expires", "0")
 }
 
-async function queuePosition(job) {
-  if (job.status !== "QUEUED") return null
-
-  const [processingCount, queuedAhead] = await Promise.all([
-    prisma.pokedexImportJob.count({ where: { status: "PROCESSING" } }),
-    prisma.pokedexImportJob.count({
-      where: {
-        status: "QUEUED",
-        id: { lt: job.id },
-      },
-    }),
-  ])
-
-  return processingCount + queuedAhead + 1
+function queueBusyResponse(res, estimate) {
+  const retryAfterSeconds = pokedexImportQueueRetryAfterSeconds(estimate)
+  res.setHeader("Retry-After", String(retryAfterSeconds))
+  return res.status(429).json({
+    error: `The Pokédex import queue is busy. Estimated wait is about ${estimate.estimatedWaitSeconds} seconds, so new uploads are paused until it is likely to be 2 minutes or less.`,
+    queue: {
+      ...estimate,
+      maxWaitSeconds: MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
+      retryAfterSeconds,
+    },
+  })
 }
 
 export default async function handler(req, res) {
@@ -53,21 +55,24 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "GET") {
-    const jobs = await prisma.pokedexImportJob.findMany({
-      where: { ownerId },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        status: true,
-        totalImages: true,
-        processedImages: true,
-        createdAt: true,
-        startedAt: true,
-        completedAt: true,
-        error: true,
-      },
-    })
+    const [jobs, queue] = await Promise.all([
+      prisma.pokedexImportJob.findMany({
+        where: { ownerId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          status: true,
+          totalImages: true,
+          processedImages: true,
+          createdAt: true,
+          startedAt: true,
+          completedAt: true,
+          error: true,
+        },
+      }),
+      getPokedexImportQueueEstimate(),
+    ])
 
     return res.status(200).json({
       jobs: jobs.map((job) => ({
@@ -76,6 +81,10 @@ export default async function handler(req, res) {
         startedAt: job.startedAt?.toISOString() || null,
         completedAt: job.completedAt?.toISOString() || null,
       })),
+      queue: {
+        ...queue,
+        maxWaitSeconds: MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
+      },
     })
   }
 
@@ -84,17 +93,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" })
   }
 
-  const activeJobs = await prisma.pokedexImportJob.count({
-    where: {
-      ownerId,
-      status: { in: ["UPLOADING", "QUEUED", "PROCESSING"] },
-    },
-  })
-
-  if (activeJobs >= MAX_ACTIVE_POKEDEX_IMPORT_JOBS) {
-    return res.status(429).json({
-      error: `You already have ${MAX_ACTIVE_POKEDEX_IMPORT_JOBS} Pokédex imports uploading, queued or processing. Wait for one to finish before adding another.`,
-    })
+  const queueBeforeUpload = await getPokedexImportQueueEstimate()
+  if (!queueBeforeUpload.acceptingUploads) {
+    return queueBusyResponse(res, queueBeforeUpload)
   }
 
   let images
@@ -102,6 +103,11 @@ export default async function handler(req, res) {
     images = decodePokedexImportImages(req.body?.images)
   } catch (error) {
     return res.status(400).json({ error: error.message })
+  }
+
+  const queueBeforeCreate = await getPokedexImportQueueEstimate()
+  if (!queueBeforeCreate.acceptingUploads) {
+    return queueBusyResponse(res, queueBeforeCreate)
   }
 
   const job = await prisma.pokedexImportJob.create({
@@ -148,8 +154,9 @@ export default async function handler(req, res) {
     },
   })
 
-  const [position, pushSubscriptions] = await Promise.all([
-    queuePosition(queuedJob),
+  const [position, estimatedWait, pushSubscriptions] = await Promise.all([
+    getPokedexImportQueuePosition(queuedJob),
+    getPokedexImportQueueEstimate({ beforeJobId: queuedJob.id }),
     prisma.pushSubscription.count({ where: { ownerId } }),
   ])
 
@@ -161,6 +168,11 @@ export default async function handler(req, res) {
       processedImages: queuedJob.processedImages,
       createdAt: queuedJob.createdAt.toISOString(),
       queuePosition: position,
+      estimatedWaitSeconds: estimatedWait.estimatedWaitSeconds,
+    },
+    queue: {
+      ...queueBeforeCreate,
+      maxWaitSeconds: MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
     },
     pushEnabled: pushSubscriptions > 0,
   })
