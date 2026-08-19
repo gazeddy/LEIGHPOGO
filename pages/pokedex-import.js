@@ -721,7 +721,7 @@ export default function PokedexImportPage() {
                           {classificationLabel(entry.classification)}
                         </span>
                       ) : (
-                        <span className="pokedex-import-badge untracked">Not currently tracked</span>
+                        <span className="pokedex-import-badge untracked">Not available</span>
                       )}
                     </label>
                   )
