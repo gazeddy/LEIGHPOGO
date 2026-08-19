@@ -12,6 +12,7 @@ jest.mock("../../pages/api/auth/[...nextauth]", () => ({
 const mockPreviousCaughtFindMany = jest.fn()
 const mockPokedexDeleteMany = jest.fn()
 const mockCreateMany = jest.fn()
+const mockWantedFindMany = jest.fn()
 const mockWantedDeleteMany = jest.fn()
 
 jest.mock("../../lib/prisma", () => ({
@@ -28,31 +29,12 @@ jest.mock("../../lib/prisma", () => ({
           createMany: mockCreateMany,
         },
         wantedTrade: {
+          findMany: mockWantedFindMany,
           deleteMany: mockWantedDeleteMany,
         },
       })
     ),
   },
-}))
-
-jest.mock("../../lib/releasedPokemonCache", () => ({
-  filterReleasedDexNumbers: (values, releasedValues) => {
-    const released = new Set(releasedValues.map(Number))
-    return Array.from(new Set(values.map(Number)))
-      .filter((value) => Number.isInteger(value) && released.has(value))
-      .sort((left, right) => left - right)
-  },
-  getReleasedPokemonData: jest.fn(async () => ({
-    dexNumbers: Array.from({ length: 1100 }, (_, index) => index + 1),
-  })),
-}))
-
-jest.mock("../../lib/pokemonAvailability", () => ({
-  applyPokemonAvailabilityOverrides: (values) => values,
-}))
-
-jest.mock("../../lib/pokemonAvailabilityStore", () => ({
-  readPokemonAvailabilityOverrides: jest.fn(async () => ({ overrides: [] })),
 }))
 
 const handler = require("../../pages/api/pokedex").default
@@ -63,6 +45,7 @@ describe("PUT /api/pokedex", () => {
     mockPreviousCaughtFindMany.mockResolvedValue([])
     mockPokedexDeleteMany.mockResolvedValue({ count: 0 })
     mockCreateMany.mockResolvedValue({ count: 0 })
+    mockWantedFindMany.mockResolvedValue([])
     mockWantedDeleteMany.mockResolvedValue({ count: 0 })
     getServerSession.mockResolvedValue({
       user: { id: 42, ign: "gaz", role: "user" },
@@ -82,6 +65,7 @@ describe("PUT /api/pokedex", () => {
     expect(mockPokedexDeleteMany).toHaveBeenCalledTimes(1)
     expect(mockPokedexDeleteMany).toHaveBeenCalledWith({ where: { ownerId: 42 } })
     expect(mockCreateMany).toHaveBeenCalledTimes(5)
+    expect(mockWantedFindMany).toHaveBeenCalledTimes(5)
     expect(mockWantedDeleteMany).toHaveBeenCalledTimes(5)
 
     const writtenDexNumbers = mockCreateMany.mock.calls.flatMap(
@@ -115,6 +99,7 @@ describe("PUT /api/pokedex", () => {
     await handler(req, res)
 
     expect(res._getStatusCode()).toBe(200)
+    expect(mockWantedFindMany).toHaveBeenCalledTimes(1)
     expect(mockWantedDeleteMany).toHaveBeenCalledTimes(1)
     expect(mockWantedDeleteMany).toHaveBeenCalledWith({
       where: {
