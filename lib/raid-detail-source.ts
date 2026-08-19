@@ -321,6 +321,50 @@ export function matchMegaSupplementRecords(
   ).values());
 }
 
+function pokemonRecordAliases(record: PokemonTypeRecord): string[] {
+  const name = normaliseBossName(record.pokemon_name);
+  const form = normaliseBossName(record.form ?? "normal");
+  return Array.from(new Set([
+    name,
+    form && form !== "normal" ? `${form} ${name}` : "",
+    form && form !== "normal" ? `${name} ${form}` : "",
+  ].filter(Boolean).map(normaliseBossName)));
+}
+
+function matchPokemonPart(part: string, records: PokemonTypeRecord[]): PokemonTypeRecord | null {
+  const ranked = records
+    .map((record, index) => {
+      const form = normaliseBossName(record.form ?? "normal");
+      const nameScore = pokemonRecordAliases(record).reduce((best, alias) => {
+        if (alias === part) return Math.max(best, 100);
+        if (alias.length >= 4 && part.includes(alias)) return Math.max(best, 60);
+        if (part.length >= 4 && alias.includes(part)) return Math.max(best, 50);
+        return best;
+      }, -1);
+      const formScore = form === "normal" && normaliseBossName(record.pokemon_name) === part ? 20 : 0;
+      return { record, index, nameScore, total: nameScore + formScore };
+    })
+    .filter((entry) => entry.nameScore >= 0)
+    .sort((a, b) => b.total - a.total || b.nameScore - a.nameScore || a.index - b.index);
+  return ranked[0]?.record ?? null;
+}
+
+export function matchPokemonSupplementRecords(
+  item: RaidBossTickerItem,
+  records: PokemonTypeRecord[],
+): PokemonTypeRecord[] {
+  if (item.category !== "five-star") return [];
+  return Array.from(new Map(
+    itemBossParts(item.boss)
+      .map((part) => matchPokemonPart(part, records))
+      .filter((record): record is PokemonTypeRecord => Boolean(record))
+      .map((record) => [
+        `${normaliseBossName(record.pokemon_name)}|${normaliseBossName(record.form ?? "normal")}`,
+        record,
+      ]),
+  ).values());
+}
+
 function typeRecordScore(name: string, form: string, recordName: string, recordForm?: string): number {
   const targetName = normaliseBossName(name);
   const targetForm = normaliseBossName(form);
@@ -456,6 +500,31 @@ function findBasePokemonStats(
     .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.record ?? null;
 }
 
+function pokemonStatsScore(record: PokemonTypeRecord, stats: PokemonStatsRecord): number {
+  const idMatch = Number(stats.pokemon_id) === Number(record.pokemon_id);
+  const nameMatch = normaliseBossName(stats.pokemon_name) === normaliseBossName(record.pokemon_name);
+  if (!idMatch && !nameMatch) return -1;
+
+  const targetForm = normaliseBossName(record.form ?? "normal");
+  const statsForm = normaliseBossName(stats.form ?? "normal");
+  const formScore = targetForm === statsForm
+    ? 80
+    : targetForm === "normal" && statsForm === "normal"
+      ? 60
+      : 0;
+  return (idMatch ? 100 : 0) + (nameMatch ? 40 : 0) + formScore;
+}
+
+function findPokemonStats(
+  record: PokemonTypeRecord,
+  records: PokemonStatsRecord[],
+): PokemonStatsRecord | null {
+  return records
+    .map((stats, index) => ({ stats, index, score: pokemonStatsScore(record, stats) }))
+    .filter((entry) => entry.score >= 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.stats ?? null;
+}
+
 function findCpMultiplier(records: CpMultiplierRecord[], level: number): number | null {
   const record = records.find((entry) => Math.abs(Number(entry.level) - level) < 0.000001);
   return finiteNumber(record?.multiplier);
@@ -467,6 +536,25 @@ export function calculateMegaEncounterCp(
   cpMultipliers: CpMultiplierRecord[],
 ): { maxUnboostedCp: number | null; maxBoostedCp: number | null } {
   const stats = findBasePokemonStats(mega, pokemonStats);
+  const level20 = findCpMultiplier(cpMultipliers, 20);
+  const level25 = findCpMultiplier(cpMultipliers, 25);
+
+  if (!stats) {
+    return { maxUnboostedCp: null, maxBoostedCp: null };
+  }
+
+  return {
+    maxUnboostedCp: level20 === null ? null : calculatePerfectCp(stats, level20),
+    maxBoostedCp: level25 === null ? null : calculatePerfectCp(stats, level25),
+  };
+}
+
+export function calculatePokemonEncounterCp(
+  record: PokemonTypeRecord,
+  pokemonStats: PokemonStatsRecord[],
+  cpMultipliers: CpMultiplierRecord[],
+): { maxUnboostedCp: number | null; maxBoostedCp: number | null } {
+  const stats = findPokemonStats(record, pokemonStats);
   const level20 = findCpMultiplier(cpMultipliers, 20);
   const level25 = findCpMultiplier(cpMultipliers, 25);
 
@@ -496,6 +584,15 @@ function megaSupplementProfileKey(record: MegaPokemonRecord): string {
   ].join("|");
 }
 
+function pokemonSupplementProfileKey(record: PokemonTypeRecord): string {
+  return [
+    "five-star",
+    normaliseBossName(record.pokemon_name),
+    normaliseBossName(record.form ?? "normal"),
+    "supplement",
+  ].join("|");
+}
+
 function megaSupplementProfile(
   record: MegaPokemonRecord,
   supplement: SupplementCache,
@@ -515,6 +612,38 @@ function megaSupplementProfile(
     pokemonId: Number.isInteger(record.pokemon_id) ? record.pokemon_id : null,
     form: record.form || null,
     tier: "mega",
+    types,
+    weaknesses,
+    resistances,
+    boostedWeather: boostedWeatherForTypes(types, supplement.weatherBoosts),
+    maxUnboostedCp: encounterCp.maxUnboostedCp,
+    maxBoostedCp: encounterCp.maxBoostedCp,
+    possibleShiny: null,
+    refreshedAt,
+  };
+}
+
+function pokemonSupplementProfile(
+  record: PokemonTypeRecord,
+  supplement: SupplementCache,
+  refreshedAt: string,
+): RaidBossProfileData {
+  const types = validStringArray(record.type);
+  const { weaknesses, resistances } = calculateTypeMatchups(types, supplement.effectiveness);
+  const encounterCp = calculatePokemonEncounterCp(
+    record,
+    supplement.pokemonStats,
+    supplement.cpMultipliers,
+  );
+  const form = normaliseBossName(record.form ?? "normal");
+  const formLabel = String(record.form ?? "").replace(/_/g, " ");
+  return {
+    key: pokemonSupplementProfileKey(record),
+    category: "five-star",
+    name: form && form !== "normal" ? `${record.pokemon_name} (${formLabel})` : record.pokemon_name,
+    pokemonId: Number.isInteger(record.pokemon_id) ? record.pokemon_id : null,
+    form: record.form || null,
+    tier: "5",
     types,
     weaknesses,
     resistances,
@@ -556,11 +685,19 @@ export async function getCurrentRaidBossProfiles(
     };
   });
 
-  if (item.category !== "mega") return profiles;
-
   const matchedProfileNames = new Set(
     profiles.map((profile) => normaliseBossName(profile.name)),
   );
+
+  if (item.category === "five-star") {
+    const supplementalProfiles = matchPokemonSupplementRecords(item, supplement.pokemonTypes)
+      .filter((record) => !matchedProfileNames.has(normaliseBossName(record.pokemon_name)))
+      .map((record) => pokemonSupplementProfile(record, supplement, refreshedAt));
+    return [...profiles, ...supplementalProfiles];
+  }
+
+  if (item.category !== "mega") return profiles;
+
   const supplementalProfiles = matchMegaSupplementRecords(item, supplement.megaPokemon)
     .filter((record) => !matchedProfileNames.has(normaliseBossName(record.mega_name)))
     .map((record) => megaSupplementProfile(record, supplement, refreshedAt));
