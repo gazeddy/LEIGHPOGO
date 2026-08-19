@@ -195,8 +195,71 @@ def infer_clipped_top_row_entries(entries, image_width):
                 "centerY": top + median_height / 2.0,
                 "column": column,
                 "inferred": True,
+                "inferenceType": "clipped-empty",
             }
         )
+
+    if not inferred_entries:
+        return entries
+
+    return sorted(entries + inferred_entries, key=lambda entry: entry["dexNumber"])
+
+
+def infer_obscured_internal_entries(entries, image_width):
+    """Recover Pokédex numbers hidden by floating Pokémon GO controls.
+
+    Search, close and Regions controls can cover a number even though the rest
+    of the row is visible. Only fill a row when both the preceding and following
+    four-Pokémon rows are present. That proves this is an internal grid row and
+    avoids inventing a fourth cell at the end of a regional Pokédex.
+    """
+    rows = defaultdict(list)
+    for entry in entries:
+        row_base = entry["dexNumber"] - entry["column"]
+        rows[row_base].append(entry)
+
+    existing_dex = {entry["dexNumber"] for entry in entries}
+    row_bases = set(rows)
+    inferred_entries = []
+
+    for row_base, row_entries in rows.items():
+        if row_base - GRID_COLUMNS not in row_bases or row_base + GRID_COLUMNS not in row_bases:
+            continue
+        if len(row_entries) < 2:
+            continue
+
+        observed_columns = {entry["column"] for entry in row_entries}
+        if len(observed_columns) < 2:
+            continue
+
+        row_baseline = max(entry["top"] for entry in row_entries)
+        median_width = max(1, int(statistics.median(entry["width"] for entry in row_entries)))
+        median_height = max(1, int(statistics.median(entry["height"] for entry in row_entries)))
+
+        for column in range(GRID_COLUMNS):
+            dex_number = row_base + column
+            if column in observed_columns or dex_number in existing_dex:
+                continue
+            if dex_number <= 0 or dex_number > MAX_DEX_NUMBER:
+                continue
+
+            center_x = ((column + 0.5) / GRID_COLUMNS) * image_width
+            inferred_entries.append(
+                {
+                    "dexNumber": dex_number,
+                    "confidence": 0.0,
+                    "left": int(center_x - median_width / 2),
+                    "top": row_baseline,
+                    "width": median_width,
+                    "height": median_height,
+                    "centerX": center_x,
+                    "centerY": row_baseline + median_height / 2.0,
+                    "column": column,
+                    "inferred": True,
+                    "inferenceType": "obscured-grid",
+                }
+            )
+            existing_dex.add(dex_number)
 
     if not inferred_entries:
         return entries
@@ -249,6 +312,7 @@ def analyse_sprite_area(image, entry, row_baseline, cell_width):
             "foregroundFraction": 0.0,
             "darkFraction": 0.0,
             "meanChroma": 0.0,
+            "bottomObscured": False,
         }
 
     corner_w = max(2, crop.width // 9)
@@ -287,11 +351,15 @@ def analyse_sprite_area(image, entry, row_baseline, cell_width):
         "foregroundFraction": round(foreground_fraction, 4),
         "darkFraction": round(dark_fraction, 4),
         "meanChroma": round(mean_chroma, 2),
+        # Numbers this low in the screenshot mean the sprite area is under the
+        # persistent Pokémon/Shiny/Lucky controls. Do not confidently call a
+        # tile caught from those UI pixels.
+        "bottomObscured": row_baseline >= image_height * 0.88,
     }
 
 
 def classify_entry(entry, row_baseline, cell_width, metrics):
-    if entry.get("inferred"):
+    if entry.get("inferenceType") == "clipped-empty":
         return (
             "missing",
             0.84,
@@ -342,6 +410,20 @@ def classify_entry(entry, row_baseline, cell_width, metrics):
     ):
         return "missing", 0.86, "tile appears empty"
 
+    if entry.get("inferenceType") == "obscured-grid":
+        return (
+            "uncertain",
+            0.50,
+            "Pokédex number inferred from surrounding rows; on-screen controls obscure the tile",
+        )
+
+    if metrics.get("bottomObscured"):
+        return (
+            "uncertain",
+            0.50,
+            "tile is partly obscured by Pokémon GO controls; check manually",
+        )
+
     if (
         (dark_fraction >= 0.48 and mean_chroma < 38.0 and foreground_std < 48.0)
         or (all_std < 18.0 and foreground_fraction < 0.07 and mean_chroma < 45.0)
@@ -368,6 +450,7 @@ def scan_image(image_path):
         }
 
     entries = infer_clipped_top_row_entries(entries, width)
+    entries = infer_obscured_internal_entries(entries, width)
 
     cell_width = width / GRID_COLUMNS
     rows = defaultdict(list)
