@@ -45,6 +45,17 @@ function queueBusyResponse(res, estimate) {
   })
 }
 
+function serializeJob(job) {
+  return {
+    ...job,
+    createdAt: job.createdAt.toISOString(),
+    startedAt: job.startedAt?.toISOString() || null,
+    completedAt: job.completedAt?.toISOString() || null,
+    notificationReadAt: job.notificationReadAt?.toISOString() || null,
+    pushSentAt: job.pushSentAt?.toISOString() || null,
+  }
+}
+
 export default async function handler(req, res) {
   disableCaching(res)
 
@@ -59,7 +70,7 @@ export default async function handler(req, res) {
       prisma.pokedexImportJob.findMany({
         where: { ownerId },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 10,
         select: {
           id: true,
           status: true,
@@ -69,18 +80,16 @@ export default async function handler(req, res) {
           startedAt: true,
           completedAt: true,
           error: true,
+          notificationReadAt: true,
+          pushSentAt: true,
+          pushError: true,
         },
       }),
       getPokedexImportQueueEstimate(),
     ])
 
     return res.status(200).json({
-      jobs: jobs.map((job) => ({
-        ...job,
-        createdAt: job.createdAt.toISOString(),
-        startedAt: job.startedAt?.toISOString() || null,
-        completedAt: job.completedAt?.toISOString() || null,
-      })),
+      jobs: jobs.map(serializeJob),
       queue: {
         ...queue,
         maxWaitSeconds: MAX_POKEDEX_IMPORT_QUEUE_WAIT_SECONDS,
@@ -135,6 +144,7 @@ export default async function handler(req, res) {
         status: "FAILED",
         error: "The server could not store the uploaded screenshots.",
         completedAt: new Date(),
+        notificationReadAt: null,
       },
     })
     return res.status(500).json({
