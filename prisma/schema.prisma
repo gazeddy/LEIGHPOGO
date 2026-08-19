@@ -17,6 +17,7 @@ model User {
   searchStrings               SearchString[]
   pokedexEntries              PokedexEntry[]
   pokedexImportJobs           PokedexImportJob[]
+  pokedexQueueAlert           PokedexQueueAlert?
   tradeListings               TradeListing[]
   wantedTrades                WantedTrade[]
   tradeNotifications          TradeNotification[]
@@ -92,6 +93,13 @@ model PokedexImportJob {
   @@index([ownerId, notificationReadAt, completedAt])
 }
 
+model PokedexQueueAlert {
+  id        Int      @id @default(autoincrement())
+  ownerId   Int      @unique
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
 model PokemonAvailabilityOverride {
   id        Int      @id @default(autoincrement())
   dexNumber Int      @unique
@@ -142,7 +150,7 @@ model TradeListingItem {
   costume     Boolean      @default(false)
   background  Boolean      @default(false)
   dynamax     Boolean      @default(false)
-  gigantamax  Boolean      @default(false)
+  gigantamax Boolean      @default(false)
   notes       String?
 
   @@index([listingId, direction])
@@ -161,7 +169,7 @@ model WantedTrade {
   costume     Boolean  @default(false)
   background  Boolean  @default(false)
   dynamax     Boolean  @default(false)
-  gigantamax  Boolean  @default(false)
+  gigantamax Boolean  @default(false)
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
