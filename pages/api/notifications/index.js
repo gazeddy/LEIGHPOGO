@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../auth/[...nextauth]"
 import prisma from "../../../lib/prisma"
+import { deletePokedexImportCompletely } from "../../../lib/pokedexImportCleanup"
 import {
   serializeTradeNotification,
   tradeNotificationInclude,
@@ -66,7 +67,6 @@ export default async function handler(req, res) {
             ownerId: userId,
             status: { in: POKEDEX_UNREAD_STATUSES },
             notificationReadAt: null,
-            notificationDismissedAt: null,
           },
         }),
       ])
@@ -95,7 +95,6 @@ export default async function handler(req, res) {
           where: {
             ownerId: userId,
             status: { in: POKEDEX_NOTIFICATION_STATUSES },
-            notificationDismissedAt: null,
           },
           orderBy: { completedAt: "desc" },
           take: NOTIFICATION_LIST_LIMIT,
@@ -149,7 +148,6 @@ export default async function handler(req, res) {
           ownerId: userId,
           status: { in: POKEDEX_UNREAD_STATUSES },
           notificationReadAt: null,
-          notificationDismissedAt: null,
         },
         data: { notificationReadAt: readAt },
       }),
@@ -162,31 +160,49 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "DELETE") {
-    const dismissedAt = new Date()
-    const [tradeResult, friendCodeResult, pokedexImportResult] = await Promise.all([
-      prisma.tradeNotification.deleteMany({
-        where: { ownerId: userId },
-      }),
-      prisma.friendCodeGrabNotification.deleteMany({
-        where: { ownerId: userId },
-      }),
-      prisma.pokedexImportJob.updateMany({
+    try {
+      // Undo imports newest-first so multiple accepted imports unwind in the
+      // reverse order in which they affected the user's Pokédex.
+      const pokedexImportJobs = await prisma.pokedexImportJob.findMany({
         where: {
           ownerId: userId,
           status: { in: POKEDEX_NOTIFICATION_STATUSES },
-          notificationDismissedAt: null,
         },
-        data: {
-          notificationDismissedAt: dismissedAt,
-          notificationReadAt: dismissedAt,
+        orderBy: [{ completedAt: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          ownerId: true,
+          status: true,
+          resultJson: true,
         },
-      }),
-    ])
+      })
 
-    return res.status(200).json({
-      cleared: tradeResult.count + friendCodeResult.count + pokedexImportResult.count,
-      unreadCount: 0,
-    })
+      for (const job of pokedexImportJobs) {
+        await deletePokedexImportCompletely(job, userId)
+      }
+
+      const [tradeResult, friendCodeResult] = await Promise.all([
+        prisma.tradeNotification.deleteMany({
+          where: { ownerId: userId },
+        }),
+        prisma.friendCodeGrabNotification.deleteMany({
+          where: { ownerId: userId },
+        }),
+      ])
+
+      return res.status(200).json({
+        cleared:
+          tradeResult.count + friendCodeResult.count + pokedexImportJobs.length,
+        deletedPokedexImports: pokedexImportJobs.length,
+        unreadCount: 0,
+      })
+    } catch (error) {
+      console.error("Unable to completely clear notifications", error)
+      return res.status(500).json({
+        error:
+          "Notifications could not be completely cleared. Nothing else should be cleared until the Pokédex import cleanup can finish safely.",
+      })
+    }
   }
 
   res.setHeader("Allow", ["GET", "PUT", "DELETE"])
