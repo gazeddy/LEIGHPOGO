@@ -33,6 +33,7 @@ done
 [[ -f "$REPO_DIR/.env" ]] || fail "$REPO_DIR/.env is missing."
 [[ -f "$REPO_DIR/prisma/dev.db" ]] || fail "$REPO_DIR/prisma/dev.db is missing."
 [[ -f "$REPO_DIR/deploy/install-push.sh" ]] || fail "deploy/install-push.sh is missing."
+[[ -f "$REPO_DIR/deploy/install-pokedex-import-worker.sh" ]] || fail "deploy/install-pokedex-import-worker.sh is missing."
 
 APP_USER="$(stat -c '%U' "$REPO_DIR")"
 APP_GROUP="$(stat -c '%G' "$REPO_DIR")"
@@ -107,8 +108,12 @@ systemctl is-active --quiet "${SERVICE_NAME}.service" || fail "${SERVICE_NAME}.s
 echo "Installing V3 push configuration and Raid Hour scheduler..."
 bash "$REPO_DIR/deploy/install-push.sh" "$SERVICE_NAME" "$PORT" "$SITE_URL"
 
-systemctl is-active --quiet "${SERVICE_NAME}.service" || fail "${SERVICE_NAME}.service is not active after push setup."
+echo "Installing Pokédex import queue worker..."
+bash "$REPO_DIR/deploy/install-pokedex-import-worker.sh" "$SERVICE_NAME" "$PORT"
+
+systemctl is-active --quiet "${SERVICE_NAME}.service" || fail "${SERVICE_NAME}.service is not active after push/worker setup."
 systemctl is-enabled --quiet "${SERVICE_NAME}-raid-hour.timer" || fail "${SERVICE_NAME}-raid-hour.timer is not enabled."
+systemctl is-enabled --quiet "${SERVICE_NAME}-pokedex-import-worker.timer" || fail "${SERVICE_NAME}-pokedex-import-worker.timer is not enabled."
 
 if (( LIVE_WAS_ACTIVE == 1 )) && ! systemctl is-active --quiet "$LIVE_SERVICE"; then
   fail "$LIVE_SERVICE was active before the test install but is no longer active."
@@ -123,5 +128,6 @@ echo "URL: ${SITE_URL}"
 echo "Database backup: ${DB_BACKUP}"
 echo "Environment backup: ${ENV_BACKUP}"
 echo "Push timer: ${SERVICE_NAME}-raid-hour.timer"
+echo "Pokédex queue timer: ${SERVICE_NAME}-pokedex-import-worker.timer"
 echo
 echo "Live service was not targeted: ${LIVE_SERVICE} / port ${LIVE_PORT}."

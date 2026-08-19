@@ -1,10 +1,12 @@
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/router"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "./api/auth/[...nextauth]"
 
 const MAX_FILES = 20
 const MAX_FILE_BYTES = 8 * 1024 * 1024
+const POLL_INTERVAL_MS = 3000
 
 function PokedexImportStyles() {
   return <style jsx global>{`
@@ -32,9 +34,12 @@ function PokedexImportStyles() {
     .pokedex-import-badge.caught { border: 1px solid #2ea043; color: #7ee787; background: rgba(46, 160, 67, 0.12); }
     .pokedex-import-badge.untracked { border: 1px solid #6e7681; color: #c9d1d9; background: rgba(110, 118, 129, 0.12); }
     .pokedex-import-warning { padding: 10px 12px; border: 1px solid #d29922; border-radius: 8px; background: rgba(210, 153, 34, 0.08); }
+    .pokedex-import-queue { display: grid; gap: 10px; }
+    .pokedex-import-progress { width: 100%; height: 12px; accent-color: #2ea043; }
     .pokedex-import-confirm { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px; border: 1px solid #484f58; border-radius: 8px; }
     .pokedex-import-confirm input { width: 20px; height: 20px; margin-top: 2px; }
     .pokedex-import-success { border-color: #2ea043; background: rgba(46, 160, 67, 0.10); }
+    .pokedex-import-secondary-note { margin: 0; }
     @media (max-width: 680px) {
       .pokedex-import-hero { grid-template-columns: 1fr; }
       .pokedex-import-entry { grid-template-columns: auto minmax(0, 1fr); }
@@ -54,11 +59,7 @@ function fileToPayload(file) {
         reject(new Error(`Unable to encode ${file.name}.`))
         return
       }
-      resolve({
-        name: file.name,
-        type: file.type,
-        data: value.slice(commaIndex + 1),
-      })
+      resolve({ name: file.name, type: file.type, data: value.slice(commaIndex + 1) })
     }
     reader.readAsDataURL(file)
   })
@@ -76,45 +77,120 @@ function classificationLabel(classification) {
   return "Looks caught"
 }
 
+function jobStatusText(job) {
+  if (!job) return ""
+  if (job.status === "QUEUED") {
+    return job.queuePosition
+      ? `Queued · position ${job.queuePosition}`
+      : "Queued for processing"
+  }
+  if (job.status === "PROCESSING") {
+    return `Processing ${job.processedImages || 0} of ${job.totalImages} screenshots`
+  }
+  if (job.status === "COMPLETE") return "Processing complete"
+  if (job.status === "FAILED") return "Processing failed"
+  return job.status
+}
+
 export default function PokedexImportPage() {
+  const router = useRouter()
   const [catalog, setCatalog] = useState(null)
   const [catalogError, setCatalogError] = useState("")
   const [files, setFiles] = useState([])
   const [scanResults, setScanResults] = useState([])
   const [selectedMissing, setSelectedMissing] = useState(new Set())
-  const [scanning, setScanning] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [applying, setApplying] = useState(false)
   const [acknowledged, setAcknowledged] = useState(false)
   const [message, setMessage] = useState("")
   const [success, setSuccess] = useState(null)
+  const [currentJob, setCurrentJob] = useState(null)
+  const [pushEnabled, setPushEnabled] = useState(null)
 
   useEffect(() => {
-    const loadCatalog = async () => {
+    const loadInitialData = async () => {
       try {
-        const response = await fetch("/api/pokedex-catalog")
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error || "Unable to load Pokédex data.")
-        setCatalog(data)
+        const [catalogResponse, pushResponse] = await Promise.all([
+          fetch("/api/pokedex-catalog"),
+          fetch("/api/push/subscription"),
+        ])
+
+        const catalogData = await catalogResponse.json()
+        if (!catalogResponse.ok) {
+          throw new Error(catalogData.error || "Unable to load Pokédex data.")
+        }
+        setCatalog(catalogData)
+
+        if (pushResponse.ok) {
+          const pushData = await pushResponse.json()
+          setPushEnabled(Array.isArray(pushData.subscriptions) && pushData.subscriptions.length > 0)
+        }
       } catch (error) {
         setCatalogError(error.message)
       }
     }
-    loadCatalog()
+    loadInitialData()
   }, [])
+
+  const applyJobState = useCallback((job) => {
+    setCurrentJob(job)
+
+    if (job.status === "COMPLETE" && job.result) {
+      const results = Array.isArray(job.result.results) ? job.result.results : []
+      setScanResults(results)
+      setSelectedMissing(new Set((job.result.likelyMissingDexNumbers || []).map(Number)))
+      setAcknowledged(false)
+      setMessage(
+        `OCR finished. Review the missing selections below before applying import #${job.id}.`,
+      )
+    } else if (job.status === "FAILED") {
+      setScanResults([])
+      setSelectedMissing(new Set())
+      setMessage(job.error || "The queued OCR job failed.")
+    }
+  }, [])
+
+  const loadJob = useCallback(
+    async (jobId) => {
+      const response = await fetch(`/api/pokedex-import/jobs/${jobId}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Unable to load the queued import.")
+      applyJobState(data.job)
+      return data.job
+    },
+    [applyJobState],
+  )
+
+  useEffect(() => {
+    if (!router.isReady) return
+    const rawJobId = Array.isArray(router.query.job) ? router.query.job[0] : router.query.job
+    const jobId = Number(rawJobId)
+    if (!Number.isInteger(jobId) || jobId <= 0) return
+
+    loadJob(jobId).catch((error) => setMessage(error.message))
+  }, [loadJob, router.isReady, router.query.job])
+
+  useEffect(() => {
+    if (!currentJob || !["QUEUED", "PROCESSING"].includes(currentJob.status)) return undefined
+
+    const interval = window.setInterval(() => {
+      loadJob(currentJob.id).catch((error) => setMessage(error.message))
+    }, POLL_INTERVAL_MS)
+
+    return () => window.clearInterval(interval)
+  }, [currentJob, loadJob])
 
   const pokemonByDex = useMemo(() => {
     const map = new Map()
     for (const region of catalog?.regions || []) {
-      for (const pokemon of region.pokemon || []) {
-        map.set(Number(pokemon.dexNumber), pokemon)
-      }
+      for (const pokemon of region.pokemon || []) map.set(Number(pokemon.dexNumber), pokemon)
     }
     return map
   }, [catalog])
 
   const releasedSet = useMemo(
     () => new Set((catalog?.releasedDexNumbers || []).map(Number)),
-    [catalog]
+    [catalog],
   )
 
   const reviewedEntries = useMemo(() => {
@@ -144,7 +220,7 @@ export default function PokedexImportPage() {
   }, [scanResults])
 
   const trackedMissingCount = Array.from(selectedMissing).filter((dexNumber) =>
-    releasedSet.has(dexNumber)
+    releasedSet.has(dexNumber),
   ).length
   const proposedCaughtCount = Math.max(0, releasedSet.size - trackedMissingCount)
   const warnings = scanResults.filter((result) => result.warning)
@@ -156,6 +232,11 @@ export default function PokedexImportPage() {
     setScanResults([])
     setSelectedMissing(new Set())
     setAcknowledged(false)
+    setCurrentJob(null)
+
+    if (router.query.job) {
+      router.replace("/pokedex-import", undefined, { shallow: true })
+    }
 
     if (selected.length > MAX_FILES) {
       setFiles([])
@@ -165,8 +246,7 @@ export default function PokedexImportPage() {
     }
 
     const invalid = selected.find(
-      (file) =>
-        !["image/png", "image/jpeg"].includes(file.type) || file.size > MAX_FILE_BYTES
+      (file) => !["image/png", "image/jpeg"].includes(file.type) || file.size > MAX_FILE_BYTES,
     )
     if (invalid) {
       setFiles([])
@@ -178,43 +258,44 @@ export default function PokedexImportPage() {
     setFiles(selected)
   }
 
-  const scanScreenshots = async () => {
+  const queueScreenshots = async () => {
     if (!files.length) return
 
-    setScanning(true)
+    setSubmitting(true)
     setMessage("")
     setSuccess(null)
     setAcknowledged(false)
+
     try {
       const images = []
       for (const file of files) images.push(await fileToPayload(file))
 
-      const response = await fetch("/api/pokedex-import/scan", {
+      const response = await fetch("/api/pokedex-import/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Unable to scan the screenshots.")
+      if (!response.ok) throw new Error(data.error || "Unable to queue the screenshots.")
 
-      const results = Array.isArray(data.results) ? data.results : []
-      setScanResults(results)
-      setSelectedMissing(new Set((data.likelyMissingDexNumbers || []).map(Number)))
+      setCurrentJob(data.job)
+      setPushEnabled(Boolean(data.pushEnabled))
+      setFiles([])
+      await router.replace(
+        { pathname: "/pokedex-import", query: { job: data.job.id } },
+        undefined,
+        { shallow: true },
+      )
 
-      const recognised = new Set(
-        results.flatMap((result) => (result.entries || []).map((entry) => Number(entry.dexNumber)))
-      ).size
       setMessage(
-        recognised
-          ? `OCR recognised ${recognised} Pokédex entries. Review the missing boxes before applying the import.`
-          : "No Pokédex entries were recognised. Try a clearer screenshot with the numbered grid visible."
+        data.pushEnabled
+          ? `Import #${data.job.id} is queued. You can leave this page; a push notification will be sent when processing finishes.`
+          : `Import #${data.job.id} is queued. Push is not enabled for this account, so keep this page open or return later to review it.`,
       )
     } catch (error) {
-      setScanResults([])
-      setSelectedMissing(new Set())
       setMessage(error.message)
     } finally {
-      setScanning(false)
+      setSubmitting(false)
     }
   }
 
@@ -286,27 +367,64 @@ export default function PokedexImportPage() {
       </div>
 
       <div className="card">
-        <h2>2. Upload and scan</h2>
+        <h2>2. Add screenshots to the queue</h2>
         <div className="pokedex-import-file">
           <input
             type="file"
             accept="image/png,image/jpeg"
             multiple
             onChange={chooseFiles}
-            disabled={scanning || applying}
+            disabled={submitting || applying}
           />
           <p className="muted">
-            Up to {MAX_FILES} screenshots, 8 MB each. OCR jobs are processed one at a time to keep server load low.
+            Up to {MAX_FILES} screenshots, 8 MB each. The server processes one queued import at a time to keep CPU load predictable.
           </p>
-          {files.length > 0 && <p>{files.length} screenshot{files.length === 1 ? "" : "s"} selected.</p>}
+          {files.length > 0 && (
+            <p>{files.length} screenshot{files.length === 1 ? "" : "s"} selected.</p>
+          )}
           <div className="pokedex-import-actions">
-            <button type="button" onClick={scanScreenshots} disabled={!files.length || scanning || applying}>
-              {scanning ? `Scanning ${files.length} screenshot${files.length === 1 ? "" : "s"}…` : "Scan screenshots"}
+            <button
+              type="button"
+              onClick={queueScreenshots}
+              disabled={!files.length || submitting || applying}
+            >
+              {submitting ? "Adding to queue…" : "Queue screenshots"}
             </button>
           </div>
         </div>
         {message && <p className="status-text">{message}</p>}
       </div>
+
+      {currentJob && ["QUEUED", "PROCESSING"].includes(currentJob.status) && (
+        <div className="card pokedex-import-queue">
+          <h2>Import #{currentJob.id}</h2>
+          <strong>{jobStatusText(currentJob)}</strong>
+          {currentJob.status === "PROCESSING" && (
+            <progress
+              className="pokedex-import-progress"
+              value={currentJob.processedImages || 0}
+              max={currentJob.totalImages || 1}
+            />
+          )}
+          {pushEnabled ? (
+            <p className="muted pokedex-import-secondary-note">
+              You can close LEIGHPOGO. Your existing push subscription will notify you when this import is ready to review.
+            </p>
+          ) : (
+            <p className="pokedex-import-warning">
+              Push notifications are not enabled on this account. You can still leave and return to this import later, or enable push from the Notifications page.
+            </p>
+          )}
+        </div>
+      )}
+
+      {currentJob?.status === "FAILED" && (
+        <div className="card">
+          <h2>Import #{currentJob.id} failed</h2>
+          <p className="status-text">{currentJob.error || "The queued screenshots could not be processed."}</p>
+          <p className="muted">Choose the screenshots again to create a new queue job.</p>
+        </div>
+      )}
 
       {scanResults.length > 0 && (
         <div className="card">
@@ -381,8 +499,7 @@ export default function PokedexImportPage() {
         <div className={`card ${success ? "pokedex-import-success" : ""}`}>
           <h2>4. Apply import</h2>
           <p>
-            This replaces your saved Pokédex progress. The {trackedMissingCount} released Pokémon selected above will remain missing;
-            the other {proposedCaughtCount} released Pokémon will be marked caught.
+            This replaces your saved Pokédex progress. The {trackedMissingCount} released Pokémon selected above will remain missing; the other {proposedCaughtCount} released Pokémon will be marked caught.
           </p>
 
           <label className="pokedex-import-confirm">
@@ -397,16 +514,11 @@ export default function PokedexImportPage() {
             </span>
           </label>
 
-          <div className="pokedex-import-actions" style={{ marginTop: 12 }}>
+          <div className="pokedex-import-actions pokedex-import-apply-actions">
             <button
               type="button"
               onClick={applyImport}
-              disabled={
-                !acknowledged ||
-                applying ||
-                Boolean(success) ||
-                !catalog?.availabilityKnown
-              }
+              disabled={!acknowledged || applying || Boolean(success) || !catalog?.availabilityKnown}
             >
               {applying ? "Applying import…" : "Apply to my Pokédex"}
             </button>
