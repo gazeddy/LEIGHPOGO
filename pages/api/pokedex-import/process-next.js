@@ -4,6 +4,7 @@ import {
   processStoredPokedexImport,
   removeStoredPokedexImport,
 } from "../../../lib/pokedexImportQueue"
+import { notifyPokedexQueueAvailabilityIfOpen } from "../../../lib/pokedexQueueAvailabilityAlerts"
 import { sendPushToUser } from "../../../lib/pushServer"
 
 const STALE_JOB_MS = 30 * 60 * 1000
@@ -161,6 +162,15 @@ async function recordPushResult(jobId, push) {
   return pushError
 }
 
+async function notifyQueueAvailability() {
+  try {
+    return await notifyPokedexQueueAvailabilityIfOpen()
+  } catch (error) {
+    console.error("Unable to evaluate Pokédex queue availability alerts", error)
+    return null
+  }
+}
+
 export default async function handler(req, res) {
   disableCaching(res)
 
@@ -179,6 +189,7 @@ export default async function handler(req, res) {
   const job = await claimNextJob()
 
   if (!job) {
+    await notifyQueueAvailability()
     return res.status(204).end()
   }
 
@@ -211,6 +222,7 @@ export default async function handler(req, res) {
     // Keep the screenshots until the user reviews and accepts the OCR result.
     const push = await sendCompletionPush(job, true)
     const pushError = await recordPushResult(job.id, push)
+    const queueAvailability = await notifyQueueAvailability()
 
     return res.status(200).json({
       processed: true,
@@ -219,6 +231,7 @@ export default async function handler(req, res) {
       screenshotsRetainedForReview: true,
       push,
       pushError,
+      queueAvailability,
     })
   } catch (error) {
     console.error(`Pokédex import job ${job.id} failed`, error?.cause || error)
@@ -243,6 +256,7 @@ export default async function handler(req, res) {
     await removeStoredPokedexImport(job.id).catch(() => {})
     const push = await sendCompletionPush(job, false)
     const pushError = await recordPushResult(job.id, push)
+    const queueAvailability = await notifyQueueAvailability()
 
     return res.status(200).json({
       processed: true,
@@ -251,6 +265,7 @@ export default async function handler(req, res) {
       error: message,
       push,
       pushError,
+      queueAvailability,
     })
   }
 }
