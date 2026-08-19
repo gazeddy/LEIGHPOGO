@@ -87,9 +87,10 @@ describe("wishlist trade matching", () => {
     })).toEqual(["Shiny", "Lucky", "XXL", "Special background"])
   })
 
-  it("builds push payloads that deep-link to the matching listing", () => {
+  it("builds push payloads that deep-link to and consume the matching listing notification", () => {
     expect(tradePushPayload(
       {
+        id: 91,
         ownerId: 2,
         type: "WISHLIST_MATCH",
         pokemonName: "Pikachu",
@@ -101,6 +102,8 @@ describe("wishlist trade matching", () => {
       body: "Ash listed Shiny Pikachu, matching your wanted list.",
       url: "/trades/17",
       tag: "trade-2-17-pikachu",
+      notificationKind: "TRADE",
+      notificationId: 91,
     })
   })
 
