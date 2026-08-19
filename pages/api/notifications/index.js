@@ -12,6 +12,7 @@ import {
 
 const POKEDEX_NOTIFICATION_STATUSES = ["COMPLETE", "FAILED", "ACCEPTED"]
 const POKEDEX_UNREAD_STATUSES = ["COMPLETE", "FAILED"]
+const NOTIFICATION_LIST_LIMIT = 20
 
 const sessionUserId = (session) => {
   const userId = Number(session?.user?.id)
@@ -65,6 +66,7 @@ export default async function handler(req, res) {
             ownerId: userId,
             status: { in: POKEDEX_UNREAD_STATUSES },
             notificationReadAt: null,
+            notificationDismissedAt: null,
           },
         }),
       ])
@@ -81,21 +83,22 @@ export default async function handler(req, res) {
           where: { ownerId: userId },
           include: tradeNotificationInclude,
           orderBy: { createdAt: "desc" },
-          take: 50,
+          take: NOTIFICATION_LIST_LIMIT,
         }),
         prisma.friendCodeGrabNotification.findMany({
           where: { ownerId: userId },
           include: friendCodeGrabNotificationInclude,
           orderBy: { createdAt: "desc" },
-          take: 50,
+          take: NOTIFICATION_LIST_LIMIT,
         }),
         prisma.pokedexImportJob.findMany({
           where: {
             ownerId: userId,
             status: { in: POKEDEX_NOTIFICATION_STATUSES },
+            notificationDismissedAt: null,
           },
           orderBy: { completedAt: "desc" },
-          take: 50,
+          take: NOTIFICATION_LIST_LIMIT,
           select: {
             id: true,
             status: true,
@@ -115,11 +118,12 @@ export default async function handler(req, res) {
       ...pokedexImportJobs.map(serializePokedexImportNotification),
     ]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 50)
+      .slice(0, NOTIFICATION_LIST_LIMIT)
 
     return res.status(200).json({
       unreadCount,
       notifications,
+      limit: NOTIFICATION_LIST_LIMIT,
     })
   }
 
@@ -145,6 +149,7 @@ export default async function handler(req, res) {
           ownerId: userId,
           status: { in: POKEDEX_UNREAD_STATUSES },
           notificationReadAt: null,
+          notificationDismissedAt: null,
         },
         data: { notificationReadAt: readAt },
       }),
@@ -156,6 +161,34 @@ export default async function handler(req, res) {
     })
   }
 
-  res.setHeader("Allow", ["GET", "PUT"])
+  if (req.method === "DELETE") {
+    const dismissedAt = new Date()
+    const [tradeResult, friendCodeResult, pokedexImportResult] = await Promise.all([
+      prisma.tradeNotification.deleteMany({
+        where: { ownerId: userId },
+      }),
+      prisma.friendCodeGrabNotification.deleteMany({
+        where: { ownerId: userId },
+      }),
+      prisma.pokedexImportJob.updateMany({
+        where: {
+          ownerId: userId,
+          status: { in: POKEDEX_NOTIFICATION_STATUSES },
+          notificationDismissedAt: null,
+        },
+        data: {
+          notificationDismissedAt: dismissedAt,
+          notificationReadAt: dismissedAt,
+        },
+      }),
+    ])
+
+    return res.status(200).json({
+      cleared: tradeResult.count + friendCodeResult.count + pokedexImportResult.count,
+      unreadCount: 0,
+    })
+  }
+
+  res.setHeader("Allow", ["GET", "PUT", "DELETE"])
   return res.status(405).json({ error: "Method not allowed" })
 }
