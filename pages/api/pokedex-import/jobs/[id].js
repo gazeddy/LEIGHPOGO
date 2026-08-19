@@ -1,6 +1,11 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../../auth/[...nextauth]"
 import prisma from "../../../../lib/prisma"
+import { removeStoredPokedexImport } from "../../../../lib/pokedexImportQueue"
+import {
+  getPokedexImportQueueEstimate,
+  getPokedexImportQueuePosition,
+} from "../../../../lib/pokedexImportQueueEstimate"
 
 const sessionUserId = (session) => {
   const userId = Number(session?.user?.id)
@@ -14,27 +19,36 @@ function disableCaching(res) {
   res.setHeader("Expires", "0")
 }
 
-async function queuePosition(job) {
-  if (job.status !== "QUEUED") return null
+async function loadOwnedJob(id, ownerId) {
+  return prisma.pokedexImportJob.findFirst({
+    where: { id, ownerId },
+    select: {
+      id: true,
+      status: true,
+      totalImages: true,
+      processedImages: true,
+      resultJson: true,
+      error: true,
+      createdAt: true,
+      startedAt: true,
+      completedAt: true,
+    },
+  })
+}
 
-  const [processingCount, queuedAhead] = await Promise.all([
-    prisma.pokedexImportJob.count({ where: { status: "PROCESSING" } }),
-    prisma.pokedexImportJob.count({
-      where: {
-        status: "QUEUED",
-        id: { lt: job.id },
-      },
-    }),
-  ])
+function parseCompletedResult(job) {
+  if (!["COMPLETE", "ACCEPTED"].includes(job.status) || !job.resultJson) {
+    return null
+  }
 
-  return processingCount + queuedAhead + 1
+  return JSON.parse(job.resultJson)
 }
 
 export default async function handler(req, res) {
   disableCaching(res)
 
-  if (req.method !== "GET") {
-    res.setHeader("Allow", ["GET"])
+  if (!["GET", "POST"].includes(req.method)) {
+    res.setHeader("Allow", ["GET", "POST"])
     return res.status(405).json({ error: "Method not allowed" })
   }
 
@@ -49,34 +63,65 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid Pokédex import job." })
   }
 
-  const job = await prisma.pokedexImportJob.findFirst({
-    where: { id, ownerId },
-    select: {
-      id: true,
-      status: true,
-      totalImages: true,
-      processedImages: true,
-      resultJson: true,
-      error: true,
-      createdAt: true,
-      startedAt: true,
-      completedAt: true,
-    },
-  })
-
+  const job = await loadOwnedJob(id, ownerId)
   if (!job) {
     return res.status(404).json({ error: "Pokédex import job not found." })
   }
 
-  let result = null
-  if (job.status === "COMPLETE" && job.resultJson) {
-    try {
-      result = JSON.parse(job.resultJson)
-    } catch (error) {
-      console.error("Unable to parse Pokédex import result", error)
-      return res.status(500).json({ error: "The completed OCR result could not be read." })
+  if (req.method === "POST") {
+    const action = String(req.body?.action || "").trim().toUpperCase()
+    if (action !== "ACCEPT") {
+      return res.status(400).json({ error: "Unsupported Pokédex import action." })
     }
+
+    if (job.status === "ACCEPTED") {
+      try {
+        await removeStoredPokedexImport(job.id)
+      } catch (error) {
+        console.error(`Unable to re-run screenshot cleanup for import ${job.id}`, error)
+        return res.status(500).json({
+          error: "The stored screenshots could not be deleted yet. Try again to finish cleanup.",
+        })
+      }
+      return res.status(200).json({ accepted: true, screenshotsDeleted: true })
+    }
+
+    if (job.status !== "COMPLETE") {
+      return res.status(409).json({
+        error: "This Pokédex import can only be accepted after OCR processing is complete.",
+      })
+    }
+
+    try {
+      await removeStoredPokedexImport(job.id)
+      await prisma.pokedexImportJob.update({
+        where: { id: job.id },
+        data: { status: "ACCEPTED" },
+      })
+    } catch (error) {
+      console.error(`Unable to delete accepted Pokédex screenshots for job ${job.id}`, error)
+      return res.status(500).json({
+        error: "The stored screenshots could not be deleted yet. Try again to finish cleanup.",
+      })
+    }
+
+    return res.status(200).json({ accepted: true, screenshotsDeleted: true })
   }
+
+  let result = null
+  try {
+    result = parseCompletedResult(job)
+  } catch (error) {
+    console.error("Unable to parse Pokédex import result", error)
+    return res.status(500).json({ error: "The completed OCR result could not be read." })
+  }
+
+  const [position, estimatedWait] = await Promise.all([
+    getPokedexImportQueuePosition(job),
+    job.status === "QUEUED"
+      ? getPokedexImportQueueEstimate({ beforeJobId: job.id })
+      : Promise.resolve(null),
+  ])
 
   return res.status(200).json({
     job: {
@@ -84,7 +129,8 @@ export default async function handler(req, res) {
       status: job.status,
       totalImages: job.totalImages,
       processedImages: job.processedImages,
-      queuePosition: await queuePosition(job),
+      queuePosition: position,
+      estimatedWaitSeconds: estimatedWait?.estimatedWaitSeconds ?? null,
       error: job.error,
       createdAt: job.createdAt.toISOString(),
       startedAt: job.startedAt?.toISOString() || null,
