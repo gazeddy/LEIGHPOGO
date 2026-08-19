@@ -12,7 +12,7 @@ jest.mock("../../pages/api/auth/[...nextauth]", () => ({
 jest.mock("../../lib/prisma", () => ({
   friendCodeGrabNotification: {
     findFirst: jest.fn(),
-    update: jest.fn(),
+    delete: jest.fn(),
   },
 }))
 
@@ -24,11 +24,11 @@ beforeEach(() => {
 })
 
 describe("friend code grab notification item API", () => {
-  it("does not allow a user to mark another user's notification as read", async () => {
+  it("does not allow a user to delete another user's notification", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.friendCodeGrabNotification.findFirst.mockResolvedValueOnce(null)
     const { req, res } = createMocks({
-      method: "PUT",
+      method: "DELETE",
       query: { id: "44" },
     })
 
@@ -39,6 +39,6 @@ describe("friend code grab notification item API", () => {
       where: { id: 44, ownerId: 12 },
       select: { id: true },
     })
-    expect(prisma.friendCodeGrabNotification.update).not.toHaveBeenCalled()
+    expect(prisma.friendCodeGrabNotification.delete).not.toHaveBeenCalled()
   })
 })
