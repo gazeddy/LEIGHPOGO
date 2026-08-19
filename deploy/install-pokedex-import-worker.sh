@@ -71,7 +71,7 @@ After=network-online.target ${APP_SERVICE}
 Type=oneshot
 User=${APP_USER}
 EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/bin/curl --fail-with-body --silent --show-error --max-time 900 --output /dev/null --request POST --header=X-Pokedex-Import-Worker-Secret:\${POKEDEX_IMPORT_WORKER_SECRET} http://127.0.0.1:${PORT}/api/pokedex-import/process-next
+ExecStart=/usr/bin/curl --fail-with-body --silent --show-error --max-time 900 --output /dev/null --request POST --header "X-Pokedex-Import-Worker-Secret: \${POKEDEX_IMPORT_WORKER_SECRET}" http://127.0.0.1:${PORT}/api/pokedex-import/process-next
 EOF
 
 cat > "/etc/systemd/system/${WORKER_TIMER}" <<EOF
@@ -92,6 +92,7 @@ EOF
 systemctl daemon-reload
 systemctl restart "$APP_SERVICE"
 systemctl enable --now "$WORKER_TIMER"
+systemctl reset-failed "$WORKER_SERVICE" >/dev/null 2>&1 || true
 
 systemctl is-active --quiet "$APP_SERVICE" || fail "${APP_SERVICE} is not active after worker setup."
 systemctl is-enabled --quiet "$WORKER_TIMER" || fail "${WORKER_TIMER} is not enabled."
