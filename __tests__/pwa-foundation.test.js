@@ -51,7 +51,7 @@ describe("PWA foundation", () => {
       "utf8",
     )
 
-    expect(serviceWorker).toContain('const STATIC_CACHE = "leighpogo-static-v4"')
+    expect(serviceWorker).toContain('const STATIC_CACHE = "leighpogo-static-v5"')
     expect(serviceWorker).toContain('const OFFLINE_URL = "/offline.html"')
     expect(serviceWorker).toContain('url.pathname.startsWith("/api/")')
     expect(serviceWorker).toContain('url.pathname.startsWith("/_next/data/")')
@@ -60,6 +60,18 @@ describe("PWA foundation", () => {
     expect(serviceWorker).toContain('const DEFAULT_ICON = "/pwa-icon-192.png"')
     expect(serviceWorker).toContain('"/favicon.ico"')
     expect(serviceWorker).toContain('"/pwa-icon-maskable-512.png"')
+  })
+
+  it("consumes matching in-app alerts when a push is clicked", () => {
+    const serviceWorker = fs.readFileSync(
+      path.join(process.cwd(), "public/sw.js"),
+      "utf8",
+    )
+
+    expect(serviceWorker).toContain("notificationKind: payload.notificationKind || null")
+    expect(serviceWorker).toContain('method: "DELETE"')
+    expect(serviceWorker).toContain('action: "DISMISS_NOTIFICATION"')
+    expect(serviceWorker).toContain("consumeClickedNotification(data)")
   })
 
   it("publishes mobile, browser and Apple metadata using the release artwork", () => {
