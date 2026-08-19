@@ -310,13 +310,19 @@ def classify_entry(entry, row_baseline, cell_width, metrics):
     dark_fraction = metrics["darkFraction"]
     mean_chroma = metrics["meanChroma"]
 
-    # Fallback for a row where every visible tile is empty, so no lower label
-    # exists in that row to provide the usual positional signal.
-    if all_std < 15.8 and foreground_std < 39.0:
-        return "missing", 0.86, "tile appears empty"
+    # Pokémon GO's current regional Pokédex renders seen-but-not-caught sprites
+    # as a nearly flat cyan silhouette. They are not actually dark, so colour
+    # uniformity is a much stronger signal than brightness. Real caught sprites
+    # contain substantially more colour/texture variation.
+    if (
+        foreground_fraction >= 0.05
+        and foreground_std <= 18.0
+        and mean_chroma >= 55.0
+    ):
+        return "missing", 0.92, "uniform uncaught silhouette detected"
 
-    # Seen-but-not-caught Pokémon are rendered as dark silhouettes. Keep this
-    # deliberately conservative and surface borderline cases for user review.
+    # Retain a conservative dark-silhouette fallback for screenshots from UI
+    # variants where uncaught sprites are rendered darker.
     if (
         foreground_fraction >= 0.05
         and dark_fraction >= 0.55
@@ -324,6 +330,17 @@ def classify_entry(entry, row_baseline, cell_width, metrics):
         and foreground_std < 45.0
     ):
         return "missing", 0.76, "sprite resembles an uncaught silhouette"
+
+    # Fallback for a row where every visible tile is empty, so no lower label
+    # exists in that row to provide the usual positional signal. Require almost
+    # no foreground content: pale caught sprites such as Altaria can have low
+    # overall contrast but still occupy a sizeable part of the tile.
+    if (
+        all_std < 15.8
+        and foreground_std < 39.0
+        and foreground_fraction < 0.04
+    ):
+        return "missing", 0.86, "tile appears empty"
 
     if (
         (dark_fraction >= 0.48 and mean_chroma < 38.0 and foreground_std < 48.0)
