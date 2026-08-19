@@ -77,17 +77,29 @@ function classificationLabel(classification) {
   return "Looks caught"
 }
 
+function formatWait(seconds) {
+  const value = Math.max(0, Number(seconds) || 0)
+  if (value < 60) return `${Math.ceil(value)} sec`
+  const minutes = Math.floor(value / 60)
+  const remaining = Math.ceil(value % 60)
+  return remaining ? `${minutes} min ${remaining} sec` : `${minutes} min`
+}
+
 function jobStatusText(job) {
   if (!job) return ""
   if (job.status === "QUEUED") {
+    const wait = Number.isFinite(Number(job.estimatedWaitSeconds))
+      ? ` · estimated wait ${formatWait(job.estimatedWaitSeconds)}`
+      : ""
     return job.queuePosition
-      ? `Queued · position ${job.queuePosition}`
-      : "Queued for processing"
+      ? `Queued · position ${job.queuePosition}${wait}`
+      : `Queued for processing${wait}`
   }
   if (job.status === "PROCESSING") {
     return `Processing ${job.processedImages || 0} of ${job.totalImages} screenshots`
   }
-  if (job.status === "COMPLETE") return "Processing complete"
+  if (job.status === "COMPLETE") return "Processing complete · awaiting your review"
+  if (job.status === "ACCEPTED") return "Accepted · stored screenshots deleted"
   if (job.status === "FAILED") return "Processing failed"
   return job.status
 }
@@ -101,18 +113,21 @@ export default function PokedexImportPage() {
   const [selectedMissing, setSelectedMissing] = useState(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [applying, setApplying] = useState(false)
+  const [cleaningUp, setCleaningUp] = useState(false)
   const [acknowledged, setAcknowledged] = useState(false)
   const [message, setMessage] = useState("")
   const [success, setSuccess] = useState(null)
   const [currentJob, setCurrentJob] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(null)
+  const [queueState, setQueueState] = useState(null)
 
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [catalogResponse, pushResponse] = await Promise.all([
+        const [catalogResponse, pushResponse, queueResponse] = await Promise.all([
           fetch("/api/pokedex-catalog"),
           fetch("/api/push/subscription"),
+          fetch("/api/pokedex-import/jobs"),
         ])
 
         const catalogData = await catalogResponse.json()
@@ -124,6 +139,11 @@ export default function PokedexImportPage() {
         if (pushResponse.ok) {
           const pushData = await pushResponse.json()
           setPushEnabled(Array.isArray(pushData.subscriptions) && pushData.subscriptions.length > 0)
+        }
+
+        if (queueResponse.ok) {
+          const queueData = await queueResponse.json()
+          setQueueState(queueData.queue || null)
         }
       } catch (error) {
         setCatalogError(error.message)
@@ -140,12 +160,20 @@ export default function PokedexImportPage() {
       setScanResults(results)
       setSelectedMissing(new Set((job.result.likelyMissingDexNumbers || []).map(Number)))
       setAcknowledged(false)
+      setSuccess(null)
       setMessage(
         `OCR finished. Review the missing selections below before applying import #${job.id}.`,
       )
+    } else if (job.status === "ACCEPTED") {
+      setScanResults([])
+      setSelectedMissing(new Set())
+      setAcknowledged(false)
+      setSuccess({ accepted: true, cleanupPending: false })
+      setMessage(`Import #${job.id} was already accepted and its stored screenshots were deleted.`)
     } else if (job.status === "FAILED") {
       setScanResults([])
       setSelectedMissing(new Set())
+      setSuccess(null)
       setMessage(job.error || "The queued OCR job failed.")
     }
   }, [])
@@ -267,6 +295,19 @@ export default function PokedexImportPage() {
     setAcknowledged(false)
 
     try {
+      const preflightResponse = await fetch("/api/pokedex-import/jobs")
+      const preflightData = await preflightResponse.json()
+      if (!preflightResponse.ok) {
+        throw new Error(preflightData.error || "Unable to check the Pokédex import queue.")
+      }
+      setQueueState(preflightData.queue || null)
+
+      if (preflightData.queue && !preflightData.queue.acceptingUploads) {
+        throw new Error(
+          `The OCR queue is temporarily full enough to exceed the 2-minute wait target (about ${formatWait(preflightData.queue.estimatedWaitSeconds)}). Try again shortly.`,
+        )
+      }
+
       const images = []
       for (const file of files) images.push(await fileToPayload(file))
 
@@ -276,9 +317,13 @@ export default function PokedexImportPage() {
         body: JSON.stringify({ images }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Unable to queue the screenshots.")
+      if (!response.ok) {
+        if (data.queue) setQueueState(data.queue)
+        throw new Error(data.error || "Unable to queue the screenshots.")
+      }
 
       setCurrentJob(data.job)
+      setQueueState(data.queue || null)
       setPushEnabled(Boolean(data.pushEnabled))
       setFiles([])
       await router.replace(
@@ -287,10 +332,13 @@ export default function PokedexImportPage() {
         { shallow: true },
       )
 
+      const wait = Number.isFinite(Number(data.job.estimatedWaitSeconds))
+        ? ` Estimated wait: ${formatWait(data.job.estimatedWaitSeconds)}.`
+        : ""
       setMessage(
         data.pushEnabled
-          ? `Import #${data.job.id} is queued. You can leave this page; a push notification will be sent when processing finishes.`
-          : `Import #${data.job.id} is queued. Push is not enabled for this account, so keep this page open or return later to review it.`,
+          ? `Import #${data.job.id} is queued first-come-first-served.${wait} You can leave this page; a push notification will be sent when processing finishes.`
+          : `Import #${data.job.id} is queued first-come-first-served.${wait} Push is not enabled for this account, so keep this page open or return later to review it.`,
       )
     } catch (error) {
       setMessage(error.message)
@@ -309,8 +357,48 @@ export default function PokedexImportPage() {
     setAcknowledged(false)
   }
 
+  const acceptAndDeleteScreenshots = async () => {
+    if (!currentJob?.id) throw new Error("The completed import job could not be identified.")
+
+    const response = await fetch(`/api/pokedex-import/jobs/${currentJob.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ACCEPT" }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to delete the stored screenshots.")
+    }
+
+    setCurrentJob((previous) =>
+      previous ? { ...previous, status: "ACCEPTED" } : previous,
+    )
+    return data
+  }
+
+  const retryScreenshotCleanup = async () => {
+    setCleaningUp(true)
+    setMessage("")
+    try {
+      await acceptAndDeleteScreenshots()
+      setSuccess((previous) => ({ ...(previous || {}), cleanupPending: false }))
+      setMessage("Stored screenshots deleted successfully.")
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setCleaningUp(false)
+    }
+  }
+
   const applyImport = async () => {
-    if (!acknowledged || !catalog?.availabilityKnown || !reviewedEntries.length) return
+    if (
+      !acknowledged ||
+      !catalog?.availabilityKnown ||
+      !reviewedEntries.length ||
+      currentJob?.status !== "COMPLETE"
+    ) {
+      return
+    }
 
     setApplying(true)
     setMessage("")
@@ -328,12 +416,23 @@ export default function PokedexImportPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Unable to apply the Pokédex import.")
 
-      setSuccess({
+      const saved = {
         caughtCount: data.dexNumbers?.length || dexNumbers.length,
         missingCount: trackedMissingCount,
         removedWantedCount: Number(data.removedWantedCount || 0),
-      })
-      setMessage("Pokédex import applied successfully.")
+        cleanupPending: false,
+      }
+
+      try {
+        await acceptAndDeleteScreenshots()
+        setSuccess(saved)
+        setMessage("Pokédex import applied successfully and the uploaded screenshots were deleted.")
+      } catch (cleanupError) {
+        setSuccess({ ...saved, cleanupPending: true })
+        setMessage(
+          `Pokédex progress was saved, but screenshot cleanup still needs to finish: ${cleanupError.message}`,
+        )
+      }
     } catch (error) {
       setMessage(error.message)
     } finally {
@@ -374,11 +473,19 @@ export default function PokedexImportPage() {
             accept="image/png,image/jpeg"
             multiple
             onChange={chooseFiles}
-            disabled={submitting || applying}
+            disabled={submitting || applying || cleaningUp}
           />
           <p className="muted">
-            Up to {MAX_FILES} screenshots, 8 MB each. The server processes one queued import at a time to keep CPU load predictable.
+            Up to {MAX_FILES} screenshots, 8 MB each per import. There is no per-account job cap: jobs are processed strictly first-come-first-served. New uploads are paused when the estimated wait would exceed 2 minutes.
           </p>
+          <p className="muted">
+            Uploaded screenshots stay on the server while you review the OCR result and are deleted as soon as you accept the import as correct.
+          </p>
+          {queueState && !queueState.acceptingUploads && (
+            <p className="pokedex-import-warning">
+              Queue busy: estimated wait is about {formatWait(queueState.estimatedWaitSeconds)}. New uploads will be accepted again when the estimate falls to 2 minutes or less.
+            </p>
+          )}
           {files.length > 0 && (
             <p>{files.length} screenshot{files.length === 1 ? "" : "s"} selected.</p>
           )}
@@ -386,9 +493,9 @@ export default function PokedexImportPage() {
             <button
               type="button"
               onClick={queueScreenshots}
-              disabled={!files.length || submitting || applying}
+              disabled={!files.length || submitting || applying || cleaningUp}
             >
-              {submitting ? "Adding to queue…" : "Queue screenshots"}
+              {submitting ? "Checking queue and uploading…" : "Queue screenshots"}
             </button>
           </div>
         </div>
@@ -423,6 +530,13 @@ export default function PokedexImportPage() {
           <h2>Import #{currentJob.id} failed</h2>
           <p className="status-text">{currentJob.error || "The queued screenshots could not be processed."}</p>
           <p className="muted">Choose the screenshots again to create a new queue job.</p>
+        </div>
+      )}
+
+      {currentJob?.status === "ACCEPTED" && scanResults.length === 0 && (
+        <div className="card pokedex-import-success">
+          <h2>Import #{currentJob.id} accepted</h2>
+          <p className="status-text">The OCR result was accepted and the uploaded screenshots have been deleted from the server.</p>
         </div>
       )}
 
@@ -468,7 +582,7 @@ export default function PokedexImportPage() {
                   <input
                     type="checkbox"
                     checked={released && selectedMissing.has(entry.dexNumber)}
-                    disabled={!released || applying}
+                    disabled={!released || applying || cleaningUp}
                     onChange={() => toggleMissing(entry.dexNumber)}
                     aria-label={`Mark ${pokemon?.name || `#${entry.dexNumber}`} as missing`}
                   />
@@ -506,11 +620,11 @@ export default function PokedexImportPage() {
             <input
               type="checkbox"
               checked={acknowledged}
-              disabled={applying || Boolean(success)}
+              disabled={applying || cleaningUp || Boolean(success)}
               onChange={(event) => setAcknowledged(event.target.checked)}
             />
             <span>
-              I uploaded every Pokédex screen containing a Pokémon I have not caught, and I reviewed the missing selections above.
+              I uploaded every Pokédex screen containing a Pokémon I have not caught, and I reviewed the missing selections above. Once accepted, the uploaded screenshots can be deleted.
             </span>
           </label>
 
@@ -518,23 +632,29 @@ export default function PokedexImportPage() {
             <button
               type="button"
               onClick={applyImport}
-              disabled={!acknowledged || applying || Boolean(success) || !catalog?.availabilityKnown}
+              disabled={!acknowledged || applying || cleaningUp || Boolean(success) || !catalog?.availabilityKnown}
             >
               {applying ? "Applying import…" : "Apply to my Pokédex"}
             </button>
-            {success && (
+            {success?.cleanupPending && (
+              <button type="button" onClick={retryScreenshotCleanup} disabled={cleaningUp}>
+                {cleaningUp ? "Deleting screenshots…" : "Delete stored screenshots"}
+              </button>
+            )}
+            {success && !success.cleanupPending && (
               <Link className="button-link" href="/pokedex">
                 View my Pokédex
               </Link>
             )}
           </div>
 
-          {success && (
+          {success?.caughtCount !== undefined && (
             <p className="status-text">
               Saved {success.caughtCount} caught Pokémon with {success.missingCount} released Pokémon left missing.
               {success.removedWantedCount
                 ? ` Removed ${success.removedWantedCount} wanted ${success.removedWantedCount === 1 ? "listing" : "listings"} that are now caught.`
                 : ""}
+              {!success.cleanupPending ? " Uploaded screenshots deleted." : " Screenshot deletion is still pending."}
             </p>
           )}
         </div>
