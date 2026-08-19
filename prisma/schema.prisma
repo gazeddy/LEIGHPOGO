@@ -73,24 +73,26 @@ model PokedexEntry {
 }
 
 model PokedexImportJob {
-  id                 Int       @id @default(autoincrement())
-  ownerId            Int
-  owner              User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  status             String    @default("QUEUED")
-  totalImages        Int
-  processedImages    Int       @default(0)
-  resultJson         String?
-  error              String?
-  createdAt          DateTime  @default(now())
-  startedAt          DateTime?
-  completedAt        DateTime?
-  notificationReadAt DateTime?
-  pushSentAt         DateTime?
-  pushError          String?
+  id                      Int       @id @default(autoincrement())
+  ownerId                 Int
+  owner                   User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  status                  String    @default("QUEUED")
+  totalImages             Int
+  processedImages         Int       @default(0)
+  resultJson              String?
+  error                   String?
+  createdAt               DateTime  @default(now())
+  startedAt               DateTime?
+  completedAt             DateTime?
+  notificationReadAt      DateTime?
+  notificationDismissedAt DateTime?
+  pushSentAt              DateTime?
+  pushError               String?
 
   @@index([status, createdAt])
   @@index([ownerId, createdAt])
   @@index([ownerId, notificationReadAt, completedAt])
+  @@index([ownerId, notificationDismissedAt, completedAt])
 }
 
 model PokedexQueueAlert {
@@ -246,7 +248,7 @@ model RaidBossProfile {
   id               Int       @id @default(autoincrement())
   key              String    @unique
   category         String
-  name             String
+  name              String
   pokemonId        Int?
   form             String?
   tier             String?
