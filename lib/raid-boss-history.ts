@@ -22,6 +22,7 @@ import type {
 
 const CATEGORIES: RaidCategory[] = ["five-star", "shadow", "mega"];
 const PROFILE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const PREVIOUS_ROTATION_VISIBILITY_MS = 24 * 60 * 60 * 1000;
 
 function parseJsonArray<T>(value: string | null | undefined): T[] {
   if (!value) return [];
@@ -287,10 +288,15 @@ async function profilesForRotation(row: any): Promise<RaidBossProfileData[]> {
 }
 
 async function categoryHistory(category: RaidCategory, now: Date): Promise<RaidRotationData[]> {
+  const previousCutoff = new Date(now.getTime() - PREVIOUS_ROTATION_VISIBILITY_MS);
   const rows = await prisma.raidRotation.findMany({
-    where: { category, start: { lte: now } },
+    where: {
+      category,
+      start: { lte: now },
+      end: { gt: previousCutoff },
+    },
     orderBy: { start: "desc" },
-    take: 5,
+    take: 2,
   });
 
   return Promise.all(rows.map(async (row: any) => ({
