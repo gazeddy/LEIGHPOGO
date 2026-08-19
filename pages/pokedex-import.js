@@ -120,6 +120,7 @@ export default function PokedexImportPage() {
   const [currentJob, setCurrentJob] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(null)
   const [queueState, setQueueState] = useState(null)
+  const [recentJobs, setRecentJobs] = useState([])
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -144,6 +145,7 @@ export default function PokedexImportPage() {
         if (queueResponse.ok) {
           const queueData = await queueResponse.json()
           setQueueState(queueData.queue || null)
+          setRecentJobs(Array.isArray(queueData.jobs) ? queueData.jobs : [])
         }
       } catch (error) {
         setCatalogError(error.message)
@@ -183,8 +185,32 @@ export default function PokedexImportPage() {
       const response = await fetch(`/api/pokedex-import/jobs/${jobId}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Unable to load the queued import.")
-      applyJobState(data.job)
-      return data.job
+
+      let job = data.job
+      applyJobState(job)
+
+      if (
+        ["COMPLETE", "FAILED"].includes(job.status) &&
+        !job.notificationReadAt
+      ) {
+        const markResponse = await fetch(`/api/pokedex-import/jobs/${job.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "MARK_READ" }),
+        }).catch(() => null)
+
+        if (markResponse?.ok) {
+          const marked = await markResponse.json().catch(() => ({}))
+          job = {
+            ...job,
+            notificationReadAt: marked.notificationReadAt || new Date().toISOString(),
+          }
+          setCurrentJob(job)
+          window.dispatchEvent(new Event("trade-notifications-updated"))
+        }
+      }
+
+      return job
     },
     [applyJobState],
   )
@@ -197,6 +223,27 @@ export default function PokedexImportPage() {
 
     loadJob(jobId).catch((error) => setMessage(error.message))
   }, [loadJob, router.isReady, router.query.job])
+
+  useEffect(() => {
+    if (!router.isReady || currentJob) return
+
+    const rawJobId = Array.isArray(router.query.job) ? router.query.job[0] : router.query.job
+    const queryJobId = Number(rawJobId)
+    if (Number.isInteger(queryJobId) && queryJobId > 0) return
+
+    const recoverable = recentJobs.find((job) =>
+      ["COMPLETE", "PROCESSING", "QUEUED"].includes(job.status),
+    )
+    if (!recoverable) return
+
+    router
+      .replace(
+        { pathname: "/pokedex-import", query: { job: recoverable.id } },
+        undefined,
+        { shallow: true },
+      )
+      .catch((error) => setMessage(error.message))
+  }, [currentJob, recentJobs, router])
 
   useEffect(() => {
     if (!currentJob || !["QUEUED", "PROCESSING"].includes(currentJob.status)) return undefined
@@ -371,8 +418,9 @@ export default function PokedexImportPage() {
     }
 
     setCurrentJob((previous) =>
-      previous ? { ...previous, status: "ACCEPTED" } : previous,
+      previous ? { ...previous, status: "ACCEPTED", notificationReadAt: new Date().toISOString() } : previous,
     )
+    window.dispatchEvent(new Event("trade-notifications-updated"))
     return data
   }
 
@@ -529,6 +577,11 @@ export default function PokedexImportPage() {
         <div className="card">
           <h2>Import #{currentJob.id} failed</h2>
           <p className="status-text">{currentJob.error || "The queued screenshots could not be processed."}</p>
+          {currentJob.pushError && (
+            <p className="pokedex-import-warning">
+              Push notification was not delivered: {currentJob.pushError}
+            </p>
+          )}
           <p className="muted">Choose the screenshots again to create a new queue job.</p>
         </div>
       )}
@@ -540,9 +593,14 @@ export default function PokedexImportPage() {
         </div>
       )}
 
-      {scanResults.length > 0 && (
+      {currentJob?.status === "COMPLETE" && (
         <div className="card">
           <h2>3. Review missing Pokémon</h2>
+          {currentJob.pushError && (
+            <p className="pokedex-import-warning">
+              OCR finished, but the push notification was not delivered: {currentJob.pushError} The result is still available here and in Notifications.
+            </p>
+          )}
           {!catalog?.availabilityKnown && (
             <p className="pokedex-import-warning">
               Pokémon release status is currently unavailable. The import cannot be applied safely until it is available again.
@@ -554,62 +612,70 @@ export default function PokedexImportPage() {
             </p>
           ))}
 
-          <div className="pokedex-import-summary">
-            <div className="pokedex-import-stat">
-              <strong>{reviewedEntries.length}</strong>
-              <span>entries recognised</span>
-            </div>
-            <div className="pokedex-import-stat">
-              <strong>{trackedMissingCount}</strong>
-              <span>released Pokémon marked missing</span>
-            </div>
-            <div className="pokedex-import-stat">
-              <strong>{proposedCaughtCount}</strong>
-              <span>released Pokémon assumed caught</span>
-            </div>
-          </div>
+          {reviewedEntries.length === 0 ? (
+            <p className="pokedex-import-warning">
+              OCR completed but no numbered Pokédex entries were recognised. No changes can be accepted from this job. Upload clearer screenshots with the numbered grid visible and try again.
+            </p>
+          ) : (
+            <>
+              <div className="pokedex-import-summary">
+                <div className="pokedex-import-stat">
+                  <strong>{reviewedEntries.length}</strong>
+                  <span>entries recognised</span>
+                </div>
+                <div className="pokedex-import-stat">
+                  <strong>{trackedMissingCount}</strong>
+                  <span>released Pokémon marked missing</span>
+                </div>
+                <div className="pokedex-import-stat">
+                  <strong>{proposedCaughtCount}</strong>
+                  <span>released Pokémon assumed caught</span>
+                </div>
+              </div>
 
-          <p className="muted">
-            Tick Missing for anything you have not caught. OCR suggestions are only a starting point; silhouettes can be harder to classify than empty tiles.
-          </p>
+              <p className="muted">
+                Tick Missing for anything you have not caught. OCR suggestions are only a starting point; silhouettes can be harder to classify than empty tiles.
+              </p>
 
-          <div className="pokedex-import-review">
-            {reviewedEntries.map((entry) => {
-              const pokemon = pokemonByDex.get(entry.dexNumber)
-              const released = releasedSet.has(entry.dexNumber)
-              return (
-                <label className="pokedex-import-entry" key={entry.dexNumber}>
-                  <input
-                    type="checkbox"
-                    checked={released && selectedMissing.has(entry.dexNumber)}
-                    disabled={!released || applying || cleaningUp}
-                    onChange={() => toggleMissing(entry.dexNumber)}
-                    aria-label={`Mark ${pokemon?.name || `#${entry.dexNumber}`} as missing`}
-                  />
-                  <span className="pokedex-import-entry-main">
-                    <span className="pokedex-import-entry-title">
-                      <strong>{pokemon?.name || "Pokémon"}</strong>
-                      <span className="dex-number">#{String(entry.dexNumber).padStart(3, "0")}</span>
-                    </span>
-                    <span className="pokedex-import-entry-meta">
-                      {entry.reason || "OCR result"} · {entry.sources.join(", ")}
-                    </span>
-                  </span>
-                  {released ? (
-                    <span className={`pokedex-import-badge ${entry.classification}`}>
-                      {classificationLabel(entry.classification)}
-                    </span>
-                  ) : (
-                    <span className="pokedex-import-badge untracked">Not currently tracked</span>
-                  )}
-                </label>
-              )
-            })}
-          </div>
+              <div className="pokedex-import-review">
+                {reviewedEntries.map((entry) => {
+                  const pokemon = pokemonByDex.get(entry.dexNumber)
+                  const released = releasedSet.has(entry.dexNumber)
+                  return (
+                    <label className="pokedex-import-entry" key={entry.dexNumber}>
+                      <input
+                        type="checkbox"
+                        checked={released && selectedMissing.has(entry.dexNumber)}
+                        disabled={!released || applying || cleaningUp}
+                        onChange={() => toggleMissing(entry.dexNumber)}
+                        aria-label={`Mark ${pokemon?.name || `#${entry.dexNumber}`} as missing`}
+                      />
+                      <span className="pokedex-import-entry-main">
+                        <span className="pokedex-import-entry-title">
+                          <strong>{pokemon?.name || "Pokémon"}</strong>
+                          <span className="dex-number">#{String(entry.dexNumber).padStart(3, "0")}</span>
+                        </span>
+                        <span className="pokedex-import-entry-meta">
+                          {entry.reason || "OCR result"} · {entry.sources.join(", ")}
+                        </span>
+                      </span>
+                      {released ? (
+                        <span className={`pokedex-import-badge ${entry.classification}`}>
+                          {classificationLabel(entry.classification)}
+                        </span>
+                      ) : (
+                        <span className="pokedex-import-badge untracked">Not currently tracked</span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {reviewedEntries.length > 0 && (
+      {reviewedEntries.length > 0 && currentJob?.status === "COMPLETE" && (
         <div className={`card ${success ? "pokedex-import-success" : ""}`}>
           <h2>4. Apply import</h2>
           <p>
