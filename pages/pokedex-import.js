@@ -34,6 +34,8 @@ function PokedexImportStyles() {
     .pokedex-import-badge.caught { border: 1px solid #2ea043; color: #7ee787; background: rgba(46, 160, 67, 0.12); }
     .pokedex-import-badge.untracked { border: 1px solid #6e7681; color: #c9d1d9; background: rgba(110, 118, 129, 0.12); }
     .pokedex-import-warning { padding: 10px 12px; border: 1px solid #d29922; border-radius: 8px; background: rgba(210, 153, 34, 0.08); }
+    .pokedex-import-warning p { margin: 0; }
+    .pokedex-import-warning .pokedex-import-actions { margin-top: 10px; }
     .pokedex-import-queue { display: grid; gap: 10px; }
     .pokedex-import-progress { width: 100%; height: 12px; accent-color: #2ea043; }
     .pokedex-import-confirm { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px; border: 1px solid #484f58; border-radius: 8px; }
@@ -121,6 +123,8 @@ export default function PokedexImportPage() {
   const [pushEnabled, setPushEnabled] = useState(null)
   const [queueState, setQueueState] = useState(null)
   const [recentJobs, setRecentJobs] = useState([])
+  const [queueAlertRegistered, setQueueAlertRegistered] = useState(false)
+  const [queueAlertLoading, setQueueAlertLoading] = useState(false)
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -146,6 +150,7 @@ export default function PokedexImportPage() {
           const queueData = await queueResponse.json()
           setQueueState(queueData.queue || null)
           setRecentJobs(Array.isArray(queueData.jobs) ? queueData.jobs : [])
+          setQueueAlertRegistered(Boolean(queueData.queueAlertRegistered))
         }
       } catch (error) {
         setCatalogError(error.message)
@@ -333,6 +338,35 @@ export default function PokedexImportPage() {
     setFiles(selected)
   }
 
+  const requestQueueAlert = async () => {
+    setQueueAlertLoading(true)
+    setMessage("")
+    try {
+      const response = await fetch("/api/pokedex-import/queue-alert", {
+        method: "POST",
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to register the queue notification.")
+      }
+
+      if (data.queue) setQueueState(data.queue)
+      setPushEnabled(Boolean(data.pushEnabled))
+
+      if (data.availableNow) {
+        setQueueAlertRegistered(false)
+        setMessage("The queue is available now. You can upload your screenshots.")
+      } else {
+        setQueueAlertRegistered(true)
+        setMessage("Queue notification set. We'll send you a push as soon as uploads are available again.")
+      }
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setQueueAlertLoading(false)
+    }
+  }
+
   const queueScreenshots = async () => {
     if (!files.length) return
 
@@ -348,6 +382,7 @@ export default function PokedexImportPage() {
         throw new Error(preflightData.error || "Unable to check the Pokédex import queue.")
       }
       setQueueState(preflightData.queue || null)
+      setQueueAlertRegistered(Boolean(preflightData.queueAlertRegistered))
 
       if (preflightData.queue && !preflightData.queue.acceptingUploads) {
         throw new Error(
@@ -372,6 +407,7 @@ export default function PokedexImportPage() {
       setCurrentJob(data.job)
       setQueueState(data.queue || null)
       setPushEnabled(Boolean(data.pushEnabled))
+      setQueueAlertRegistered(Boolean(data.queueAlertRegistered))
       setFiles([])
       await router.replace(
         { pathname: "/pokedex-import", query: { job: data.job.id } },
@@ -530,9 +566,30 @@ export default function PokedexImportPage() {
             Uploaded screenshots stay on the server while you review the OCR result and are deleted as soon as you accept the import as correct.
           </p>
           {queueState && !queueState.acceptingUploads && (
-            <p className="pokedex-import-warning">
-              Queue busy: estimated wait is about {formatWait(queueState.estimatedWaitSeconds)}. New uploads will be accepted again when the estimate falls to 2 minutes or less.
-            </p>
+            <div className="pokedex-import-warning">
+              <p>
+                Queue busy: estimated wait is about {formatWait(queueState.estimatedWaitSeconds)}. New uploads will be accepted again when the estimate falls to 2 minutes or less.
+              </p>
+              {pushEnabled ? (
+                <div className="pokedex-import-actions">
+                  <button
+                    type="button"
+                    onClick={requestQueueAlert}
+                    disabled={queueAlertRegistered || queueAlertLoading}
+                  >
+                    {queueAlertRegistered
+                      ? "Notification set"
+                      : queueAlertLoading
+                        ? "Setting notification…"
+                        : "Notify me when I can upload"}
+                  </button>
+                </div>
+              ) : (
+                <p className="muted">
+                  Enable push notifications from the Notifications page to get an alert when uploads reopen.
+                </p>
+              )}
+            </div>
           )}
           {files.length > 0 && (
             <p>{files.length} screenshot{files.length === 1 ? "" : "s"} selected.</p>
