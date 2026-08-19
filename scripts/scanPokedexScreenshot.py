@@ -25,6 +25,8 @@ def clamp(value, lower, upper):
 def run_tesseract(image_path):
     command = [
         "tesseract",
+        "-c",
+        "tessedit_char_whitelist=0123456789",
         str(image_path),
         "stdout",
         "--psm",
@@ -32,8 +34,6 @@ def run_tesseract(image_path):
         "-l",
         "eng",
         "tsv",
-        "-c",
-        "tessedit_char_whitelist=0123456789",
     ]
     completed = subprocess.run(
         command,
@@ -100,6 +100,7 @@ def parse_ocr_entries(tsv_text, image_width, image_height):
                 "centerX": center_x,
                 "centerY": center_y,
                 "column": column,
+                "inferred": False,
             }
         )
 
@@ -114,6 +115,93 @@ def parse_ocr_entries(tsv_text, image_width, image_height):
             by_dex[entry["dexNumber"]] = entry
 
     return sorted(by_dex.values(), key=lambda entry: entry["dexNumber"])
+
+
+def infer_clipped_top_row_entries(entries, image_width):
+    """Recover leading cells whose raised number is hidden above the viewport.
+
+    Pokémon GO's four-column regional Pokédex is strictly sequential. When the
+    screen is stopped part-way through a row, an empty uncaught tile can have
+    its number raised high enough to sit behind the region header while caught
+    neighbours still show their lower labels. For example, visible 835/836/837
+    in columns 1/2/3 proves that the clipped column-0 tile is 834.
+
+    Only the visually top-most row is reconstructed, and at least two OCR'd
+    neighbours must agree on the same row base. That keeps this inference
+    deliberately narrow and leaves normal OCR failures for manual review.
+    """
+    if len(entries) < 2:
+        return entries
+
+    rows = defaultdict(list)
+    for entry in entries:
+        row_base = entry["dexNumber"] - entry["column"]
+        rows[row_base].append(entry)
+
+    eligible_rows = [
+        (row_base, row_entries)
+        for row_base, row_entries in rows.items()
+        if len(row_entries) >= 2
+    ]
+    if not eligible_rows:
+        return entries
+
+    top_row_base, top_row_entries = min(
+        eligible_rows,
+        key=lambda item: statistics.median(entry["centerY"] for entry in item[1]),
+    )
+
+    observed_columns = {entry["column"] for entry in top_row_entries}
+    first_observed_column = min(observed_columns)
+    if first_observed_column <= 0:
+        return entries
+
+    # Require at least two adjacent visible neighbours so one stray OCR number
+    # cannot manufacture a leading Pokédex entry.
+    adjacent_pairs = sum(
+        1
+        for column in observed_columns
+        if column + 1 in observed_columns
+    )
+    if adjacent_pairs < 1:
+        return entries
+
+    row_baseline = max(entry["top"] for entry in top_row_entries)
+    median_width = max(1, int(statistics.median(entry["width"] for entry in top_row_entries)))
+    median_height = max(1, int(statistics.median(entry["height"] for entry in top_row_entries)))
+    cell_width = image_width / GRID_COLUMNS
+    inferred_raise = max(24, int(cell_width * 0.32))
+
+    inferred_entries = []
+    for column in range(first_observed_column):
+        if column in observed_columns:
+            continue
+
+        dex_number = top_row_base + column
+        if dex_number <= 0 or dex_number > MAX_DEX_NUMBER:
+            continue
+
+        center_x = ((column + 0.5) / GRID_COLUMNS) * image_width
+        top = max(0, row_baseline - inferred_raise)
+        inferred_entries.append(
+            {
+                "dexNumber": dex_number,
+                "confidence": 0.0,
+                "left": int(center_x - median_width / 2),
+                "top": top,
+                "width": median_width,
+                "height": median_height,
+                "centerX": center_x,
+                "centerY": top + median_height / 2.0,
+                "column": column,
+                "inferred": True,
+            }
+        )
+
+    if not inferred_entries:
+        return entries
+
+    return sorted(entries + inferred_entries, key=lambda entry: entry["dexNumber"])
 
 
 def channel_std(pixels):
@@ -203,6 +291,13 @@ def analyse_sprite_area(image, entry, row_baseline, cell_width):
 
 
 def classify_entry(entry, row_baseline, cell_width, metrics):
+    if entry.get("inferred"):
+        return (
+            "missing",
+            0.84,
+            "uncaught tile inferred from neighbouring Pokédex numbers; its raised number is clipped above the viewport",
+        )
+
     raised_amount = row_baseline - entry["top"]
     raised_threshold = max(18.0, cell_width * 0.20)
 
@@ -255,10 +350,14 @@ def scan_image(image_path):
             "warning": "No Pokédex grid numbers were recognised.",
         }
 
+    entries = infer_clipped_top_row_entries(entries, width)
+
     cell_width = width / GRID_COLUMNS
     rows = defaultdict(list)
     for entry in entries:
-        row_key = (entry["dexNumber"] - entry["column"]) // GRID_COLUMNS
+        # Within one four-column Pokédex row, dexNumber - column is constant.
+        # Using that exact base also lets us reconstruct a clipped leading cell.
+        row_key = entry["dexNumber"] - entry["column"]
         rows[row_key].append(entry)
 
     output_entries = []
@@ -277,7 +376,12 @@ def scan_image(image_path):
                     "classification": classification,
                     "confidence": round(confidence, 2),
                     "reason": reason,
-                    "ocrConfidence": round(entry["confidence"] / 100.0, 3),
+                    "ocrConfidence": (
+                        None
+                        if entry.get("inferred")
+                        else round(entry["confidence"] / 100.0, 3)
+                    ),
+                    "inferred": bool(entry.get("inferred")),
                     "metrics": metrics,
                 }
             )
