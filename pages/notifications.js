@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/router"
 import { getServerSession } from "next-auth/next"
@@ -237,9 +236,6 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
       {notifications.length === 0 ? (
         <div className="card">
           <p className="muted">You do not have any notifications yet.</p>
-          <Link className="button-link" href="/friend-codes">
-            View friend codes
-          </Link>
         </div>
       ) : (
         <div className="notification-list">
