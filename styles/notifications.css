@@ -32,6 +32,31 @@
   gap: 16px;
 }
 
+.notifications-hero-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.notification-clear-button {
+  border: 1px solid #da3633;
+  background: transparent;
+  color: #ff7b72;
+}
+
+.notification-clear-button:hover,
+.notification-clear-button:focus-visible {
+  border-color: #f85149;
+  background: rgba(218, 54, 51, 0.14);
+  color: #ff938a;
+}
+
+.notification-clear-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .push-settings {
   display: grid;
   gap: 14px;
@@ -120,6 +145,14 @@
   .push-settings-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .notifications-hero-actions {
+    width: 100%;
+  }
+
+  .notifications-hero-actions button {
+    flex: 1 1 160px;
   }
 
   .push-status {
