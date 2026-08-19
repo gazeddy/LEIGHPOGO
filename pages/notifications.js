@@ -109,10 +109,22 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
     notifyNavbar()
   }
 
+  const closeDisplayedPushNotifications = async () => {
+    try {
+      if (!("serviceWorker" in navigator)) return
+      const registration = await navigator.serviceWorker.ready
+      if (typeof registration.getNotifications !== "function") return
+      const displayed = await registration.getNotifications()
+      displayed.forEach((notification) => notification.close())
+    } catch {
+      // Closing already displayed OS notifications is best-effort only.
+    }
+  }
+
   const clearNotifications = async () => {
     if (
       !window.confirm(
-        "Clear all notifications? Pokédex import history will be kept, but these alerts will disappear from your inbox.",
+        "Clear all notifications? Pokédex import notifications will be permanently deleted. Any Pokédex changes made by those imports will be rolled back, associated wanted-trade changes restored, and retained screenshots/OCR data removed. This cannot be undone.",
       )
     ) {
       return
@@ -124,11 +136,13 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
       const response = await fetch("/api/notifications", { method: "DELETE" })
 
       if (!response.ok) {
-        window.alert("Unable to clear notifications.")
+        const data = await response.json().catch(() => ({}))
+        window.alert(data.error || "Unable to clear notifications.")
         return
       }
 
       setNotifications([])
+      await closeDisplayedPushNotifications()
 
       try {
         if (typeof navigator.clearAppBadge === "function") {
@@ -339,7 +353,6 @@ export async function getServerSideProps(context) {
         where: {
           ownerId: userId,
           status: { in: POKEDEX_NOTIFICATION_STATUSES },
-          notificationDismissedAt: null,
         },
         orderBy: { completedAt: "desc" },
         take: NOTIFICATION_LIST_LIMIT,
