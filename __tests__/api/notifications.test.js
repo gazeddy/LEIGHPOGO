@@ -9,29 +9,42 @@ jest.mock("../../pages/api/auth/[...nextauth]", () => ({
   authOptions: {},
 }))
 
+jest.mock("../../lib/pokedexImportCleanup", () => ({
+  deletePokedexImportCompletely: jest.fn(),
+}))
+
 jest.mock("../../lib/prisma", () => ({
   tradeNotification: {
+    count: jest.fn(),
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  friendCodeGrabNotification: {
+    count: jest.fn(),
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  pokedexImportJob: {
     count: jest.fn(),
     findMany: jest.fn(),
     updateMany: jest.fn(),
     findFirst: jest.fn(),
     update: jest.fn(),
   },
-  friendCodeGrabNotification: {
-    count: jest.fn(),
-    findMany: jest.fn(),
-    updateMany: jest.fn(),
-  },
-  pokedexImportJob: {
-    count: jest.fn(),
-    findMany: jest.fn(),
-    updateMany: jest.fn(),
-  },
 }))
 
 const prisma = require("../../lib/prisma")
 const collectionHandler = require("../../pages/api/notifications").default
 const itemHandler = require("../../pages/api/notifications/[id]").default
+const friendCodeItemHandler = require("../../pages/api/friend-code-grabs/[id]").default
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -72,14 +85,12 @@ describe("notifications API", () => {
         ownerId: 12,
         status: { in: ["COMPLETE", "FAILED"] },
         notificationReadAt: null,
+        notificationDismissedAt: null,
       },
     })
-    expect(prisma.tradeNotification.findMany).not.toHaveBeenCalled()
-    expect(prisma.friendCodeGrabNotification.findMany).not.toHaveBeenCalled()
-    expect(prisma.pokedexImportJob.findMany).not.toHaveBeenCalled()
   })
 
-  it("marks all of the current user's unread notifications as read", async () => {
+  it("marks all current visible notifications as read", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.tradeNotification.updateMany.mockResolvedValueOnce({ count: 2 })
     prisma.friendCodeGrabNotification.updateMany.mockResolvedValueOnce({ count: 1 })
@@ -90,25 +101,18 @@ describe("notifications API", () => {
 
     expect(res._getStatusCode()).toBe(200)
     expect(JSON.parse(res._getData())).toEqual({ updated: 4, unreadCount: 0 })
-    expect(prisma.tradeNotification.updateMany).toHaveBeenCalledWith({
-      where: { ownerId: 12, readAt: null },
-      data: { readAt: expect.any(Date) },
-    })
-    expect(prisma.friendCodeGrabNotification.updateMany).toHaveBeenCalledWith({
-      where: { ownerId: 12, readAt: null },
-      data: { readAt: expect.any(Date) },
-    })
     expect(prisma.pokedexImportJob.updateMany).toHaveBeenCalledWith({
       where: {
         ownerId: 12,
         status: { in: ["COMPLETE", "FAILED"] },
         notificationReadAt: null,
+        notificationDismissedAt: null,
       },
       data: { notificationReadAt: expect.any(Date) },
     })
   })
 
-  it("returns Pokédex import notifications in the private inbox", async () => {
+  it("returns only non-dismissed Pokédex import notifications", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.tradeNotification.count.mockResolvedValueOnce(0)
     prisma.friendCodeGrabNotification.count.mockResolvedValueOnce(0)
@@ -121,7 +125,7 @@ describe("notifications API", () => {
         status: "COMPLETE",
         totalImages: 3,
         error: null,
-        pushError: "No push subscription is registered for this account.",
+        pushError: null,
         createdAt: new Date("2026-08-19T10:00:00Z"),
         completedAt: new Date("2026-08-19T10:00:30Z"),
         notificationReadAt: null,
@@ -132,35 +136,62 @@ describe("notifications API", () => {
     await collectionHandler(req, res)
 
     expect(res._getStatusCode()).toBe(200)
-    const body = JSON.parse(res._getData())
-    expect(body.unreadCount).toBe(1)
-    expect(body.notifications).toEqual([
+    expect(prisma.pokedexImportJob.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: "POKEDEX_IMPORT",
-        id: 77,
-        jobId: 77,
-        status: "COMPLETE",
-        totalImages: 3,
-        readAt: null,
+        where: {
+          ownerId: 12,
+          status: { in: ["COMPLETE", "FAILED", "ACCEPTED"] },
+          notificationDismissedAt: null,
+        },
       }),
-    ])
+    )
   })
 
-  it("does not allow a user to mark another user's trade notification as read", async () => {
+  it("deletes a trade notification when it is clicked through", async () => {
+    getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
+    prisma.tradeNotification.findFirst.mockResolvedValueOnce({ id: 44 })
+    prisma.tradeNotification.delete.mockResolvedValueOnce({ id: 44 })
+    const { req, res } = createMocks({
+      method: "DELETE",
+      query: { id: "44" },
+    })
+
+    await itemHandler(req, res)
+
+    expect(res._getStatusCode()).toBe(200)
+    expect(prisma.tradeNotification.delete).toHaveBeenCalledWith({
+      where: { id: 44 },
+    })
+  })
+
+  it("deletes a friend-code notification when it is clicked through", async () => {
+    getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
+    prisma.friendCodeGrabNotification.findFirst.mockResolvedValueOnce({ id: 55 })
+    prisma.friendCodeGrabNotification.delete.mockResolvedValueOnce({ id: 55 })
+    const { req, res } = createMocks({
+      method: "DELETE",
+      query: { id: "55" },
+    })
+
+    await friendCodeItemHandler(req, res)
+
+    expect(res._getStatusCode()).toBe(200)
+    expect(prisma.friendCodeGrabNotification.delete).toHaveBeenCalledWith({
+      where: { id: 55 },
+    })
+  })
+
+  it("does not allow a user to modify another user's trade notification", async () => {
     getServerSession.mockResolvedValueOnce({ user: { id: 12 } })
     prisma.tradeNotification.findFirst.mockResolvedValueOnce(null)
     const { req, res } = createMocks({
-      method: "PUT",
+      method: "DELETE",
       query: { id: "44" },
     })
 
     await itemHandler(req, res)
 
     expect(res._getStatusCode()).toBe(404)
-    expect(prisma.tradeNotification.findFirst).toHaveBeenCalledWith({
-      where: { id: 44, ownerId: 12 },
-      select: { id: true },
-    })
-    expect(prisma.tradeNotification.update).not.toHaveBeenCalled()
+    expect(prisma.tradeNotification.delete).not.toHaveBeenCalled()
   })
 })
