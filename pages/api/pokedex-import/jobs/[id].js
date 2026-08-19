@@ -75,7 +75,7 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const action = String(req.body?.action || "").trim().toUpperCase()
 
-    if (action === "DISMISS_NOTIFICATION") {
+    if (["DISMISS_NOTIFICATION", "MARK_READ"].includes(action)) {
       if (!["COMPLETE", "FAILED", "ACCEPTED"].includes(job.status)) {
         return res.status(409).json({
           error: "This Pokédex import has not finished processing yet.",
@@ -83,38 +83,20 @@ export default async function handler(req, res) {
       }
 
       const dismissedAt = job.notificationDismissedAt || new Date()
+      const readAt = job.notificationReadAt || dismissedAt
       await prisma.pokedexImportJob.update({
         where: { id: job.id },
         data: {
           notificationDismissedAt: dismissedAt,
-          notificationReadAt: job.notificationReadAt || dismissedAt,
+          notificationReadAt: readAt,
         },
       })
 
       return res.status(200).json({
-        dismissed: true,
-        notificationDismissedAt: dismissedAt.toISOString(),
-      })
-    }
-
-    if (action === "MARK_READ") {
-      if (!["COMPLETE", "FAILED", "ACCEPTED"].includes(job.status)) {
-        return res.status(409).json({
-          error: "This Pokédex import has not finished processing yet.",
-        })
-      }
-
-      const readAt = job.notificationReadAt || new Date()
-      if (!job.notificationReadAt) {
-        await prisma.pokedexImportJob.update({
-          where: { id: job.id },
-          data: { notificationReadAt: readAt },
-        })
-      }
-
-      return res.status(200).json({
         read: true,
+        dismissed: true,
         notificationReadAt: readAt.toISOString(),
+        notificationDismissedAt: dismissedAt.toISOString(),
       })
     }
 
