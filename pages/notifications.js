@@ -124,7 +124,7 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
   const clearNotifications = async () => {
     if (
       !window.confirm(
-        "Clear all notifications? Pokédex import notifications will be permanently deleted. Any Pokédex changes made by those imports will be rolled back, associated wanted-trade changes restored, and retained screenshots/OCR data removed. This cannot be undone.",
+        "Clear all notifications? Trade and friend-code notifications will simply be removed. Pokédex import notifications that have not been opened will also be permanently deleted; if one of those imports changed your Pokédex, those Pokédex changes will be undone and any Wanted Trades automatically removed by that import will be restored. This cannot be undone.",
       )
     ) {
       return
