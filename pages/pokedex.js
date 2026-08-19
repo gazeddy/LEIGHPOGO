@@ -52,6 +52,10 @@ function PokedexStyles() {
     .pokedex-search-tools input,
     .pokedex-search-tools select { min-width: 0; }
     .pokedex-search-summary { margin: 8px 0 0; }
+    .pokedex-region-bulk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #30363d; }
+    .pokedex-region-bulk-actions button { width: auto; min-width: 112px; }
+    .pokedex-region-clear { background: #6e3535; }
+    .pokedex-region-clear:hover { background: #8c4141; }
     .pokemon-card-sprite { width: 72px; height: 72px; object-fit: contain; padding: 6px; border: 1px solid #21262d; border-radius: 10px; background: #070b10; }
     .pokemon-card-name { display: grid; justify-items: start; gap: 4px; min-width: 0; }
     .pokemon-card-name h3 { margin: 0; overflow-wrap: anywhere; }
@@ -104,6 +108,8 @@ function PokedexStyles() {
       .pokemon-caught-toggle span { display: none; }
       .pokemon-resource-grid { grid-template-columns: 1fr; }
       .region-meta p { display: none; }
+      .pokedex-region-bulk-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .pokedex-region-bulk-actions button { width: 100%; min-width: 0; }
     }
   `}</style>
 }
@@ -376,6 +382,8 @@ function PokedexRegion({
   addingWantedDex,
   onAddWanted,
   onToggle,
+  onFillRegion,
+  onClearRegion,
   onNavigate,
   focusedDex,
   expandedDex,
@@ -423,28 +431,42 @@ function PokedexRegion({
       </button>
 
       {isOpen && (
-        <div className="pokemon-card-grid">
-          {region.pokemon.map((pokemon) => {
-            const released = !availabilityKnown || releasedSet.has(pokemon.dexNumber)
-            return (
-              <PokemonCard
-                key={pokemon.dexNumber}
-                pokemon={pokemon}
-                details={detailsByPokemon?.[pokemon.dexNumber]}
-                caught={caughtSet.has(pokemon.dexNumber)}
-                released={released}
-                availabilityKnown={availabilityKnown}
-                wanted={wantedDexSet.has(pokemon.dexNumber)}
-                addingWanted={addingWantedDex === pokemon.dexNumber}
-                onAddWanted={onAddWanted}
-                onToggle={onToggle}
-                onNavigate={onNavigate}
-                expanded={expandedDex === pokemon.dexNumber}
-                onExpand={onExpand}
-              />
-            )
-          })}
-        </div>
+        <>
+          <div className="pokedex-region-bulk-actions" aria-label={`${region.region} Pokédex bulk actions`}>
+            <button type="button" onClick={() => onFillRegion(region.region)}>
+              Fill region
+            </button>
+            <button
+              type="button"
+              className="pokedex-region-clear"
+              onClick={() => onClearRegion(region.region)}
+            >
+              Clear region
+            </button>
+          </div>
+          <div className="pokemon-card-grid">
+            {region.pokemon.map((pokemon) => {
+              const released = !availabilityKnown || releasedSet.has(pokemon.dexNumber)
+              return (
+                <PokemonCard
+                  key={pokemon.dexNumber}
+                  pokemon={pokemon}
+                  details={detailsByPokemon?.[pokemon.dexNumber]}
+                  caught={caughtSet.has(pokemon.dexNumber)}
+                  released={released}
+                  availabilityKnown={availabilityKnown}
+                  wanted={wantedDexSet.has(pokemon.dexNumber)}
+                  addingWanted={addingWantedDex === pokemon.dexNumber}
+                  onAddWanted={onAddWanted}
+                  onToggle={onToggle}
+                  onNavigate={onNavigate}
+                  expanded={expandedDex === pokemon.dexNumber}
+                  onExpand={onExpand}
+                />
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )
@@ -591,6 +613,28 @@ export default function PokedexPage() {
       next.has(dexNumber) ? next.delete(dexNumber) : next.add(dexNumber)
       return next
     })
+  }
+
+  const setRegionCaught = (regionName, shouldBeCaught) => {
+    const region = catalog?.regions?.find((candidate) => candidate.region === regionName)
+    if (!region) return
+
+    const regionDexNumbers = region.pokemon
+      .map((pokemon) => Number(pokemon.dexNumber))
+      .filter((dexNumber) => trackableSet.has(dexNumber))
+
+    setCaughtSet((previous) => {
+      const next = new Set(previous)
+      for (const dexNumber of regionDexNumbers) {
+        if (shouldBeCaught) next.add(dexNumber)
+        else next.delete(dexNumber)
+      }
+      return next
+    })
+
+    setStatusMessage(
+      `${regionName} ${shouldBeCaught ? "filled" : "cleared"}: ${regionDexNumbers.length} available Pokémon marked ${shouldBeCaught ? "caught" : "missing"}. Press Save progress to apply.`
+    )
   }
 
   const addWanted = async (pokemon) => {
@@ -801,6 +845,8 @@ export default function PokedexPage() {
           addingWantedDex={addingWantedDex}
           onAddWanted={addWanted}
           onToggle={toggleCaught}
+          onFillRegion={(regionName) => setRegionCaught(regionName, true)}
+          onClearRegion={(regionName) => setRegionCaught(regionName, false)}
           onNavigate={navigateToPokemon}
           focusedDex={focusedDex}
           expandedDex={expandedDex}
