@@ -32,6 +32,9 @@ async function loadOwnedJob(id, ownerId) {
       createdAt: true,
       startedAt: true,
       completedAt: true,
+      notificationReadAt: true,
+      pushSentAt: true,
+      pushError: true,
     },
   })
 }
@@ -70,6 +73,28 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const action = String(req.body?.action || "").trim().toUpperCase()
+
+    if (action === "MARK_READ") {
+      if (!["COMPLETE", "FAILED", "ACCEPTED"].includes(job.status)) {
+        return res.status(409).json({
+          error: "This Pokédex import has not finished processing yet.",
+        })
+      }
+
+      const readAt = job.notificationReadAt || new Date()
+      if (!job.notificationReadAt) {
+        await prisma.pokedexImportJob.update({
+          where: { id: job.id },
+          data: { notificationReadAt: readAt },
+        })
+      }
+
+      return res.status(200).json({
+        read: true,
+        notificationReadAt: readAt.toISOString(),
+      })
+    }
+
     if (action !== "ACCEPT") {
       return res.status(400).json({ error: "Unsupported Pokédex import action." })
     }
@@ -77,6 +102,12 @@ export default async function handler(req, res) {
     if (job.status === "ACCEPTED") {
       try {
         await removeStoredPokedexImport(job.id)
+        if (!job.notificationReadAt) {
+          await prisma.pokedexImportJob.update({
+            where: { id: job.id },
+            data: { notificationReadAt: new Date() },
+          })
+        }
       } catch (error) {
         console.error(`Unable to re-run screenshot cleanup for import ${job.id}`, error)
         return res.status(500).json({
@@ -96,7 +127,10 @@ export default async function handler(req, res) {
       await removeStoredPokedexImport(job.id)
       await prisma.pokedexImportJob.update({
         where: { id: job.id },
-        data: { status: "ACCEPTED" },
+        data: {
+          status: "ACCEPTED",
+          notificationReadAt: new Date(),
+        },
       })
     } catch (error) {
       console.error(`Unable to delete accepted Pokédex screenshots for job ${job.id}`, error)
@@ -135,6 +169,9 @@ export default async function handler(req, res) {
       createdAt: job.createdAt.toISOString(),
       startedAt: job.startedAt?.toISOString() || null,
       completedAt: job.completedAt?.toISOString() || null,
+      notificationReadAt: job.notificationReadAt?.toISOString() || null,
+      pushSentAt: job.pushSentAt?.toISOString() || null,
+      pushError: job.pushError,
       result,
     },
   })
