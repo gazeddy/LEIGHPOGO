@@ -36,6 +36,8 @@ async function recoverStaleJobs() {
       startedAt: null,
       processedImages: 0,
       error: null,
+      pushSentAt: null,
+      pushError: null,
     },
   })
 
@@ -54,6 +56,9 @@ async function recoverStaleJobs() {
         status: "FAILED",
         error: "The screenshot upload did not finish. Please queue the import again.",
         completedAt: new Date(),
+        notificationReadAt: null,
+        pushSentAt: null,
+        pushError: "The upload expired before OCR processing could start.",
       },
     })
 
@@ -92,6 +97,8 @@ async function claimNextJob() {
         startedAt: new Date(),
         processedImages: 0,
         error: null,
+        pushSentAt: null,
+        pushError: null,
       },
     })
 
@@ -120,8 +127,38 @@ async function sendCompletionPush(job, success) {
     })
   } catch (error) {
     console.error("Unable to send Pokédex import push notification", error)
-    return null
+    return {
+      configured: null,
+      subscriptions: null,
+      sent: 0,
+      failed: 1,
+      removed: 0,
+      error: String(error?.message || error || "Unknown push error"),
+    }
   }
+}
+
+function pushFailureMessage(push) {
+  if (!push) return "Push delivery returned no result."
+  if (push.error) return `Push delivery failed: ${push.error}`
+  if (push.configured === false) return "Web Push is not configured on this server."
+  if (Number(push.subscriptions) === 0) return "No push subscription is registered for this account."
+  if (Number(push.sent) === 0) {
+    return `The push service did not accept the notification${Number(push.failed) > 0 ? ` (${push.failed} failed)` : ""}.`
+  }
+  return null
+}
+
+async function recordPushResult(jobId, push) {
+  const pushError = pushFailureMessage(push)
+  await prisma.pokedexImportJob.update({
+    where: { id: jobId },
+    data: {
+      pushSentAt: pushError ? null : new Date(),
+      pushError,
+    },
+  })
+  return pushError
 }
 
 export default async function handler(req, res) {
@@ -164,12 +201,16 @@ export default async function handler(req, res) {
         resultJson: JSON.stringify(result),
         error: null,
         completedAt: new Date(),
+        notificationReadAt: null,
+        pushSentAt: null,
+        pushError: null,
       },
     })
 
-    // Keep the original screenshots until the user reviews and accepts the OCR
-    // result. The ACCEPT action removes them immediately after confirmation.
+    // The completed job itself is also the persistent in-app notification.
+    // Keep the screenshots until the user reviews and accepts the OCR result.
     const push = await sendCompletionPush(job, true)
+    const pushError = await recordPushResult(job.id, push)
 
     return res.status(200).json({
       processed: true,
@@ -177,6 +218,7 @@ export default async function handler(req, res) {
       status: "COMPLETE",
       screenshotsRetainedForReview: true,
       push,
+      pushError,
     })
   } catch (error) {
     console.error(`Pokédex import job ${job.id} failed`, error?.cause || error)
@@ -192,11 +234,15 @@ export default async function handler(req, res) {
         status: "FAILED",
         error: message,
         completedAt: new Date(),
+        notificationReadAt: null,
+        pushSentAt: null,
+        pushError: null,
       },
     })
 
     await removeStoredPokedexImport(job.id).catch(() => {})
     const push = await sendCompletionPush(job, false)
+    const pushError = await recordPushResult(job.id, push)
 
     return res.status(200).json({
       processed: true,
@@ -204,6 +250,7 @@ export default async function handler(req, res) {
       status: "FAILED",
       error: message,
       push,
+      pushError,
     })
   }
 }
