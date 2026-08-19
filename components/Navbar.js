@@ -182,6 +182,7 @@ export default function Navbar() {
               <Link href="/pokedex" className="nav-item nav-subitem">Pokédex</Link>
               {session && (
                 <>
+                  <Link href="/pokedex-import" className="nav-item nav-subitem">Pokédex Import</Link>
                   <Link href="/gyms" className="nav-item nav-subitem">Gym Map</Link>
                   <Link href="/trades" className="nav-item nav-subitem">Trades</Link>
                   <Link href="/trades/wanted" className="nav-item nav-subitem">Wanted Trades</Link>
@@ -217,6 +218,12 @@ export default function Navbar() {
                 <span className="app-tool-symbol" aria-hidden="true">◉</span>
                 <span><strong>Pokédex</strong><small>Track your dex</small></span>
               </Link>
+              {session && (
+                <Link href="/pokedex-import" className="app-tool-card">
+                  <span className="app-tool-symbol" aria-hidden="true">⇧</span>
+                  <span><strong>Dex Import</strong><small>Scan screenshots</small></span>
+                </Link>
+              )}
               <Link href="/friend-codes" className="app-tool-card">
                 <span className="app-tool-symbol" aria-hidden="true">＋</span>
                 <span><strong>Friend Codes</strong><small>Copy trainer codes</small></span>
