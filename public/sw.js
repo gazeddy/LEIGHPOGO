@@ -1,4 +1,4 @@
-const STATIC_CACHE = "leighpogo-static-v4"
+const STATIC_CACHE = "leighpogo-static-v5"
 const OFFLINE_URL = "/offline.html"
 const STATIC_ASSETS = [
   OFFLINE_URL,
@@ -97,19 +97,53 @@ self.addEventListener("push", (event) => {
     renotify: Boolean(payload.renotify),
     data: {
       url: payload.url || "/",
+      notificationKind: payload.notificationKind || null,
+      notificationId: Number(payload.notificationId) || null,
     },
   }
 
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
+async function consumeClickedNotification(data = {}) {
+  try {
+    const kind = String(data.notificationKind || "").toUpperCase()
+    const notificationId = Number(data.notificationId)
+
+    if (kind === "TRADE" && Number.isInteger(notificationId) && notificationId > 0) {
+      await fetch(`/api/notifications/${notificationId}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      })
+      return
+    }
+
+    const target = new URL(data.url || "/", self.location.origin)
+    if (target.pathname === "/pokedex-import") {
+      const jobId = Number(target.searchParams.get("job"))
+      if (Number.isInteger(jobId) && jobId > 0) {
+        await fetch(`/api/pokedex-import/jobs/${jobId}`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "DISMISS_NOTIFICATION" }),
+        })
+      }
+    }
+  } catch {
+    // Notification cleanup is best-effort; never block opening the destination.
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close()
 
-  const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin).href
+  const data = event.notification.data || {}
+  const targetUrl = new URL(data.url || "/", self.location.origin).href
 
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+  const navigate = self.clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then((clients) => {
       for (const client of clients) {
         if (client.url === targetUrl && "focus" in client) {
           return client.focus()
@@ -122,5 +156,6 @@ self.addEventListener("notificationclick", (event) => {
 
       return undefined
     })
-  )
+
+  event.waitUntil(Promise.all([consumeClickedNotification(data), navigate]))
 })
