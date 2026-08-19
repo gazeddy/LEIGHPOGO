@@ -25,6 +25,7 @@ function secretMatches(provided, expected) {
 
 async function recoverStaleJobs() {
   const staleBefore = new Date(Date.now() - STALE_JOB_MS)
+
   await prisma.pokedexImportJob.updateMany({
     where: {
       status: "PROCESSING",
@@ -35,6 +36,18 @@ async function recoverStaleJobs() {
       startedAt: null,
       processedImages: 0,
       error: null,
+    },
+  })
+
+  await prisma.pokedexImportJob.updateMany({
+    where: {
+      status: "UPLOADING",
+      createdAt: { lt: staleBefore },
+    },
+    data: {
+      status: "FAILED",
+      error: "The screenshot upload did not finish. Please queue the import again.",
+      completedAt: new Date(),
     },
   })
 }

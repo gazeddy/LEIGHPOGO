@@ -87,13 +87,13 @@ export default async function handler(req, res) {
   const activeJobs = await prisma.pokedexImportJob.count({
     where: {
       ownerId,
-      status: { in: ["QUEUED", "PROCESSING"] },
+      status: { in: ["UPLOADING", "QUEUED", "PROCESSING"] },
     },
   })
 
   if (activeJobs >= MAX_ACTIVE_POKEDEX_IMPORT_JOBS) {
     return res.status(429).json({
-      error: `You already have ${MAX_ACTIVE_POKEDEX_IMPORT_JOBS} Pokédex imports queued or processing. Wait for one to finish before adding another.`,
+      error: `You already have ${MAX_ACTIVE_POKEDEX_IMPORT_JOBS} Pokédex imports uploading, queued or processing. Wait for one to finish before adding another.`,
     })
   }
 
@@ -107,6 +107,7 @@ export default async function handler(req, res) {
   const job = await prisma.pokedexImportJob.create({
     data: {
       ownerId,
+      status: "UPLOADING",
       totalImages: images.length,
     },
     select: {
@@ -135,18 +136,30 @@ export default async function handler(req, res) {
     })
   }
 
+  const queuedJob = await prisma.pokedexImportJob.update({
+    where: { id: job.id },
+    data: { status: "QUEUED" },
+    select: {
+      id: true,
+      status: true,
+      totalImages: true,
+      processedImages: true,
+      createdAt: true,
+    },
+  })
+
   const [position, pushSubscriptions] = await Promise.all([
-    queuePosition(job),
+    queuePosition(queuedJob),
     prisma.pushSubscription.count({ where: { ownerId } }),
   ])
 
   return res.status(202).json({
     job: {
-      id: job.id,
-      status: job.status,
-      totalImages: job.totalImages,
-      processedImages: job.processedImages,
-      createdAt: job.createdAt.toISOString(),
+      id: queuedJob.id,
+      status: queuedJob.status,
+      totalImages: queuedJob.totalImages,
+      processedImages: queuedJob.processedImages,
+      createdAt: queuedJob.createdAt.toISOString(),
       queuePosition: position,
     },
     pushEnabled: pushSubscriptions > 0,
