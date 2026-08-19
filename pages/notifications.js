@@ -15,7 +15,36 @@ import {
   serializeFriendCodeGrabNotification,
 } from "../lib/friendCodeNotifications"
 
+const POKEDEX_NOTIFICATION_STATUSES = ["COMPLETE", "FAILED", "ACCEPTED"]
+
+const serializePokedexImportNotification = (job) => ({
+  kind: "POKEDEX_IMPORT",
+  id: job.id,
+  jobId: job.id,
+  status: job.status,
+  totalImages: job.totalImages,
+  error: job.error,
+  pushError: job.pushError,
+  createdAt: (job.completedAt || job.createdAt).toISOString(),
+  readAt: job.notificationReadAt?.toISOString() || null,
+})
+
 const notificationMessage = (notification) => {
+  if (notification.kind === "POKEDEX_IMPORT") {
+    if (notification.status === "FAILED") {
+      return notification.error
+        ? `Your Pokédex screenshot import could not be processed: ${notification.error}`
+        : "Your Pokédex screenshot import could not be processed."
+    }
+
+    if (notification.status === "ACCEPTED") {
+      return `Pokédex import #${notification.jobId} was accepted and its uploaded screenshots were deleted.`
+    }
+
+    const count = Number(notification.totalImages) || 0
+    return `${count} Pokédex screenshot${count === 1 ? " has" : "s have"} been processed and ${count === 1 ? "is" : "are"} ready to review.`
+  }
+
   if (notification.kind === "FRIEND_CODE_GRAB") {
     const trainer = notification.copiedBy?.ign || "Another trainer"
     const codeOwner = notification.entry?.trainerName
@@ -39,10 +68,17 @@ const notificationMessage = (notification) => {
   return `${notification.listing.owner.ign} listed ${modifiers}${notification.pokemonName}, matching your wanted list.`
 }
 
-const notificationTitle = (notification) =>
-  notification.kind === "FRIEND_CODE_GRAB"
+const notificationTitle = (notification) => {
+  if (notification.kind === "POKEDEX_IMPORT") {
+    if (notification.status === "FAILED") return "Pokédex import failed"
+    if (notification.status === "ACCEPTED") return "Pokédex import accepted"
+    return "Pokédex import ready"
+  }
+
+  return notification.kind === "FRIEND_CODE_GRAB"
     ? "Friend code copied"
     : notification.pokemonName
+}
 
 export default function NotificationsPage({ initialNotifications, renderedAt }) {
   const router = useRouter()
@@ -73,6 +109,28 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
 
   const markNotificationRead = async (notification) => {
     if (notification.readAt) return notification
+
+    if (notification.kind === "POKEDEX_IMPORT") {
+      const response = await fetch(`/api/pokedex-import/jobs/${notification.jobId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "MARK_READ" }),
+      })
+
+      if (!response.ok) return notification
+
+      const readAt = new Date().toISOString()
+      const updated = { ...notification, readAt }
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id && item.kind === notification.kind
+            ? updated
+            : item,
+        ),
+      )
+      notifyNavbar()
+      return updated
+    }
 
     const url =
       notification.kind === "FRIEND_CODE_GRAB"
@@ -109,13 +167,18 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
     router.push("/friend-codes")
   }
 
+  const openPokedexImport = async (notification) => {
+    await markNotificationRead(notification)
+    router.push(`/pokedex-import?job=${notification.jobId}`)
+  }
+
   return (
     <div className="container notifications-page">
       <div className="card notifications-hero">
         <div>
           <h1>Notifications</h1>
           <p className="muted">
-            Private alerts for trade matches and when another logged-in trainer copies your friend code. Friend-code copy alerts stay in-app only and are not sent as push notifications.
+            Private alerts for Pokédex imports, trade matches and when another logged-in trainer copies your friend code. Friend-code copy alerts stay in-app only and are not sent as push notifications.
           </p>
         </div>
         {unreadCount > 0 && (
@@ -138,8 +201,10 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
         <div className="notification-list">
           {notifications.map((notification) => {
             const isFriendCodeGrab = notification.kind === "FRIEND_CODE_GRAB"
+            const isPokedexImport = notification.kind === "POKEDEX_IMPORT"
             const isAvailable =
               !isFriendCodeGrab &&
+              !isPokedexImport &&
               notification.listing.status === "ACTIVE" &&
               notification.listing.expiresAt &&
               new Date(notification.listing.expiresAt).getTime() > renderedAt
@@ -158,12 +223,21 @@ export default function NotificationsPage({ initialNotifications, renderedAt }) 
                       )}
                     </div>
                     <p>{notificationMessage(notification)}</p>
+                    {isPokedexImport && notification.pushError && notification.status !== "ACCEPTED" && (
+                      <p className="muted">
+                        Push delivery issue: {notification.pushError} The in-app result is still available here.
+                      </p>
+                    )}
                     <p className="muted">
                       {new Date(notification.createdAt).toLocaleString("en-GB")}
                     </p>
                   </div>
 
-                  {isFriendCodeGrab ? (
+                  {isPokedexImport ? (
+                    <button type="button" onClick={() => openPokedexImport(notification)}>
+                      {notification.status === "COMPLETE" ? "Review import" : "View import"}
+                    </button>
+                  ) : isFriendCodeGrab ? (
                     <button type="button" onClick={() => openFriendCodes(notification)}>
                       View friend codes
                     </button>
@@ -196,20 +270,39 @@ export async function getServerSideProps(context) {
 
   await purgeExpiredTradeListings()
 
-  const [tradeNotifications, friendCodeNotifications] = await Promise.all([
-    prisma.tradeNotification.findMany({
-      where: { ownerId: userId },
-      include: tradeNotificationInclude,
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    }),
-    prisma.friendCodeGrabNotification.findMany({
-      where: { ownerId: userId },
-      include: friendCodeGrabNotificationInclude,
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    }),
-  ])
+  const [tradeNotifications, friendCodeNotifications, pokedexImportJobs] =
+    await Promise.all([
+      prisma.tradeNotification.findMany({
+        where: { ownerId: userId },
+        include: tradeNotificationInclude,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      prisma.friendCodeGrabNotification.findMany({
+        where: { ownerId: userId },
+        include: friendCodeGrabNotificationInclude,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      prisma.pokedexImportJob.findMany({
+        where: {
+          ownerId: userId,
+          status: { in: POKEDEX_NOTIFICATION_STATUSES },
+        },
+        orderBy: { completedAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          status: true,
+          totalImages: true,
+          error: true,
+          pushError: true,
+          createdAt: true,
+          completedAt: true,
+          notificationReadAt: true,
+        },
+      }),
+    ])
 
   const notifications = [
     ...tradeNotifications.map((notification) => ({
@@ -217,6 +310,7 @@ export async function getServerSideProps(context) {
       ...serializeTradeNotification(notification),
     })),
     ...friendCodeNotifications.map(serializeFriendCodeGrabNotification),
+    ...pokedexImportJobs.map(serializePokedexImportNotification),
   ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 50)
