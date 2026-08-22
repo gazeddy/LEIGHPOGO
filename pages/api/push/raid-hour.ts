@@ -1,11 +1,11 @@
 import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
-  sendWednesdayRaidHourPush,
-  type RaidHourPushResult,
-} from "../../../lib/raid-hour-push";
+  sendRaidEventPushes,
+  type RaidEventPushResult,
+} from "../../../lib/raid-event-push";
 
-type RaidHourResponse = RaidHourPushResult | { error: string };
+type RaidEventResponse = RaidEventPushResult | { error: string };
 
 function isAuthorised(req: NextApiRequest): boolean {
   const expected = String(process.env.RAID_HOUR_CRON_SECRET || "").trim();
@@ -26,7 +26,7 @@ function isAuthorised(req: NextApiRequest): boolean {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<RaidHourResponse>,
+  res: NextApiResponse<RaidEventResponse>,
 ) {
   res.setHeader("Cache-Control", "private, no-store");
 
@@ -46,15 +46,15 @@ export default async function handler(
   }
 
   try {
-    const result = await sendWednesdayRaidHourPush(new Date());
+    const result = await sendRaidEventPushes(new Date());
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Wednesday Raid Hour push job failed", error);
+    console.error("Raid event push job failed", error);
     return res.status(500).json({
       error:
         error instanceof Error
           ? error.message
-          : "Wednesday Raid Hour push job failed.",
+          : "Raid event push job failed.",
     });
   }
 }
