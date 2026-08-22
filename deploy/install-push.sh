@@ -101,8 +101,9 @@ EOF
 systemctl daemon-reload
 systemctl restart "$APP_SERVICE"
 
-# This creates/reuses RAID_HOUR_CRON_SECRET, attaches it to the application
-# service, and enables the persistent 15-minute scheduler timer.
+# This creates/reuses the scheduler secret, attaches it to the application
+# service, and enables the persistent 15-minute raid-event scheduler. The
+# legacy raid-hour unit name is retained so existing installations upgrade in place.
 bash "${SCRIPT_DIR}/install-raid-hour-timer.sh" "$SERVICE_NAME" "$PORT"
 
 echo
@@ -110,6 +111,6 @@ echo "LEIGHPOGO push notification server setup is complete."
 echo "Application service: ${APP_SERVICE}"
 echo "Push environment: ${ENV_FILE}"
 echo "VAPID subject: ${VAPID_SUBJECT}"
-echo "Raid Hour timer: ${SERVICE_NAME}-raid-hour.timer"
+echo "Raid event timer: ${SERVICE_NAME}-raid-hour.timer (legacy unit name retained)"
 echo
 echo "Now sign in to LEIGHPOGO, open Notifications, enable push, and use Send test push."
