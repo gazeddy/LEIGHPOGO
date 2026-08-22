@@ -1,8 +1,8 @@
 const fs = require("fs")
 const path = require("path")
 
-describe("V3 Wednesday Raid Hour push wiring", () => {
-  it("stores the device timezone and weekly deduplication key", () => {
+describe("V3 raid event push wiring", () => {
+  it("stores the device timezone and legacy Raid Hour deduplication key", () => {
     const schema = fs.readFileSync(
       path.join(process.cwd(), "prisma/schema.prisma"),
       "utf8",
@@ -21,7 +21,7 @@ describe("V3 Wednesday Raid Hour push wiring", () => {
     expect(migration).toContain('ADD COLUMN "lastRaidHourReminderKey"')
   })
 
-  it("syncs the browser timezone with the saved push subscription", () => {
+  it("syncs the browser timezone and describes raid-event reminders", () => {
     const component = fs.readFileSync(
       path.join(process.cwd(), "components/PushNotificationSettings.js"),
       "utf8",
@@ -29,17 +29,17 @@ describe("V3 Wednesday Raid Hour push wiring", () => {
 
     expect(component).toContain("resolvedOptions().timeZone")
     expect(component).toContain("timeZone: browserTimeZone()")
-    expect(component).toContain("Wednesday 18:00 local-time 5★ Raid Hour reminder")
+    expect(component).toContain("raid-event reminders about 30 minutes before Raid Hours and Raid Days")
   })
 
-  it("protects the scheduler endpoint with a server-side secret", () => {
+  it("protects the generic raid-event scheduler endpoint with a server-side secret", () => {
     const endpoint = fs.readFileSync(
       path.join(process.cwd(), "pages/api/push/raid-hour.ts"),
       "utf8",
     )
 
     expect(endpoint).toContain("RAID_HOUR_CRON_SECRET")
-    expect(endpoint).toContain("sendWednesdayRaidHourPush")
+    expect(endpoint).toContain("sendRaidEventPushes")
     expect(endpoint).toContain("timingSafeEqual")
   })
 
