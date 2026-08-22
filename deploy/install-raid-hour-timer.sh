@@ -28,6 +28,7 @@ for command in systemctl openssl curl; do
 done
 
 APP_SERVICE="${SERVICE_NAME}.service"
+# Keep the historic unit/env names so existing installations upgrade in place.
 TIMER_BASE="${SERVICE_NAME}-raid-hour"
 ENV_DIR="/etc/leighpogo"
 ENV_FILE="${ENV_DIR}/${TIMER_BASE}.env"
@@ -47,9 +48,9 @@ if [[ ! -f "$ENV_FILE" ]] || ! grep -q '^RAID_HOUR_CRON_SECRET=' "$ENV_FILE"; th
   umask 077
   printf 'RAID_HOUR_CRON_SECRET=%s\n' "$(openssl rand -hex 32)" > "$ENV_FILE"
   chmod 0600 "$ENV_FILE"
-  echo "Generated a Raid Hour scheduler secret in ${ENV_FILE}."
+  echo "Generated a raid-event scheduler secret in ${ENV_FILE}."
 else
-  echo "Reusing the existing Raid Hour scheduler secret in ${ENV_FILE}."
+  echo "Reusing the existing raid-event scheduler secret in ${ENV_FILE}."
 fi
 
 install -d -m 0755 "$DROPIN_DIR"
@@ -60,7 +61,7 @@ EOF
 
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=LEIGHPOGO Wednesday Raid Hour push check for ${SERVICE_NAME}
+Description=LEIGHPOGO raid event push check for ${SERVICE_NAME}
 After=${APP_SERVICE}
 Wants=${APP_SERVICE}
 
@@ -72,7 +73,7 @@ EOF
 
 cat > "$TIMER_FILE" <<EOF
 [Unit]
-Description=Check for due LEIGHPOGO Raid Hour pushes every 15 minutes
+Description=Check for due LEIGHPOGO raid event pushes every 15 minutes
 
 [Timer]
 OnCalendar=*-*-* *:00/15:00
@@ -89,8 +90,8 @@ systemctl restart "$APP_SERVICE"
 systemctl enable --now "${TIMER_BASE}.timer"
 
 echo
-echo "Raid Hour push scheduler installed."
+echo "Raid event push scheduler installed."
 echo "Application service: ${APP_SERVICE}"
-echo "Scheduler timer: ${TIMER_BASE}.timer"
+echo "Scheduler timer: ${TIMER_BASE}.timer (legacy unit name retained)"
 echo "Scheduler endpoint: http://127.0.0.1:${PORT}/api/push/raid-hour"
 systemctl --no-pager --full status "${TIMER_BASE}.timer" || true
