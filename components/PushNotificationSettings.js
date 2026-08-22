@@ -235,7 +235,7 @@ export default function PushNotificationSettings() {
             Get LEIGHPOGO alerts even when the site is not open. Permission is only requested when you choose Enable.
           </p>
           <p className="muted">
-            Push-enabled devices receive the Wednesday 18:00 local-time 5★ Raid Hour reminder with the current boss and hundo CPs.
+            Push-enabled devices receive raid-event reminders about 30 minutes before Raid Hours and Raid Days, including the boss and hundo CPs when that data is available.
           </p>
         </div>
         <span className={`push-status ${subscribed ? "enabled" : "disabled"}`}>
