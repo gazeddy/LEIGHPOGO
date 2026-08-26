@@ -155,6 +155,14 @@ export function raidEventBossItems(event: PokemonGoEventSummary): RaidBossTicker
   });
 }
 
+export function selectCurrentFiveStarRaidItems(
+  items: RaidBossTickerItem[],
+): RaidBossTickerItem[] {
+  return items.filter(
+    (item) => item.category === "five-star" && item.state === "current",
+  );
+}
+
 function uniqueBosses(bosses: RaidEventBossSummary[]): RaidEventBossSummary[] {
   const seen = new Set<string>();
   return bosses.filter((boss) => {
