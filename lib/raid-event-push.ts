@@ -16,7 +16,7 @@ import {
   isRaidHourEasterEggOwnerEligible,
   selectRaidHourEasterEggOwner,
 } from "./raid-hour-push";
-import type { PokemonGoEventSummary } from "./events";
+import type { PokemonGoEventSummary, RaidBossTickerItem } from "./events";
 import { isWebPushConfigured, sendWebPush } from "./webPush";
 
 export const RAID_EVENT_PUSH_USAGE_TYPE = "RAID_EVENT_PUSH_SENT";
@@ -104,6 +104,41 @@ function uniqueBosses(bosses: RaidEventBossSummary[]): RaidEventBossSummary[] {
   });
 }
 
+async function bossSummariesForTickerItem(
+  item: RaidBossTickerItem,
+): Promise<RaidEventBossSummary[]> {
+  const catchCp = item.catchCp ?? [];
+  if (catchCp.length > 0) {
+    return catchCp.map((boss) => ({
+      name: boss.boss,
+      maxUnboostedCp: boss.maxUnboostedCp,
+      maxBoostedCp: boss.maxBoostedCp,
+    }));
+  }
+
+  try {
+    const profiles = await getCurrentRaidBossProfiles(item);
+    if (profiles.length > 0) {
+      return profiles.map((profile) => ({
+        name: profile.name,
+        maxUnboostedCp: profile.maxUnboostedCp,
+        maxBoostedCp: profile.maxBoostedCp,
+      }));
+    }
+  } catch (error) {
+    console.error(
+      `Unable to resolve raid-event boss data for ${item.boss}`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+
+  return [{
+    name: item.boss,
+    maxUnboostedCp: null,
+    maxBoostedCp: null,
+  }];
+}
+
 async function resolveRaidEventBosses(
   event: PokemonGoEventSummary,
   now: Date,
@@ -112,66 +147,29 @@ async function resolveRaidEventBosses(
   const bosses: RaidEventBossSummary[] = [];
 
   for (const item of items) {
-    try {
-      const profiles = await getCurrentRaidBossProfiles(item);
-      if (profiles.length > 0) {
-        bosses.push(
-          ...profiles.map((profile) => ({
-            name: profile.name,
-            maxUnboostedCp: profile.maxUnboostedCp,
-            maxBoostedCp: profile.maxBoostedCp,
-          })),
-        );
-      } else {
-        bosses.push({
-          name: item.boss,
-          maxUnboostedCp: null,
-          maxBoostedCp: null,
-        });
-      }
-    } catch (error) {
-      console.error(
-        `Unable to resolve raid-event boss data for ${item.boss}`,
-        error instanceof Error ? error.message : error,
-      );
-      bosses.push({
-        name: item.boss,
-        maxUnboostedCp: null,
-        maxBoostedCp: null,
-      });
-    }
+    bosses.push(...(await bossSummariesForTickerItem(item)));
   }
 
   if (bosses.length > 0) return uniqueBosses(bosses);
 
-  // Some feeds use a generic "Raid Hour" title. In that case retain the
-  // existing behaviour and use the current five-star raid rotation.
+  // Some feeds use a generic "Raid Hour" title. In that case collect every
+  // currently active five-star boss, not just the first rotation returned.
   if (event.eventType.trim().toLowerCase() === "raid-hour") {
     try {
       const raidTools = await getRaidToolsData(now);
-      const current = raidTools.tickerItems.find(
+      const current = raidTools.tickerItems.filter(
         (item) => item.category === "five-star" && item.state === "current",
       );
-      if (current) {
-        const catchCp = current.catchCp ?? [];
-        if (catchCp.length > 0) {
-          return uniqueBosses(
-            catchCp.map((boss) => ({
-              name: boss.boss,
-              maxUnboostedCp: boss.maxUnboostedCp,
-              maxBoostedCp: boss.maxBoostedCp,
-            })),
-          );
-        }
-        return [{
-          name: current.boss,
-          maxUnboostedCp: null,
-          maxBoostedCp: null,
-        }];
+
+      const currentBosses: RaidEventBossSummary[] = [];
+      for (const item of current) {
+        currentBosses.push(...(await bossSummariesForTickerItem(item)));
       }
+
+      return uniqueBosses(currentBosses);
     } catch (error) {
       console.error(
-        "Unable to resolve current five-star boss for generic Raid Hour",
+        "Unable to resolve current five-star bosses for generic Raid Hour",
         error instanceof Error ? error.message : error,
       );
     }
