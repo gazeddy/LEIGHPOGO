@@ -165,6 +165,16 @@ function uniqueBosses(bosses: RaidEventBossSummary[]): RaidEventBossSummary[] {
   });
 }
 
+function bossCpLine(boss: RaidEventBossSummary, easterEgg: boolean): string {
+  if (easterEgg) return `${boss.name}: Hundo - 15/15/15`;
+
+  const hasCp =
+    Number.isFinite(boss.maxUnboostedCp) && Number.isFinite(boss.maxBoostedCp);
+  if (!hasCp) return boss.name;
+
+  return `${boss.name}: Hundo ${boss.maxUnboostedCp} CP • WB ${boss.maxBoostedCp} CP`;
+}
+
 export function buildRaidEventPushPayload(
   event: PokemonGoEventSummary,
   bosses: RaidEventBossSummary[],
@@ -196,8 +206,8 @@ export function buildRaidEventPushPayload(
   }
 
   return {
-    title: label,
-    body: `Starts in 30 minutes • ${resolved.map((boss) => boss.name).join(" • ")}`,
+    title: `${label} starts in 30 minutes`,
+    body: resolved.map((boss) => bossCpLine(boss, easterEgg)).join("\n"),
     tag: `raid-event-${event.eventID}`,
     renotify: false,
     url,
