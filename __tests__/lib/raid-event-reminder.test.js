@@ -4,6 +4,7 @@ const {
   isRaidEventReminderDue,
   raidEventBossItems,
   raidEventBossText,
+  selectCurrentFiveStarRaidItems,
 } = require("../../lib/raid-event-reminder")
 
 function event(overrides = {}) {
@@ -74,6 +75,22 @@ describe("raid event push reminder", () => {
       ["Lunala", "five-star"],
     ])
     expect(inferRaidCategory("Mega Charizard X")).toBe("mega")
+  })
+
+  it("keeps every simultaneous current five-star boss for a generic Raid Hour", () => {
+    const items = [
+      { eventID: "a", category: "five-star", state: "current", boss: "Boss One" },
+      { eventID: "b", category: "five-star", state: "current", boss: "Boss Two" },
+      { eventID: "c", category: "five-star", state: "current", boss: "Boss Three" },
+      { eventID: "d", category: "mega", state: "current", boss: "Mega Boss" },
+      { eventID: "e", category: "five-star", state: "next", boss: "Next Boss" },
+    ]
+
+    expect(selectCurrentFiveStarRaidItems(items).map((item) => item.boss)).toEqual([
+      "Boss One",
+      "Boss Two",
+      "Boss Three",
+    ])
   })
 
   it("builds a single-boss reminder with hundo CP and event deep link", () => {
