@@ -94,23 +94,25 @@ describe("raid event push reminder", () => {
     })
   })
 
-  it("keeps multi-boss notifications compact instead of listing every CP", () => {
+  it("lists every multi-boss hundo CP pair on its own line", () => {
     const payload = buildRaidEventPushPayload(
       event({
-        eventID: "double-raid-day",
-        name: "Kyogre and Groudon Raid Day",
-        eventType: "raid-day",
-        heading: "Raid Day",
+        eventID: "triple-raid-hour",
+        name: "Raid Hour",
       }),
       [
-        { name: "Kyogre", maxUnboostedCp: 2351, maxBoostedCp: 2939 },
-        { name: "Groudon", maxUnboostedCp: 2351, maxBoostedCp: 2939 },
+        { name: "Boss One", maxUnboostedCp: 2100, maxBoostedCp: 2625 },
+        { name: "Boss Two", maxUnboostedCp: 2200, maxBoostedCp: 2750 },
+        { name: "Boss Three", maxUnboostedCp: 2300, maxBoostedCp: 2875 },
       ],
     )
 
-    expect(payload.title).toBe("Raid Day")
-    expect(payload.body).toBe("Starts in 30 minutes • Kyogre • Groudon")
-    expect(payload.body).not.toContain("2351")
+    expect(payload.title).toBe("Raid Hour starts in 30 minutes")
+    expect(payload.body).toBe(
+      "Boss One: Hundo 2100 CP • WB 2625 CP\n" +
+        "Boss Two: Hundo 2200 CP • WB 2750 CP\n" +
+        "Boss Three: Hundo 2300 CP • WB 2875 CP",
+    )
   })
 
   it("preserves the existing Raid Hour easter-egg hundo wording", () => {
