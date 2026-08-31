@@ -1,5 +1,6 @@
 import {
   buildDailyRaidSummaryPayload,
+  hasActiveEventRaidBosses,
   isDailyRaidSummaryDue,
   selectDailyRaidSummaryBosses,
 } from "../../lib/raid-daily-summary";
@@ -35,6 +36,39 @@ describe("daily raid summary timing", () => {
   it("uses GMT correctly in winter", () => {
     expect(isDailyRaidSummaryDue(new Date("2026-12-01T18:00:00.000Z"))).toBe(true);
     expect(isDailyRaidSummaryDue(new Date("2026-12-01T17:00:00.000Z"))).toBe(false);
+  });
+});
+
+describe("daily raid summary event trigger", () => {
+  it("does not trigger for ordinary five-star or Mega rotations alone", () => {
+    expect(
+      hasActiveEventRaidBosses([
+        item("five-star-normal", "five-star", "Kyogre"),
+        item("ordinary-mega-gyarados", "mega", "Gyarados"),
+      ]),
+    ).toBe(false);
+  });
+
+  it("triggers for an active event-derived Mega raid schedule", () => {
+    expect(
+      hasActiveEventRaidBosses([
+        item("mega-ascension--raid-2026-08-31-slot-mega", "mega", "Malamar"),
+      ]),
+    ).toBe(true);
+  });
+
+  it("triggers for a five-star-only event raid schedule", () => {
+    expect(
+      hasActiveEventRaidBosses([
+        item("festival--raid-2026-09-05-slot-five-star", "five-star", "Armored Mewtwo"),
+      ]),
+    ).toBe(true);
+  });
+
+  it("does not trigger for a future event raid before it becomes current", () => {
+    const next = item("festival--raid-2026-09-05-slot-five-star", "five-star", "Armored Mewtwo");
+    next.state = "next";
+    expect(hasActiveEventRaidBosses([next])).toBe(false);
   });
 });
 
