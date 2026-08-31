@@ -192,7 +192,17 @@ export default function EventCard({ event }: EventCardProps) {
       <div className="event-content">
         <div className="event-heading-row">
           <p className="event-type">{event.heading}</p>
-          <span className="event-native-badge">LeighPogo info</span>
+          {campfireUrl && (
+            <a
+              href={campfireUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="event-campfire-pill"
+              aria-label="View meetup on Campfire"
+            >
+              Campfire <span aria-hidden="true">↗</span>
+            </a>
+          )}
         </div>
         <h2>{event.name}</h2>
         <p className="event-time">{formatEventRange(event.start, event.end)}</p>
@@ -262,19 +272,6 @@ export default function EventCard({ event }: EventCardProps) {
             ))}
           </div>
         )}
-
-        {campfireUrl && (
-          <div className="event-links">
-            <a
-              href={campfireUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="event-link event-link-campfire"
-            >
-              View meetup on Campfire <span aria-hidden="true">↗</span>
-            </a>
-          </div>
-        )}
       </div>
 
       <style jsx>{`
@@ -326,7 +323,7 @@ export default function EventCard({ event }: EventCardProps) {
         }
 
         .event-type,
-        .event-native-badge {
+        .event-campfire-pill {
           margin: 0;
           padding: 5px 9px;
           border: 1px solid #30363d;
@@ -342,9 +339,16 @@ export default function EventCard({ event }: EventCardProps) {
           color: #79c0ff;
         }
 
-        .event-native-badge {
+        .event-campfire-pill {
           border-color: rgba(63, 185, 80, 0.45);
           color: #7ee787;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .event-campfire-pill:hover,
+        .event-campfire-pill:focus-visible {
+          text-decoration: underline;
         }
 
         h2 {
@@ -442,28 +446,6 @@ export default function EventCard({ event }: EventCardProps) {
           background: #21262d;
           color: #c9d1d9;
           font-size: 0.72rem;
-        }
-
-        .event-links {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px 16px;
-          margin-top: 18px;
-        }
-
-        .event-link {
-          color: #58a6ff;
-          font-weight: 700;
-          text-decoration: none;
-        }
-
-        .event-link-campfire {
-          color: #3fb950;
-        }
-
-        .event-link:hover,
-        .event-link:focus-visible {
-          text-decoration: underline;
         }
       `}</style>
 
