@@ -10,10 +10,10 @@ V3 remains the launched production baseline. V4 should reuse existing V3 systems
 
 Before active V4 development starts:
 
-- [ ] Finish current raid-boss work on `v3`
-- [ ] Test and push the completed V3 raid-boss changes
-- [ ] Merge/push the final V3 state to `main`
-- [ ] Bring `v4` forward to the new `main` before feature work begins
+- [x] Finish current raid-boss work on `v3`
+- [x] Test and push the completed V3 raid-boss changes
+- [x] Merge/push the final V3 state to `main`
+- [x] Bring `v4` forward to the new `main` before feature work begins
 - [ ] Retire/delete `v3` once `main` is confirmed good
 
 ## 1. Native event information
