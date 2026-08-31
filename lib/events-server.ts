@@ -11,7 +11,7 @@ import { localEventToSummary, readLocalEvents } from "./local-events";
 
 const EVENTS_FEED_URL =
   "https://raw.githubusercontent.com/Drumstix42/ScrapedDuck/refs/heads/data/events.min.json";
-const EVENTS_CACHE_VERSION = 2;
+const EVENTS_CACHE_VERSION = 3;
 const EVENTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const EVENTS_CACHE_PATH =
   process.env.EVENTS_CACHE_PATH?.trim() ||
@@ -78,6 +78,16 @@ function normaliseRaidScheduleBoss(
   };
 }
 
+function asRaidBosses(value: unknown): PokemonGoRaidScheduleBoss[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(normaliseRaidScheduleBoss)
+    .filter((boss): boss is PokemonGoRaidScheduleBoss => boss !== null);
+}
+
 function asRaidSchedule(value: unknown): PokemonGoRaidScheduleEntry[] {
   if (!Array.isArray(value)) {
     return [];
@@ -91,11 +101,7 @@ function asRaidSchedule(value: unknown): PokemonGoRaidScheduleEntry[] {
 
       const entry = rawEntry as Record<string, unknown>;
       const date = asRequiredString(entry.date);
-      const bosses = Array.isArray(entry.bosses)
-        ? entry.bosses
-            .map(normaliseRaidScheduleBoss)
-            .filter((boss): boss is PokemonGoRaidScheduleBoss => boss !== null)
-        : [];
+      const bosses = asRaidBosses(entry.bosses);
 
       if (!date || bosses.length === 0) {
         return null;
@@ -109,6 +115,46 @@ function asRaidSchedule(value: unknown): PokemonGoRaidScheduleEntry[] {
       };
     })
     .filter((entry): entry is PokemonGoRaidScheduleEntry => entry !== null);
+}
+
+function raidBossKey(boss: PokemonGoRaidScheduleBoss): string {
+  return boss.name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function raidScheduleWithEventWideBosses(
+  scheduleValue: unknown,
+  raidBattlesValue: unknown,
+): PokemonGoRaidScheduleEntry[] {
+  const schedule = asRaidSchedule(scheduleValue);
+  if (schedule.length === 0) return schedule;
+
+  const raidBattles =
+    raidBattlesValue &&
+    typeof raidBattlesValue === "object" &&
+    !Array.isArray(raidBattlesValue)
+      ? (raidBattlesValue as Record<string, unknown>)
+      : null;
+  const aggregateBosses = asRaidBosses(raidBattles?.bosses);
+  if (aggregateBosses.length === 0) return schedule;
+
+  const scheduledBosses = new Set(
+    schedule.flatMap((entry) => entry.bosses.map(raidBossKey)),
+  );
+  const eventWideExtras = aggregateBosses.filter(
+    (boss) => !scheduledBosses.has(raidBossKey(boss)),
+  );
+  if (eventWideExtras.length === 0) return schedule;
+
+  return schedule.map((entry) => {
+    const existing = new Set(entry.bosses.map(raidBossKey));
+    return {
+      ...entry,
+      bosses: [
+        ...entry.bosses,
+        ...eventWideExtras.filter((boss) => !existing.has(raidBossKey(boss))),
+      ],
+    };
+  });
 }
 
 function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
@@ -146,7 +192,10 @@ function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
     tags: asTags(event.tags),
     description: asOptionalString(event.description),
     campfireUrl: asOptionalString(event.campfireUrl),
-    raidSchedule: asRaidSchedule(extraData?.raidSchedule ?? event.raidSchedule),
+    raidSchedule: raidScheduleWithEventWideBosses(
+      extraData?.raidSchedule ?? event.raidSchedule,
+      extraData?.raidbattles,
+    ),
     source: event.source === "local" ? "local" : "feed",
   };
 }
