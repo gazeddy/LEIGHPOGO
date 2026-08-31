@@ -10,6 +10,10 @@ import {
   getImportedEventsForAdmin,
 } from "./events-server";
 import {
+  getMegaFallbackProfiles,
+  isProvisionalMegaProfileKey,
+} from "./mega-fallback-source";
+import {
   getCurrentRaidBossProfiles,
 } from "./raid-detail-source";
 import type {
@@ -25,6 +29,7 @@ import type {
 
 const CATEGORIES: RaidCategory[] = ["five-star", "shadow", "mega"];
 const PROFILE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const PROVISIONAL_PROFILE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 const PREVIOUS_ROTATION_VISIBILITY_MS = 24 * 60 * 60 * 1000;
 
 function parseJsonArray<T>(value: string | null | undefined): T[] {
@@ -233,6 +238,11 @@ function rotationBossParts(value: string): string[] {
     .filter(Boolean);
 }
 
+function profileMatchesPart(name: string, part: string): boolean {
+  const normalised = normaliseLooseName(name);
+  return normalised === part || normalised.includes(part) || part.includes(normalised);
+}
+
 async function findReusableProfileKeys(item: RaidBossTickerItem): Promise<string[]> {
   const parts = rotationBossParts(item.boss);
   if (parts.length === 0) return [];
@@ -242,34 +252,37 @@ async function findReusableProfileKeys(item: RaidBossTickerItem): Promise<string
   });
   return Array.from(new Set(
     parts.flatMap((part) => profiles
-      .filter((profile: { key: string; name: string }) => {
-        const name = normaliseLooseName(profile.name);
-        return name === part || name.includes(part) || part.includes(name);
-      })
+      .filter((profile: { key: string; name: string }) => profileMatchesPart(profile.name, part))
       .map((profile: { key: string; name: string }) => profile.key)),
   ));
 }
 
 async function profilesAreFresh(
   keys: string[],
+  item: RaidBossTickerItem,
   now: Date,
 ): Promise<boolean> {
   if (keys.length === 0) return false;
 
   const profiles = await prisma.raidBossProfile.findMany({
     where: { key: { in: keys } },
-    select: { key: true, refreshedAt: true },
+    select: { key: true, name: true, refreshedAt: true },
   });
 
   if (profiles.length !== keys.length) return false;
 
-  return profiles.every((profile: { refreshedAt: Date | null }) => {
+  const parts = rotationBossParts(item.boss);
+  if (!parts.every((part) => profiles.some((profile: { name: string }) => profileMatchesPart(profile.name, part)))) {
+    return false;
+  }
+
+  return profiles.every((profile: { key: string; refreshedAt: Date | null }) => {
     if (!profile.refreshedAt) return false;
     const refreshedAt = new Date(profile.refreshedAt).getTime();
-    return (
-      Number.isFinite(refreshedAt) &&
-      now.getTime() - refreshedAt < PROFILE_REFRESH_INTERVAL_MS
-    );
+    const maxAge = isProvisionalMegaProfileKey(profile.key)
+      ? PROVISIONAL_PROFILE_REFRESH_INTERVAL_MS
+      : PROFILE_REFRESH_INTERVAL_MS;
+    return Number.isFinite(refreshedAt) && now.getTime() - refreshedAt < maxAge;
   });
 }
 
@@ -285,25 +298,37 @@ async function enrichActiveRotation(
   if (!rotation) return;
 
   const existingKeys = parseJsonArray<string>(rotation.bossKeys);
-  if (await profilesAreFresh(existingKeys, now)) return;
+  if (await profilesAreFresh(existingKeys, item, now)) return;
 
-  let keys: string[] = [];
+  let profiles: RaidBossProfileData[] = [];
   try {
-    const profiles = await getCurrentRaidBossProfiles(item);
-    for (const profile of profiles) {
-      await saveProfile(profile);
-    }
-    keys = profiles.map((profile) => profile.key);
+    profiles = await getCurrentRaidBossProfiles(item);
   } catch (error) {
-    console.error(`Unable to refresh raid details for ${item.boss}`, error);
+    console.error(`Unable to refresh primary raid details for ${item.boss}`, error);
   }
 
+  if (item.category === "mega") {
+    try {
+      profiles = [
+        ...profiles,
+        ...(await getMegaFallbackProfiles(item, profiles)),
+      ];
+    } catch (error) {
+      console.error(`Unable to build Mega fallback details for ${item.boss}`, error);
+    }
+  }
+
+  for (const profile of profiles) {
+    await saveProfile(profile);
+  }
+
+  let keys = profiles.map((profile) => profile.key);
   if (keys.length === 0) {
     keys = await findReusableProfileKeys(item);
   }
 
   if (keys.length > 0) {
-    const bossKeys = JSON.stringify(keys);
+    const bossKeys = JSON.stringify(Array.from(new Set(keys)));
     if (rotation.bossKeys !== bossKeys) {
       await prisma.raidRotation.update({
         where: { eventId: item.eventID },
