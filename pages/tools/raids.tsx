@@ -2,6 +2,10 @@ import Head from "next/head";
 import type { GetServerSideProps } from "next";
 import { useState } from "react";
 import { getRaidToolsData } from "../../lib/raid-boss-history";
+import {
+  normaliseRaidDisplayBossName,
+  raidDisplayBossNamesMatch,
+} from "../../lib/raid-display-match";
 import type {
   RaidBossProfileData,
   RaidCategoryData,
@@ -39,16 +43,6 @@ function buildRaidSearchString(weaknesses: RaidTypeMatchup[]): string {
   return uniqueTypes.map((type) => `@${type}`).join(",");
 }
 
-function normaliseDisplayedBossName(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/[’']/g, "")
-    .replace(/^\s*(?:mega|shadow)\s+/i, "")
-    .replace(/[^a-z0-9♀♂]+/gi, " ")
-    .trim()
-    .toLowerCase();
-}
-
 function declaredRotationBosses(value: string): string[] {
   return value
     .replace(/\s+(?:and|&)\s+/gi, ",")
@@ -63,11 +57,10 @@ function displayBossesForRotation(rotation: RaidRotationData): RaidBossProfileDa
 
   const remaining = [...rotation.bosses];
   const ordered = declared.map((name) => {
-    const target = normaliseDisplayedBossName(name);
-    const index = remaining.findIndex((profile) => {
-      const candidate = normaliseDisplayedBossName(profile.name);
-      return candidate === target || candidate.includes(target) || target.includes(candidate);
-    });
+    const target = normaliseRaidDisplayBossName(name);
+    const index = remaining.findIndex((profile) =>
+      raidDisplayBossNamesMatch(profile.name, name),
+    );
 
     if (index >= 0) {
       return remaining.splice(index, 1)[0];
