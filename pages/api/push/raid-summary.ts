@@ -1,12 +1,11 @@
 import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
-import { sendDailyRaidSummary } from "../../../lib/raid-daily-summary";
 import {
-  sendRaidEventPushes,
-  type RaidEventPushResult,
-} from "../../../lib/raid-event-push";
+  sendDailyRaidSummary,
+  type DailyRaidSummaryResult,
+} from "../../../lib/raid-daily-summary";
 
-type RaidEventResponse = RaidEventPushResult | { error: string };
+type RaidSummaryResponse = DailyRaidSummaryResult | { error: string };
 
 function isAuthorised(req: NextApiRequest): boolean {
   const expected = String(process.env.RAID_HOUR_CRON_SECRET || "").trim();
@@ -16,7 +15,6 @@ function isAuthorised(req: NextApiRequest): boolean {
   const supplied = String(suppliedHeader || "").replace(/^Bearer\s+/i, "").trim();
 
   if (!expected || !supplied) return false;
-
   const expectedBuffer = Buffer.from(expected);
   const suppliedBuffer = Buffer.from(supplied);
   return (
@@ -27,7 +25,7 @@ function isAuthorised(req: NextApiRequest): boolean {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<RaidEventResponse>,
+  res: NextApiResponse<RaidSummaryResponse>,
 ) {
   res.setHeader("Cache-Control", "private, no-store");
 
@@ -46,29 +44,25 @@ export default async function handler(
     return res.status(401).json({ error: "Unauthorised scheduler request." });
   }
 
-  const now = new Date();
-  // Start the daily job independently so it can still complete even if the
-  // separate 30-minute raid-event reminder fails on the same scheduler tick.
-  const dailySummary = sendDailyRaidSummary(now).catch((error) => {
-    console.error(
-      "Daily raid summary job failed",
-      error instanceof Error ? error.message : error,
-    );
-    return null;
-  });
+  const forceValue = Array.isArray(req.query.force)
+    ? req.query.force[0]
+    : req.query.force;
+  const force = /^(?:1|true|yes)$/i.test(String(forceValue || ""));
 
   try {
-    const result = await sendRaidEventPushes(now);
-    await dailySummary;
+    const result = await sendDailyRaidSummary(new Date(), {
+      force,
+      // A manual forced test must not consume today's real 18:00 delivery.
+      recordDelivery: !force,
+    });
     return res.status(200).json(result);
   } catch (error) {
-    await dailySummary;
-    console.error("Raid event push job failed", error);
+    console.error("Raid summary push job failed", error);
     return res.status(500).json({
       error:
         error instanceof Error
           ? error.message
-          : "Raid event push job failed.",
+          : "Raid summary push job failed.",
     });
   }
 }

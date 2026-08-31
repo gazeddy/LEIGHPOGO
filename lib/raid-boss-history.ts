@@ -308,6 +308,9 @@ async function enrichActiveRotation(
   }
 
   if (item.category === "mega") {
+    profiles = profiles.filter((profile) =>
+      String(profile.tier ?? "").toLowerCase().includes("mega"),
+    );
     try {
       profiles = [
         ...profiles,

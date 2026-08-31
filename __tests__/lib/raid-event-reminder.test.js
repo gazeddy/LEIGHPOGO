@@ -2,6 +2,7 @@ const {
   buildRaidEventPushPayload,
   inferRaidCategory,
   isRaidEventReminderDue,
+  isSupportedRaidEvent,
   raidEventBossItems,
   raidEventBossText,
   selectCurrentFiveStarRaidItems,
@@ -19,6 +20,30 @@ function event(overrides = {}) {
     end: "2026-08-26T19:00:00",
     ...overrides,
   }
+}
+
+function weekendEvent(overrides = {}) {
+  return event({
+    eventID: "pokemon-go-fest-2026-mega-finale",
+    name: "Pokémon GO Fest 2026: Mega Finale",
+    eventType: "event",
+    heading: "Event",
+    tags: ["event"],
+    start: "2026-09-05T10:00:00",
+    end: "2026-09-06T18:00:00",
+    raidSchedule: [
+      {
+        date: "Saturday",
+        time: "10:00 a.m. to 11:00 a.m.",
+        label: "Verdant Overgrowth",
+        bosses: [
+          { name: "Mega Beedrill", image: null, canBeShiny: true, raidType: "Mega" },
+          { name: "Mega Victreebel", image: null, canBeShiny: true, raidType: "Mega" },
+        ],
+      },
+    ],
+    ...overrides,
+  })
 }
 
 describe("raid event push reminder", () => {
@@ -43,6 +68,61 @@ describe("raid event push reminder", () => {
         new Date("2026-08-26T17:00:00.000Z"),
       ),
     ).toBe(false)
+  })
+
+  it("supports GO Fest-style weekend raid schedules even when the title does not say Raid", () => {
+    const goFest = weekendEvent()
+    expect(isSupportedRaidEvent(goFest)).toBe(true)
+    expect(
+      isRaidEventReminderDue(goFest, new Date("2026-09-05T08:30:00.000Z")),
+    ).toBe(true)
+    expect(
+      isRaidEventReminderDue(goFest, new Date("2026-09-05T08:29:59.000Z")),
+    ).toBe(false)
+
+    expect(raidEventBossItems(goFest).map((item) => [item.category, item.boss])).toEqual([
+      ["mega", "Beedrill, Victreebel"],
+    ])
+  })
+
+  it("does not add a pre-start reminder for an ordinary weekday event schedule", () => {
+    const weekday = weekendEvent({
+      eventID: "mega-ascension",
+      name: "Mega Ascension",
+      start: "2026-08-31T10:00:00",
+      end: "2026-09-04T23:59:00",
+      raidSchedule: [
+        {
+          date: "Monday, August 31",
+          time: null,
+          label: null,
+          bosses: [
+            { name: "Mega Malamar", image: null, canBeShiny: true, raidType: "Mega" },
+          ],
+        },
+      ],
+    })
+    expect(isSupportedRaidEvent(weekday)).toBe(false)
+  })
+
+  it("allows Shadow raids when the event itself is explicitly a Shadow raid event", () => {
+    const shadow = weekendEvent({
+      eventID: "shadow-raid-weekend",
+      name: "Shadow Raid Weekend",
+      raidSchedule: [
+        {
+          date: "Saturday",
+          time: "2:00 p.m. to 5:00 p.m.",
+          label: null,
+          bosses: [
+            { name: "Shadow Mewtwo", image: null, canBeShiny: true, raidType: "Shadow 5-Star" },
+          ],
+        },
+      ],
+    })
+
+    expect(isSupportedRaidEvent(shadow)).toBe(true)
+    expect(raidEventBossItems(shadow).map((item) => item.category)).toEqual(["shadow"])
   })
 
   it("extracts raid bosses whether the event label is a prefix or suffix", () => {

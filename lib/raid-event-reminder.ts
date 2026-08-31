@@ -1,3 +1,4 @@
+import { selectRaidBossEvents } from "./event-selection";
 import type {
   PokemonGoEventSummary,
   RaidBossTickerItem,
@@ -53,23 +54,70 @@ function londonWallClockMs(now: Date): number {
   );
 }
 
-function eventStartComparison(event: PokemonGoEventSummary, now: Date): {
+function wallClockComparison(startValue: string, now: Date): {
   startMs: number;
   nowMs: number;
 } {
   const startMs = new Date(
-    hasExplicitTimeZone(event.start) ? event.start : `${event.start}Z`,
+    hasExplicitTimeZone(startValue) ? startValue : `${startValue}Z`,
   ).getTime();
-  const nowMs = hasExplicitTimeZone(event.start)
+  const nowMs = hasExplicitTimeZone(startValue)
     ? now.getTime()
     : londonWallClockMs(now);
   return { startMs, nowMs };
+}
+
+function eventStartsOnWeekend(event: PokemonGoEventSummary): boolean {
+  const start = new Date(
+    hasExplicitTimeZone(event.start) ? event.start : `${event.start}Z`,
+  );
+  if (Number.isNaN(start.getTime())) return false;
+
+  if (!hasExplicitTimeZone(event.start)) {
+    return start.getUTCDay() === 0 || start.getUTCDay() === 6;
+  }
+
+  const weekday = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    weekday: "short",
+  }).format(start);
+  return weekday === "Sat" || weekday === "Sun";
+}
+
+function isExplicitShadowRaidEvent(event: PokemonGoEventSummary): boolean {
+  return /\bshadow\b/i.test(
+    [event.name, event.heading, ...(event.tags ?? [])].filter(Boolean).join(" "),
+  );
+}
+
+function supportedScheduledItems(event: PokemonGoEventSummary): RaidBossTickerItem[] {
+  const shadowEvent = isExplicitShadowRaidEvent(event);
+  return selectRaidBossEvents([event]).filter(
+    (item) =>
+      item.category === "five-star" ||
+      item.category === "mega" ||
+      (item.category === "shadow" && shadowEvent),
+  );
+}
+
+export function raidEventReminderStart(event: PokemonGoEventSummary): string {
+  const scheduled = supportedScheduledItems(event);
+  if (scheduled.length === 0) return event.start;
+  return scheduled
+    .map((item) => item.start)
+    .sort((left, right) => left.localeCompare(right))[0];
 }
 
 export function isSupportedRaidEvent(event: PokemonGoEventSummary): boolean {
   const type = event.eventType.trim().toLowerCase();
   if (type === "raid-hour" || type === "raid-day") return true;
   if (type === "raid-battles") return false;
+
+  // GO Fest, GO Wild and similar weekend events can carry their raid lineup in
+  // raidSchedule even when the event name itself does not contain "raid".
+  if (eventStartsOnWeekend(event) && supportedScheduledItems(event).length > 0) {
+    return true;
+  }
 
   const hasRaidTag = (event.tags ?? []).some(
     (tag) => tag.trim().toLowerCase() === "raid",
@@ -83,24 +131,27 @@ export function isRaidEventReminderDue(
   leadMinutes: number = RAID_EVENT_REMINDER_LEAD_MINUTES,
 ): boolean {
   if (!isSupportedRaidEvent(event)) return false;
-  const { startMs, nowMs } = eventStartComparison(event, now);
+  const { startMs, nowMs } = wallClockComparison(raidEventReminderStart(event), now);
   if (!Number.isFinite(startMs) || !Number.isFinite(nowMs)) return false;
 
   const remainingMs = startMs - nowMs;
   return remainingMs > 0 && remainingMs <= Math.max(1, leadMinutes) * 60 * 1000;
 }
 
-export function raidEventLabel(event: PokemonGoEventSummary): string {
-  const type = event.eventType.trim().toLowerCase();
-  if (type === "raid-hour") return "Raid Hour";
-  if (type === "raid-day") return "Raid Day";
-  return event.heading?.trim() || "Raid event";
-}
-
 function stripGenericPokemonGoPrefix(value: string): string {
   return value
     .replace(/^pok[eé]mon\s+go\s*[:\-–—]\s*/i, "")
     .trim();
+}
+
+export function raidEventLabel(event: PokemonGoEventSummary): string {
+  const type = event.eventType.trim().toLowerCase();
+  if (type === "raid-hour") return "Raid Hour";
+  if (type === "raid-day") return "Raid Day";
+  if (supportedScheduledItems(event).length > 0) {
+    return stripGenericPokemonGoPrefix(event.name) || "Raid event";
+  }
+  return event.heading?.trim() || "Raid event";
 }
 
 export function raidEventBossText(event: PokemonGoEventSummary): string | null {
@@ -133,6 +184,12 @@ export function inferRaidCategory(boss: string): RaidCategory {
 }
 
 export function raidEventBossItems(event: PokemonGoEventSummary): RaidBossTickerItem[] {
+  const scheduled = supportedScheduledItems(event);
+  if (scheduled.length > 0) {
+    const earliestStart = raidEventReminderStart(event);
+    return scheduled.filter((item) => item.start === earliestStart);
+  }
+
   const bossText = raidEventBossText(event);
   if (!bossText) return [];
 
@@ -178,7 +235,7 @@ function bossCpLine(boss: RaidEventBossSummary, easterEgg: boolean): string {
 
   const hasCp =
     Number.isFinite(boss.maxUnboostedCp) && Number.isFinite(boss.maxBoostedCp);
-  if (!hasCp) return boss.name;
+  if (!hasCp) return `${boss.name}: CP pending`;
 
   return `${boss.name}: Hundo ${boss.maxUnboostedCp} CP • WB ${boss.maxBoostedCp} CP`;
 }
@@ -202,7 +259,7 @@ export function buildRaidEventPushPayload(
       ? "Starts in 30 minutes • Hundo - 15/15/15"
       : hasCp
         ? `Starts in 30 minutes • Hundo: ${boss.maxUnboostedCp} CP • Weather boosted: ${boss.maxBoostedCp} CP`
-        : "Starts in 30 minutes";
+        : "Starts in 30 minutes • CP pending";
 
     return {
       title: `${label}: ${boss.name}`,
@@ -213,9 +270,15 @@ export function buildRaidEventPushPayload(
     };
   }
 
+  const visible = resolved.slice(0, 12);
+  const lines = visible.map((boss) => bossCpLine(boss, easterEgg));
+  if (resolved.length > visible.length) {
+    lines.push(`+${resolved.length - visible.length} more — open event`);
+  }
+
   return {
     title: `${label} starts in 30 minutes`,
-    body: resolved.map((boss) => bossCpLine(boss, easterEgg)).join("\n"),
+    body: lines.join("\n"),
     tag: `raid-event-${event.eventID}`,
     renotify: false,
     url,
@@ -223,6 +286,6 @@ export function buildRaidEventPushPayload(
 }
 
 export function raidEventDateKey(event: PokemonGoEventSummary): string {
-  const match = event.start.match(/^(\d{4}-\d{2}-\d{2})/);
+  const match = raidEventReminderStart(event).match(/^(\d{4}-\d{2}-\d{2})/);
   return match?.[1] || event.eventID;
 }

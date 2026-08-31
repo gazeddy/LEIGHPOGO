@@ -56,6 +56,11 @@ export interface MegaFallbackSourceData {
   weatherBoosts: WeatherBoosts;
 }
 
+interface BossEntry {
+  part: string;
+  displayName: string;
+}
+
 let memoryCache: MegaFallbackSourceData | null = null;
 let refreshPromise: Promise<MegaFallbackSourceData> | null = null;
 
@@ -144,16 +149,21 @@ async function getSourceData(): Promise<MegaFallbackSourceData> {
   return refreshPromise;
 }
 
-function itemBossParts(value: string): string[] {
+function itemBossEntries(value: string): BossEntry[] {
   return value
     .replace(/\s+(?:and|&)\s+/gi, ",")
     .replace(/\s*\/\s*/g, ",")
     .split(",")
-    .map((part) => normaliseBossName(part))
-    .filter((part): part is string => Boolean(part));
+    .map((displayName) => ({
+      displayName: displayName.trim(),
+      part: normaliseBossName(displayName),
+    }))
+    .filter((entry) => Boolean(entry.displayName) && Boolean(entry.part));
 }
 
 function profileCoversPart(profile: RaidBossProfileData, part: string): boolean {
+  const tier = String(profile.tier ?? "").toLowerCase();
+  if (!tier.includes("mega")) return false;
   const name = normaliseBossName(profile.name);
   return name === part || name.includes(part) || part.includes(name);
 }
@@ -293,14 +303,14 @@ function boostedWeather(types: string[], weatherBoosts: WeatherBoosts): string[]
 }
 
 function fallbackProfile(
-  part: string,
+  entry: BossEntry,
   source: MegaFallbackSourceData,
   refreshedAt: string,
 ): RaidBossProfileData | null {
-  const base = matchBasePokemon(part, source.pokemonTypes);
+  const base = matchBasePokemon(entry.part, source.pokemonTypes);
   if (!base) return null;
 
-  const mega = matchMega(part, source.megaPokemon);
+  const mega = matchMega(entry.part, source.megaPokemon);
   const types = validStringArray(mega?.type ?? base.type);
   const stats = findStats(base, source.pokemonStats);
   const { weaknesses, resistances } = calculateTypeMatchups(types, source.effectiveness);
@@ -308,10 +318,10 @@ function fallbackProfile(
 
   return {
     key: provisional
-      ? `mega-provisional|${normaliseBossName(base.pokemon_name)}|base`
+      ? `mega-provisional|${entry.part}|base`
       : `mega-fallback|${normaliseBossName(mega.mega_name)}|${normaliseBossName(mega.form ?? "normal")}|official`,
     category: "mega",
-    name: base.pokemon_name,
+    name: entry.displayName,
     pokemonId: Number.isInteger(base.pokemon_id) ? base.pokemon_id : null,
     form: mega?.form ?? base.form ?? null,
     tier: provisional ? "mega-provisional" : "mega",
@@ -334,9 +344,9 @@ export function buildMegaFallbackProfiles(
 ): RaidBossProfileData[] {
   if (item.category !== "mega") return [];
 
-  return itemBossParts(item.boss)
-    .filter((part) => !existingProfiles.some((profile) => profileCoversPart(profile, part)))
-    .map((part) => fallbackProfile(part, source, refreshedAt))
+  return itemBossEntries(item.boss)
+    .filter((entry) => !existingProfiles.some((profile) => profileCoversPart(profile, entry.part)))
+    .map((entry) => fallbackProfile(entry, source, refreshedAt))
     .filter((profile): profile is RaidBossProfileData => profile !== null);
 }
 
