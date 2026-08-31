@@ -3,14 +3,16 @@ import path from "node:path";
 import type {
   EventsPageData,
   PokemonGoEventSummary,
+  PokemonGoRaidScheduleBoss,
+  PokemonGoRaidScheduleEntry,
 } from "./events";
 import { applyEventOverrides } from "./event-overrides";
 import { localEventToSummary, readLocalEvents } from "./local-events";
 
 const EVENTS_FEED_URL =
   "https://raw.githubusercontent.com/Drumstix42/ScrapedDuck/refs/heads/data/events.min.json";
-const EVENTS_CACHE_VERSION = 1;
-const EVENTS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const EVENTS_CACHE_VERSION = 2;
+const EVENTS_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const EVENTS_CACHE_PATH =
   process.env.EVENTS_CACHE_PATH?.trim() ||
   path.join(process.cwd(), "data", "events-cache.json");
@@ -53,6 +55,62 @@ function asTags(value: unknown): string[] {
   );
 }
 
+function normaliseRaidScheduleBoss(
+  value: unknown,
+): PokemonGoRaidScheduleBoss | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const boss = value as Record<string, unknown>;
+  const name = asRequiredString(boss.name);
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    name,
+    image: asOptionalString(boss.image),
+    canBeShiny:
+      typeof boss.canBeShiny === "boolean" ? boss.canBeShiny : null,
+    raidType: asOptionalString(boss.raidType),
+  };
+}
+
+function asRaidSchedule(value: unknown): PokemonGoRaidScheduleEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((rawEntry): PokemonGoRaidScheduleEntry | null => {
+      if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) {
+        return null;
+      }
+
+      const entry = rawEntry as Record<string, unknown>;
+      const date = asRequiredString(entry.date);
+      const bosses = Array.isArray(entry.bosses)
+        ? entry.bosses
+            .map(normaliseRaidScheduleBoss)
+            .filter((boss): boss is PokemonGoRaidScheduleBoss => boss !== null)
+        : [];
+
+      if (!date || bosses.length === 0) {
+        return null;
+      }
+
+      return {
+        date,
+        time: asOptionalString(entry.time),
+        label: asOptionalString(entry.label),
+        bosses,
+      };
+    })
+    .filter((entry): entry is PokemonGoRaidScheduleEntry => entry !== null);
+}
+
 function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -69,6 +127,13 @@ function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
     return null;
   }
 
+  const extraData =
+    event.extraData &&
+    typeof event.extraData === "object" &&
+    !Array.isArray(event.extraData)
+      ? (event.extraData as Record<string, unknown>)
+      : null;
+
   return {
     eventID,
     name,
@@ -81,6 +146,7 @@ function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
     tags: asTags(event.tags),
     description: asOptionalString(event.description),
     campfireUrl: asOptionalString(event.campfireUrl),
+    raidSchedule: asRaidSchedule(extraData?.raidSchedule),
     source: event.source === "local" ? "local" : "feed",
   };
 }
@@ -257,8 +323,8 @@ async function loadUsableCache(): Promise<{
 
       warning =
         error instanceof Error
-          ? `The weekly refresh failed: ${error.message}`
-          : "The weekly refresh failed.";
+          ? `The hourly refresh failed: ${error.message}`
+          : "The hourly refresh failed.";
     }
   }
 
