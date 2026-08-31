@@ -146,7 +146,7 @@ function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
     tags: asTags(event.tags),
     description: asOptionalString(event.description),
     campfireUrl: asOptionalString(event.campfireUrl),
-    raidSchedule: asRaidSchedule(extraData?.raidSchedule),
+    raidSchedule: asRaidSchedule(extraData?.raidSchedule ?? event.raidSchedule),
     source: event.source === "local" ? "local" : "feed",
   };
 }
