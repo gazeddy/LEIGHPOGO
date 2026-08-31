@@ -1,25 +1,17 @@
 import { getEventDestination } from "../../lib/events";
 
 describe("event destinations", () => {
-  it("prefers a Campfire override over the imported event link", () => {
+  it("keeps imported events inside the LeighPogo Events page", () => {
     expect(
       getEventDestination({
-        campfireUrl: "https://campfire.nianticlabs.com/meetup/leigh",
-        link: "https://leekduck.com/events/community-day/",
+        eventID: "pokemon-go-fest-2026-mega-finale",
       }),
-    ).toBe("https://campfire.nianticlabs.com/meetup/leigh");
+    ).toBe("/events?event=pokemon-go-fest-2026-mega-finale");
   });
 
-  it("falls back to the imported link when no Campfire URL exists", () => {
-    expect(
-      getEventDestination({
-        campfireUrl: null,
-        link: "https://leekduck.com/events/community-day/",
-      }),
-    ).toBe("https://leekduck.com/events/community-day/");
-  });
-
-  it("returns null when neither destination exists", () => {
-    expect(getEventDestination({ campfireUrl: null, link: null })).toBeNull();
+  it("encodes event IDs when building the native destination", () => {
+    expect(getEventDestination({ eventID: "local event / Leigh" })).toBe(
+      "/events?event=local%20event%20%2F%20Leigh",
+    );
   });
 });

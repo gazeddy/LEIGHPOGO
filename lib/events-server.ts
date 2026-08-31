@@ -2,16 +2,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   EventsPageData,
+  PokemonGoEventPokemon,
   PokemonGoEventSummary,
   PokemonGoRaidScheduleBoss,
   PokemonGoRaidScheduleEntry,
 } from "./events";
+import {
+  fetchEventDetailsBySourceLink,
+  findEventDetails,
+  type EventDetailsEnrichment,
+} from "./event-details-server";
 import { applyEventOverrides } from "./event-overrides";
 import { localEventToSummary, readLocalEvents } from "./local-events";
 
 const EVENTS_FEED_URL =
   "https://raw.githubusercontent.com/Drumstix42/ScrapedDuck/refs/heads/data/events.min.json";
-const EVENTS_CACHE_VERSION = 3;
+const EVENTS_CACHE_VERSION = 4;
 const EVENTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const EVENTS_CACHE_PATH =
   process.env.EVENTS_CACHE_PATH?.trim() ||
@@ -52,6 +58,69 @@ function asTags(value: unknown): string[] {
         .map((tag) => tag.trim().toLowerCase())
         .filter(Boolean),
     ),
+  );
+}
+
+function normaliseEventPokemon(value: unknown): PokemonGoEventPokemon | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const pokemon = value as Record<string, unknown>;
+  const name = asRequiredString(pokemon.name);
+  if (!name) return null;
+
+  const shinyValue = pokemon.canBeShiny ?? pokemon.shiny_available;
+
+  return {
+    name,
+    image: asOptionalString(pokemon.image) ?? asOptionalString(pokemon.asset_url),
+    canBeShiny: typeof shinyValue === "boolean" ? shinyValue : null,
+  };
+}
+
+function asEventPokemon(value: unknown): PokemonGoEventPokemon[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const result: PokemonGoEventPokemon[] = [];
+
+  for (const rawPokemon of value) {
+    const pokemon = normaliseEventPokemon(rawPokemon);
+    if (!pokemon) continue;
+
+    const key = pokemon.name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(pokemon);
+  }
+
+  return result;
+}
+
+function bonusText(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const bonus = value as Record<string, unknown>;
+  return (
+    asOptionalString(bonus.text) ??
+    asOptionalString(bonus.bonus) ??
+    asOptionalString(bonus.description) ??
+    asOptionalString(bonus.label)
+  );
+}
+
+function asBonuses(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(value.map(bonusText).filter((bonus): bonus is string => bonus !== null)),
   );
 }
 
@@ -192,11 +261,34 @@ function normaliseEvent(value: unknown): PokemonGoEventSummary | null {
     tags: asTags(event.tags),
     description: asOptionalString(event.description),
     campfireUrl: asOptionalString(event.campfireUrl),
+    wildSpawns: asEventPokemon(event.wildSpawns),
+    featuredRaids: asEventPokemon(event.featuredRaids),
+    bonuses: asBonuses(event.bonuses ?? extraData?.bonuses),
     raidSchedule: raidScheduleWithEventWideBosses(
       extraData?.raidSchedule ?? event.raidSchedule,
       extraData?.raidbattles,
     ),
     source: event.source === "local" ? "local" : "feed",
+  };
+}
+
+function applyDetailsEnrichment(
+  event: PokemonGoEventSummary,
+  detailsBySourceLink: Map<string, EventDetailsEnrichment>,
+): PokemonGoEventSummary {
+  const details = findEventDetails(detailsBySourceLink, event.link);
+  if (!details) return event;
+
+  return {
+    ...event,
+    description: event.description ?? details.description,
+    wildSpawns:
+      details.wildSpawns.length > 0 ? details.wildSpawns : event.wildSpawns,
+    featuredRaids:
+      details.featuredRaids.length > 0
+        ? details.featuredRaids
+        : event.featuredRaids,
+    bonuses: details.bonuses.length > 0 ? details.bonuses : event.bonuses,
   };
 }
 
@@ -314,11 +406,14 @@ async function writeEventsCache(cache: StoredEventsCache): Promise<void> {
 }
 
 async function fetchLatestEvents(): Promise<StoredEventsCache> {
-  const response = await fetch(EVENTS_FEED_URL, {
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  const [response, detailsBySourceLink] = await Promise.all([
+    fetch(EVENTS_FEED_URL, {
+      headers: {
+        Accept: "application/json",
+      },
+    }),
+    fetchEventDetailsBySourceLink(),
+  ]);
 
   if (!response.ok) {
     throw new Error(
@@ -337,7 +432,8 @@ async function fetchLatestEvents(): Promise<StoredEventsCache> {
     fetchedAt: new Date().toISOString(),
     events: payload
       .map(normaliseEvent)
-      .filter((event): event is PokemonGoEventSummary => event !== null),
+      .filter((event): event is PokemonGoEventSummary => event !== null)
+      .map((event) => applyDetailsEnrichment(event, detailsBySourceLink)),
   };
 
   await writeEventsCache(cache);

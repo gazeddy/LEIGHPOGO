@@ -12,6 +12,7 @@ describe("ticker regression wiring", () => {
   const tickerPreferencesApi = readSource("pages/api/ticker-preferences.js");
   const account = readSource("pages/account.js");
   const prismaSchema = readSource("prisma/schema.prisma");
+  const eventsLib = readSource("lib/events.ts");
   const eventCard = readSource("components/events/EventCard.tsx");
   const eventTicker = readSource("components/events/EventTicker.tsx");
   const raidTicker = readSource("components/events/RaidBossTicker.tsx");
@@ -33,13 +34,15 @@ describe("ticker regression wiring", () => {
     expect(eventTicker).toContain("{item.guideSlug && item.guideTitle && (");
   });
 
-  it("shows LeekDuck and optional Campfire links on event cards while raid links keep their shared destination", () => {
-    expect(eventCard).toContain("const leekDuckUrl = event.link?.trim() || null;");
+  it("keeps event information native while preserving an optional Campfire meetup action", () => {
+    expect(eventCard).not.toContain("View on LeekDuck");
+    expect(eventCard).not.toContain("href={leekDuckUrl}");
     expect(eventCard).toContain("const campfireUrl = event.campfireUrl?.trim() || null;");
-    expect(eventCard).toContain("href={leekDuckUrl}");
-    expect(eventCard).toContain("View on LeekDuck");
     expect(eventCard).toContain("href={campfireUrl}");
     expect(eventCard).toContain("View meetup on Campfire");
+    expect(eventCard).toContain("Wild spawns");
+    expect(eventCard).toContain("Event boosts");
+    expect(eventsLib).toContain("/events?event=${encodeURIComponent(event.eventID)}");
     expect(eventSelection).toContain("const link = getEventDestination(event);");
     expect(eventSelection).toContain("link,");
   });

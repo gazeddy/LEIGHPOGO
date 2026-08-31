@@ -1,9 +1,15 @@
 import Image, { type ImageLoaderProps } from "next/image";
-import type { PokemonGoEventSummary } from "../../lib/events";
+import type {
+  PokemonGoEventPokemon,
+  PokemonGoEventSummary,
+} from "../../lib/events";
 
 interface EventCardProps {
   event: PokemonGoEventSummary;
 }
+
+const POKEMON_PREVIEW_LIMIT = 8;
+const BONUS_PREVIEW_LIMIT = 3;
 
 function passthroughImageLoader({ src }: ImageLoaderProps): string {
   return src;
@@ -71,13 +77,100 @@ function formatEventRange(start: string, end: string): string {
   return `${formatDate(start)}, ${formatTime(start)} – ${formatDate(end)}, ${formatTime(end)}`;
 }
 
+function compactDescription(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  if (compact.length <= 240) return compact;
+
+  return `${compact.slice(0, 237).trimEnd()}…`;
+}
+
+function dedupePokemon(items: PokemonGoEventPokemon[]): PokemonGoEventPokemon[] {
+  const seen = new Set<string>();
+
+  return items.filter((pokemon) => {
+    const key = pokemon.name.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function raidPokemon(event: PokemonGoEventSummary): PokemonGoEventPokemon[] {
+  const scheduled = (event.raidSchedule ?? []).flatMap((entry) =>
+    entry.bosses.map((boss) => ({
+      name: boss.name,
+      image: boss.image,
+      canBeShiny: boss.canBeShiny,
+    })),
+  );
+
+  return dedupePokemon([...scheduled, ...(event.featuredRaids ?? [])]);
+}
+
+function PokemonTiles({ items }: { items: PokemonGoEventPokemon[] }) {
+  return (
+    <div className="event-pokemon-grid">
+      {items.map((pokemon) => {
+        const optimizeImage = pokemon.image
+          ? canOptimizeEventImage(pokemon.image)
+          : false;
+
+        return (
+          <div key={pokemon.name} className="event-pokemon-tile">
+            <div className="event-pokemon-image-wrap">
+              {pokemon.image ? (
+                <Image
+                  src={pokemon.image}
+                  alt=""
+                  width={52}
+                  height={52}
+                  className="event-pokemon-image"
+                  loading="lazy"
+                  loader={optimizeImage ? undefined : passthroughImageLoader}
+                  unoptimized={!optimizeImage}
+                />
+              ) : (
+                <span className="event-pokemon-placeholder" aria-hidden="true">
+                  {pokemon.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              {pokemon.canBeShiny === true && (
+                <span
+                  className="event-pokemon-shiny"
+                  aria-label="Shiny available"
+                  title="Shiny available"
+                >
+                  ✨
+                </span>
+              )}
+            </div>
+            <span className="event-pokemon-name">{pokemon.name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function EventCard({ event }: EventCardProps) {
   const tags = event.tags ?? [];
-  const leekDuckUrl = event.link?.trim() || null;
   const campfireUrl = event.campfireUrl?.trim() || null;
   const optimizeEventImage = event.image
     ? canOptimizeEventImage(event.image)
     : false;
+  const wildSpawns = dedupePokemon(event.wildSpawns ?? []);
+  const raids = raidPokemon(event);
+  const bonuses = event.bonuses ?? [];
+  const description = compactDescription(event.description);
+  const visibleWildSpawns = wildSpawns.slice(0, POKEMON_PREVIEW_LIMIT);
+  const hiddenWildSpawns = wildSpawns.slice(POKEMON_PREVIEW_LIMIT);
+  const visibleRaids = raids.slice(0, POKEMON_PREVIEW_LIMIT);
+  const hiddenRaids = raids.slice(POKEMON_PREVIEW_LIMIT);
+  const visibleBonuses = bonuses.slice(0, BONUS_PREVIEW_LIMIT);
+  const hiddenBonuses = bonuses.slice(BONUS_PREVIEW_LIMIT);
 
   return (
     <article className="event-card">
@@ -97,12 +190,69 @@ export default function EventCard({ event }: EventCardProps) {
       )}
 
       <div className="event-content">
-        <p className="event-type">{event.heading}</p>
+        <div className="event-heading-row">
+          <p className="event-type">{event.heading}</p>
+          <span className="event-native-badge">LeighPogo info</span>
+        </div>
         <h2>{event.name}</h2>
         <p className="event-time">{formatEventRange(event.start, event.end)}</p>
 
-        {event.description && (
-          <p className="event-description">{event.description}</p>
+        {description && <p className="event-description">{description}</p>}
+
+        {wildSpawns.length > 0 && (
+          <section className="event-highlight" aria-label="Wild spawns">
+            <div className="event-highlight-heading">
+              <h3>Wild spawns</h3>
+              <span>{wildSpawns.length}</span>
+            </div>
+            <PokemonTiles items={visibleWildSpawns} />
+            {hiddenWildSpawns.length > 0 && (
+              <details className="event-more">
+                <summary>Show {hiddenWildSpawns.length} more wild spawns</summary>
+                <PokemonTiles items={hiddenWildSpawns} />
+              </details>
+            )}
+          </section>
+        )}
+
+        {raids.length > 0 && (
+          <section className="event-highlight" aria-label="Event raids">
+            <div className="event-highlight-heading">
+              <h3>Raids</h3>
+              <span>{raids.length}</span>
+            </div>
+            <PokemonTiles items={visibleRaids} />
+            {hiddenRaids.length > 0 && (
+              <details className="event-more">
+                <summary>Show {hiddenRaids.length} more raid bosses</summary>
+                <PokemonTiles items={hiddenRaids} />
+              </details>
+            )}
+          </section>
+        )}
+
+        {bonuses.length > 0 && (
+          <section className="event-highlight event-bonuses" aria-label="Event bonuses">
+            <div className="event-highlight-heading">
+              <h3>Event boosts</h3>
+              <span>{bonuses.length}</span>
+            </div>
+            <ul>
+              {visibleBonuses.map((bonus) => (
+                <li key={bonus}>{bonus}</li>
+              ))}
+            </ul>
+            {hiddenBonuses.length > 0 && (
+              <details className="event-more">
+                <summary>Show {hiddenBonuses.length} more boosts</summary>
+                <ul>
+                  {hiddenBonuses.map((bonus) => (
+                    <li key={bonus}>{bonus}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </section>
         )}
 
         {tags.length > 0 && (
@@ -113,28 +263,16 @@ export default function EventCard({ event }: EventCardProps) {
           </div>
         )}
 
-        {(leekDuckUrl || campfireUrl) && (
+        {campfireUrl && (
           <div className="event-links">
-            {leekDuckUrl && (
-              <a
-                href={leekDuckUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="event-link"
-              >
-                View on LeekDuck <span aria-hidden="true">↗</span>
-              </a>
-            )}
-            {campfireUrl && (
-              <a
-                href={campfireUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="event-link event-link-campfire"
-              >
-                View meetup on Campfire <span aria-hidden="true">↗</span>
-              </a>
-            )}
+            <a
+              href={campfireUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="event-link event-link-campfire"
+            >
+              View meetup on Campfire <span aria-hidden="true">↗</span>
+            </a>
           </div>
         )}
       </div>
@@ -146,7 +284,7 @@ export default function EventCard({ event }: EventCardProps) {
           flex-direction: column;
           overflow: hidden;
           border: 1px solid #30363d;
-          border-radius: 12px;
+          border-radius: 14px;
           background: #161b22;
           transition:
             transform 0.15s ease,
@@ -179,31 +317,47 @@ export default function EventCard({ event }: EventCardProps) {
           padding: 18px;
         }
 
-        .event-type {
-          align-self: flex-start;
-          margin: 0 0 10px;
+        .event-heading-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+
+        .event-type,
+        .event-native-badge {
+          margin: 0;
           padding: 5px 9px;
           border: 1px solid #30363d;
           border-radius: 999px;
-          color: #79c0ff;
           background: #0d1117;
-          font-size: 0.72rem;
-          font-weight: 700;
+          font-size: 0.7rem;
+          font-weight: 800;
           letter-spacing: 0.04em;
           text-transform: uppercase;
+        }
+
+        .event-type {
+          color: #79c0ff;
+        }
+
+        .event-native-badge {
+          border-color: rgba(63, 185, 80, 0.45);
+          color: #7ee787;
         }
 
         h2 {
           margin: 0;
           color: #f0f6fc;
-          font-size: 1.08rem;
+          font-size: 1.16rem;
           line-height: 1.35;
         }
 
         .event-time {
-          margin: 12px 0 0;
+          margin: 10px 0 0;
           color: #c9d1d9;
-          font-size: 0.9rem;
+          font-size: 0.88rem;
           line-height: 1.55;
         }
 
@@ -211,6 +365,68 @@ export default function EventCard({ event }: EventCardProps) {
           margin: 12px 0 0;
           color: #8b949e;
           line-height: 1.55;
+        }
+
+        .event-highlight {
+          margin-top: 16px;
+          padding-top: 14px;
+          border-top: 1px solid #30363d;
+        }
+
+        .event-highlight-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+
+        .event-highlight h3 {
+          margin: 0;
+          color: #f0f6fc;
+          font-size: 0.9rem;
+        }
+
+        .event-highlight-heading > span {
+          min-width: 28px;
+          padding: 3px 7px;
+          border-radius: 999px;
+          background: #21262d;
+          color: #8b949e;
+          font-size: 0.7rem;
+          font-weight: 800;
+          text-align: center;
+        }
+
+        .event-bonuses ul {
+          margin: 0;
+          padding-left: 20px;
+          color: #c9d1d9;
+        }
+
+        .event-bonuses li + li {
+          margin-top: 7px;
+        }
+
+        .event-more {
+          margin-top: 10px;
+          color: #8b949e;
+          font-size: 0.78rem;
+        }
+
+        .event-more summary {
+          width: fit-content;
+          cursor: pointer;
+          color: #79c0ff;
+          font-weight: 700;
+        }
+
+        .event-more[open] summary {
+          margin-bottom: 10px;
+        }
+
+        .event-more ul {
+          margin-top: 8px;
         }
 
         .event-tags {
@@ -248,6 +464,76 @@ export default function EventCard({ event }: EventCardProps) {
         .event-link:hover,
         .event-link:focus-visible {
           text-decoration: underline;
+        }
+      `}</style>
+
+      <style jsx global>{`
+        .event-card .event-pokemon-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .event-card .event-pokemon-tile {
+          display: flex;
+          min-width: 0;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          padding: 7px 4px;
+          border: 1px solid #30363d;
+          border-radius: 9px;
+          background: #0d1117;
+          text-align: center;
+        }
+
+        .event-card .event-pokemon-image-wrap {
+          position: relative;
+          display: grid;
+          width: 52px;
+          height: 52px;
+          place-items: center;
+        }
+
+        .event-card .event-pokemon-image {
+          width: 52px;
+          height: 52px;
+          object-fit: contain;
+        }
+
+        .event-card .event-pokemon-placeholder {
+          display: grid;
+          width: 42px;
+          height: 42px;
+          place-items: center;
+          border-radius: 50%;
+          background: #21262d;
+          color: #8b949e;
+          font-weight: 900;
+        }
+
+        .event-card .event-pokemon-shiny {
+          position: absolute;
+          top: -2px;
+          right: -3px;
+          font-size: 0.78rem;
+          filter: drop-shadow(0 0 4px rgba(242, 204, 96, 0.8));
+        }
+
+        .event-card .event-pokemon-name {
+          width: 100%;
+          overflow: hidden;
+          color: #c9d1d9;
+          font-size: 0.67rem;
+          font-weight: 700;
+          line-height: 1.2;
+          text-overflow: ellipsis;
+        }
+
+        @media (max-width: 420px) {
+          .event-card .event-pokemon-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
         }
       `}</style>
     </article>

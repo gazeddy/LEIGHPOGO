@@ -3,6 +3,12 @@ export const EVENT_DATA_CREDITS = {
   scrapedDuckUrl: "https://github.com/bigfoott/ScrapedDuck",
 };
 
+export interface PokemonGoEventPokemon {
+  name: string;
+  image: string | null;
+  canBeShiny: boolean | null;
+}
+
 export interface PokemonGoRaidScheduleBoss {
   name: string;
   image: string | null;
@@ -29,14 +35,17 @@ export interface PokemonGoEventSummary {
   tags?: string[];
   description?: string | null;
   campfireUrl?: string | null;
+  wildSpawns?: PokemonGoEventPokemon[];
+  featuredRaids?: PokemonGoEventPokemon[];
+  bonuses?: string[];
   raidSchedule?: PokemonGoRaidScheduleEntry[];
   source?: "feed" | "local";
 }
 
 export function getEventDestination(
-  event: Pick<PokemonGoEventSummary, "campfireUrl" | "link">,
-): string | null {
-  return event.campfireUrl?.trim() || event.link?.trim() || null;
+  event: Pick<PokemonGoEventSummary, "eventID">,
+): string {
+  return `/events?event=${encodeURIComponent(event.eventID)}`;
 }
 
 export interface EventsPageData {
