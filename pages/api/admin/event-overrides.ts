@@ -2,6 +2,11 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import {
+  canonicaliseEventOverrideCampfireLinks,
+  findCampfireDuplicateAssignments,
+  formatCampfireDuplicateWarning,
+} from "../../../lib/campfire-links";
+import {
   deleteEventOverride,
   readEventOverrides,
   saveEventOverride,
@@ -43,11 +48,20 @@ export default async function handler(
     }
 
     if (req.method === "POST") {
-      const override = await saveEventOverride(req.body as EventOverrideInput);
+      const canonicalInput = await canonicaliseEventOverrideCampfireLinks(
+        req.body as EventOverrideInput,
+      );
+      const override = await saveEventOverride(canonicalInput);
+      const overrides = await readEventOverrides();
+      const duplicateWarning = formatCampfireDuplicateWarning(
+        findCampfireDuplicateAssignments(override.eventID, overrides),
+      );
 
       return res.status(200).json({
         override,
-        message: "Event feed override saved.",
+        message: duplicateWarning
+          ? `Event feed override saved. ${duplicateWarning}`
+          : "Event feed override saved. Campfire meetup links were verified and stored as canonical Campfire URLs.",
       });
     }
 
