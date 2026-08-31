@@ -84,9 +84,34 @@ export function isDailyRaidSummaryDue(now: Date = new Date()): boolean {
   return londonClock(now).hour === DAILY_RAID_SUMMARY_HOUR;
 }
 
+export function isLondonWednesday(now: Date = new Date()): boolean {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    weekday: "short",
+  }).format(now) === "Wed";
+}
+
+function isSummaryCategory(item: RaidBossTickerItem): boolean {
+  return item.category === "five-star" || item.category === "mega";
+}
+
 export function hasActiveEventRaidBosses(items: RaidBossTickerItem[]): boolean {
   return items.some(
-    (item) => item.state === "current" && item.eventID.includes("--raid-"),
+    (item) =>
+      item.state === "current" &&
+      item.eventID.includes("--raid-") &&
+      isSummaryCategory(item),
+  );
+}
+
+export function shouldSendDailyRaidSummary(
+  items: RaidBossTickerItem[],
+  now: Date = new Date(),
+): boolean {
+  if (hasActiveEventRaidBosses(items)) return true;
+  if (!isLondonWednesday(now)) return false;
+  return items.some(
+    (item) => item.state === "current" && item.category === "five-star",
   );
 }
 
@@ -103,9 +128,6 @@ function displayNameForCategory(name: string, item: RaidBossTickerItem): string 
   const trimmed = name.trim();
   if (item.category === "mega" && !/^mega\b/i.test(trimmed)) {
     return `Mega ${trimmed}`;
-  }
-  if (item.category === "shadow" && !/^shadow\b/i.test(trimmed)) {
-    return `Shadow ${trimmed}`;
   }
   return trimmed;
 }
@@ -162,7 +184,9 @@ export function selectDailyRaidSummaryBosses(items: RaidBossTickerItem[]): {
   fiveStarBosses: DailyRaidSummaryBoss[];
   eventBosses: DailyRaidSummaryBoss[];
 } {
-  const current = items.filter((item) => item.state === "current");
+  const current = items.filter(
+    (item) => item.state === "current" && isSummaryCategory(item),
+  );
   const fiveStarBosses = uniqueBosses(
     current
       .filter((item) => item.category === "five-star")
@@ -170,8 +194,9 @@ export function selectDailyRaidSummaryBosses(items: RaidBossTickerItem[]): {
   );
   const fiveStarKeys = new Set(fiveStarBosses.map((boss) => normaliseName(boss.name)));
 
-  // Derived raid-schedule entries use --raid- IDs. These are event-specific
-  // rotations such as Mega Ascension or GO Fest habitat raid pools.
+  // Derived raid-schedule entries use --raid- IDs. Only 5-star and Mega
+  // event raids belong in the evening summary; Shadow raids are deliberately
+  // excluded even when an event schedule contains them.
   const eventBosses = uniqueBosses(
     current
       .filter((item) => item.eventID.includes("--raid-"))
@@ -268,11 +293,11 @@ export async function sendDailyRaidSummary(
     }),
   ]);
 
-  if (!hasActiveEventRaidBosses(raidTools.tickerItems)) {
+  if (!shouldSendDailyRaidSummary(raidTools.tickerItems, now)) {
     return emptyResult(
       true,
       due,
-      "No active event-specific raid bosses were found; daily raid summary suppressed.",
+      "No Wednesday 5-star Raid Hour or active event 5-star/Mega raid lineup was found; evening raid summary suppressed.",
     );
   }
 
@@ -289,7 +314,7 @@ export async function sendDailyRaidSummary(
 
   if (!payload) {
     return {
-      ...emptyResult(true, due, "An event raid is active, but no raid bosses could be resolved."),
+      ...emptyResult(true, due, "A qualifying raid night is active, but no 5-star or Mega raid bosses could be resolved."),
       fiveStarBosses,
       eventBosses,
     };
