@@ -2,7 +2,9 @@ import {
   buildDailyRaidSummaryPayload,
   hasActiveEventRaidBosses,
   isDailyRaidSummaryDue,
+  isLondonWednesday,
   selectDailyRaidSummaryBosses,
+  shouldSendDailyRaidSummary,
 } from "../../lib/raid-daily-summary";
 import type { RaidBossTickerItem } from "../../lib/events";
 
@@ -37,43 +39,78 @@ describe("daily raid summary timing", () => {
     expect(isDailyRaidSummaryDue(new Date("2026-12-01T18:00:00.000Z"))).toBe(true);
     expect(isDailyRaidSummaryDue(new Date("2026-12-01T17:00:00.000Z"))).toBe(false);
   });
+
+  it("recognises Wednesday in Europe/London", () => {
+    expect(isLondonWednesday(new Date("2026-09-02T17:00:00.000Z"))).toBe(true);
+    expect(isLondonWednesday(new Date("2026-09-03T17:00:00.000Z"))).toBe(false);
+  });
 });
 
 describe("daily raid summary event trigger", () => {
-  it("does not trigger for ordinary five-star or Mega rotations alone", () => {
+  const monday = new Date("2026-08-31T17:00:00.000Z");
+  const wednesday = new Date("2026-09-02T17:00:00.000Z");
+
+  it("does not trigger for ordinary five-star or Mega rotations on a normal non-Wednesday night", () => {
+    const items = [
+      item("five-star-normal", "five-star", "Kyogre"),
+      item("ordinary-mega-gyarados", "mega", "Gyarados"),
+    ];
+    expect(hasActiveEventRaidBosses(items)).toBe(false);
+    expect(shouldSendDailyRaidSummary(items, monday)).toBe(false);
+  });
+
+  it("triggers on Wednesday for the ordinary current five-star Raid Hour boss", () => {
     expect(
-      hasActiveEventRaidBosses([
-        item("five-star-normal", "five-star", "Kyogre"),
-        item("ordinary-mega-gyarados", "mega", "Gyarados"),
-      ]),
+      shouldSendDailyRaidSummary(
+        [item("five-star-normal", "five-star", "Kyogre")],
+        wednesday,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not trigger on Wednesday for a Mega-only ordinary rotation", () => {
+    expect(
+      shouldSendDailyRaidSummary(
+        [item("ordinary-mega-gyarados", "mega", "Gyarados")],
+        wednesday,
+      ),
     ).toBe(false);
   });
 
-  it("triggers for an active event-derived Mega raid schedule", () => {
-    expect(
-      hasActiveEventRaidBosses([
-        item("mega-ascension--raid-2026-08-31-slot-mega", "mega", "Malamar"),
-      ]),
-    ).toBe(true);
+  it("triggers for an active event-derived Mega raid schedule on any day", () => {
+    const items = [
+      item("mega-ascension--raid-2026-08-31-slot-mega", "mega", "Malamar"),
+    ];
+    expect(hasActiveEventRaidBosses(items)).toBe(true);
+    expect(shouldSendDailyRaidSummary(items, monday)).toBe(true);
   });
 
   it("triggers for a five-star-only event raid schedule", () => {
-    expect(
-      hasActiveEventRaidBosses([
-        item("festival--raid-2026-09-05-slot-five-star", "five-star", "Armored Mewtwo"),
-      ]),
-    ).toBe(true);
+    const items = [
+      item("festival--raid-2026-09-05-slot-five-star", "five-star", "Armored Mewtwo"),
+    ];
+    expect(hasActiveEventRaidBosses(items)).toBe(true);
+    expect(shouldSendDailyRaidSummary(items, monday)).toBe(true);
+  });
+
+  it("does not trigger for an event-derived Shadow raid schedule", () => {
+    const items = [
+      item("rocket-event--raid-2026-08-31-slot-shadow", "shadow", "Mewtwo"),
+    ];
+    expect(hasActiveEventRaidBosses(items)).toBe(false);
+    expect(shouldSendDailyRaidSummary(items, monday)).toBe(false);
   });
 
   it("does not trigger for a future event raid before it becomes current", () => {
     const next = item("festival--raid-2026-09-05-slot-five-star", "five-star", "Armored Mewtwo");
     next.state = "next";
     expect(hasActiveEventRaidBosses([next])).toBe(false);
+    expect(shouldSendDailyRaidSummary([next], monday)).toBe(false);
   });
 });
 
 describe("daily raid summary boss selection", () => {
-  it("includes current five-star bosses plus event-specific raid bosses with CPs but not unrelated Megas", () => {
+  it("includes current five-star bosses plus event-specific Mega bosses with CPs but not unrelated Megas", () => {
     const result = selectDailyRaidSummaryBosses([
       item(
         "five-star-normal",
@@ -124,6 +161,20 @@ describe("daily raid summary boss selection", () => {
       { name: "Armored Mewtwo", maxUnboostedCp: 1821, maxBoostedCp: 2276 },
     ]);
     expect(result.eventBosses).toEqual([]);
+  });
+
+  it("excludes Shadow raids even when they are event-derived", () => {
+    const result = selectDailyRaidSummaryBosses([
+      item(
+        "rocket-event--raid-2026-08-31-slot-shadow",
+        "shadow",
+        "Mewtwo",
+        [
+          { boss: "Shadow Mewtwo", maxUnboostedCp: 2387, maxBoostedCp: 2984, possibleShiny: true },
+        ],
+      ),
+    ]);
+    expect(result).toEqual({ fiveStarBosses: [], eventBosses: [] });
   });
 
   it("ignores next rotations", () => {
