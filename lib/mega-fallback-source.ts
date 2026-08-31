@@ -328,12 +328,33 @@ function fallbackProfile(
     types,
     weaknesses,
     resistances,
-    boostedWeather: boostedWeather(types, source.weatherBoosts),
+    boostedWeather: boostedWeather(validStringArray(base.type), source.weatherBoosts),
     maxUnboostedCp: perfectCp(stats, cpMultiplier(source.cpMultipliers, 20)),
     maxBoostedCp: perfectCp(stats, cpMultiplier(source.cpMultipliers, 25)),
     possibleShiny: null,
     refreshedAt,
   };
+}
+
+export function applyMegaEncounterDetails(
+  item: RaidBossTickerItem,
+  existingProfiles: RaidBossProfileData[],
+  source: MegaFallbackSourceData,
+  refreshedAt: string = new Date().toISOString(),
+): void {
+  if (item.category !== "mega") return;
+
+  for (const entry of itemBossEntries(item.boss)) {
+    const existing = existingProfiles.find((profile) => profileCoversPart(profile, entry.part));
+    if (!existing) continue;
+
+    const encounter = fallbackProfile(entry, source, refreshedAt);
+    if (!encounter) continue;
+
+    existing.maxUnboostedCp = encounter.maxUnboostedCp;
+    existing.maxBoostedCp = encounter.maxBoostedCp;
+    existing.boostedWeather = encounter.boostedWeather;
+  }
 }
 
 export function buildMegaFallbackProfiles(
@@ -355,7 +376,9 @@ export async function getMegaFallbackProfiles(
   existingProfiles: RaidBossProfileData[],
 ): Promise<RaidBossProfileData[]> {
   if (item.category !== "mega") return [];
-  return buildMegaFallbackProfiles(item, existingProfiles, await getSourceData());
+  const source = await getSourceData();
+  applyMegaEncounterDetails(item, existingProfiles, source);
+  return buildMegaFallbackProfiles(item, existingProfiles, source);
 }
 
 export function isProvisionalMegaProfileKey(key: string): boolean {
