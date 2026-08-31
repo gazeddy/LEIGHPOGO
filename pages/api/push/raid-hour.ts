@@ -46,24 +46,23 @@ export default async function handler(
     return res.status(401).json({ error: "Unauthorised scheduler request." });
   }
 
+  const now = new Date();
+  // Start the daily job independently so it can still complete even if the
+  // separate 30-minute raid-event reminder fails on the same scheduler tick.
+  const dailySummary = sendDailyRaidSummary(now).catch((error) => {
+    console.error(
+      "Daily raid summary job failed",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  });
+
   try {
-    const now = new Date();
     const result = await sendRaidEventPushes(now);
-
-    // The existing 15-minute scheduler also drives the 18:00 daily raid
-    // summary. Daily delivery is independently deduplicated per device/day,
-    // so repeated checks during the 18:00 hour cannot send duplicates.
-    try {
-      await sendDailyRaidSummary(now);
-    } catch (error) {
-      console.error(
-        "Daily raid summary job failed",
-        error instanceof Error ? error.message : error,
-      );
-    }
-
+    await dailySummary;
     return res.status(200).json(result);
   } catch (error) {
+    await dailySummary;
     console.error("Raid event push job failed", error);
     return res.status(500).json({
       error:
