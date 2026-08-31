@@ -4,10 +4,7 @@ import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import EventCard from "../../components/events/EventCard";
-import {
-  EVENT_DATA_CREDITS,
-  type PokemonGoEventSummary,
-} from "../../lib/events";
+import type { PokemonGoEventSummary } from "../../lib/events";
 import { shouldShowOnEventsPage } from "../../lib/event-selection";
 import { getEventsPageData } from "../../lib/events-server";
 
@@ -178,8 +175,8 @@ export default function EventsPage({
           <h1>Events</h1>
           <p>
             Current and upcoming special events, spotlight hours, raid hours and
-            other scheduled Pokémon Go activity. Current 5-star, Shadow and Mega
-            raid bosses are shown in the raid bar above.
+            other scheduled Pokémon Go activity. Event cards now surface wild
+            spawns, raid bosses and event boosts directly in LeighPogo.
           </p>
           {formattedFetchedAt && (
             <p className="updated-at">
@@ -195,7 +192,7 @@ export default function EventsPage({
               <h2>Event data administration</h2>
               <p>
                 The site refreshes its local event cache automatically when it
-                becomes seven days old. Use this only when an immediate update is
+                becomes one day old. Use this only when an immediate update is
                 needed.
               </p>
             </div>
@@ -282,23 +279,8 @@ export default function EventsPage({
 
         <footer className="events-credits">
           <p>
-            Event data provided by{" "}
-            <a
-              href={EVENT_DATA_CREDITS.leekDuckUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              LeekDuck
-            </a>{" "}
-            via{" "}
-            <a
-              href={EVENT_DATA_CREDITS.scrapedDuckUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ScrapedDuck
-            </a>
-            .
+            Event schedules and details are imported and cached by LeighPogo so
+            the useful event information stays directly on this site.
           </p>
           <p>
             Leigh Pokémon Go Community is not affiliated with Niantic, The
@@ -428,7 +410,7 @@ export default function EventsPage({
 
         .events-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
           gap: 16px;
         }
 
@@ -478,10 +460,6 @@ export default function EventsPage({
           margin-top: 6px;
         }
 
-        .events-credits a {
-          color: #58a6ff;
-        }
-
         @media (max-width: 620px) {
           .events-intro {
             padding: 22px;
@@ -501,6 +479,10 @@ export default function EventsPage({
           .events-toolbar p {
             grid-column: 1;
             grid-row: auto;
+          }
+
+          .events-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
