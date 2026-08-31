@@ -12,7 +12,6 @@ import {
   writeGymState,
   type GymRecord,
 } from "../../../lib/gyms";
-import { sendNewGymPush } from "../../../lib/new-gym-push";
 import { authOptions } from "../auth/[...nextauth]";
 
 interface CreateGymBody {
@@ -73,23 +72,21 @@ export default async function handler(
       firstSeenAt: createdAt,
     };
     const state = await readGymState();
+    const creatorOwnerId = Number(
+      (session.user as { id?: string | number } | undefined)?.id,
+    );
 
-    await writeGymState({
-      ...state,
-      gyms: sortGyms([...state.gyms, gym]),
-    });
-
-    const creatorOwnerId = Number((session.user as { id?: string | number } | undefined)?.id);
-    try {
-      await sendNewGymPush([gym], {
-        excludeOwnerId: Number.isInteger(creatorOwnerId) ? creatorOwnerId : null,
-      });
-    } catch (error) {
-      console.error(
-        "Unable to send new-gym push notification",
-        error instanceof Error ? error.message : error,
-      );
-    }
+    await writeGymState(
+      {
+        ...state,
+        gyms: sortGyms([...state.gyms, gym]),
+      },
+      {
+        excludePushOwnerId: Number.isInteger(creatorOwnerId)
+          ? creatorOwnerId
+          : null,
+      },
+    );
 
     res.setHeader("Cache-Control", "private, no-store");
     return res.status(201).json({
