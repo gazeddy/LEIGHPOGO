@@ -140,51 +140,54 @@ export async function resolveCampfireMeetupUrl(
   throw new Error(`${field} exceeded the Campfire redirect limit`);
 }
 
-async function resolveOptionalCampfireUrl(
+async function verifyOptionalCampfireUrl(
   value: string | null | undefined,
   fetchImpl: typeof fetch,
   field: string,
-): Promise<string | null | undefined> {
-  if (value === null || value === undefined) {
-    return value;
+): Promise<void> {
+  if (value === null || value === undefined || !value.trim()) {
+    return;
   }
 
-  if (!value.trim()) {
-    return value;
-  }
-
-  return resolveCampfireMeetupUrl(value, fetchImpl, field);
+  await resolveCampfireMeetupUrl(value, fetchImpl, field);
 }
 
+/**
+ * Verify Campfire links without replacing cmpf.re share links.
+ *
+ * cmpf.re is deliberately preserved in event-overrides.json because Niantic uses
+ * those links for the Campfire app hand-off. Canonical meetup URLs are resolved
+ * only for validation and duplicate detection.
+ */
 export async function canonicaliseEventOverrideCampfireLinks(
   input: EventOverrideInput,
   fetchImpl: typeof fetch = fetch,
 ): Promise<EventOverrideInput> {
-  const campfireUrl = await resolveOptionalCampfireUrl(
+  await verifyOptionalCampfireUrl(
     input.campfireUrl,
     fetchImpl,
     "Campfire URL",
   );
 
-  const campfireMeetups = Array.isArray(input.campfireMeetups)
-    ? await Promise.all(
-        input.campfireMeetups.map(
-          async (meetup, index): Promise<CampfireMeetupInput> => ({
-            ...meetup,
-            url: await resolveCampfireMeetupUrl(
-              meetup.url,
-              fetchImpl,
-              `Campfire meetup ${index + 1} URL`,
-            ),
-          }),
-        ),
-      )
-    : input.campfireMeetups;
+  if (Array.isArray(input.campfireMeetups)) {
+    await Promise.all(
+      input.campfireMeetups.map(async (meetup, index) => {
+        await resolveCampfireMeetupUrl(
+          meetup.url,
+          fetchImpl,
+          `Campfire meetup ${index + 1} URL`,
+        );
+      }),
+    );
+  }
 
   return {
     ...input,
-    campfireUrl,
-    campfireMeetups,
+    campfireMeetups: Array.isArray(input.campfireMeetups)
+      ? input.campfireMeetups.map(
+          (meetup): CampfireMeetupInput => ({ ...meetup }),
+        )
+      : input.campfireMeetups,
   };
 }
 
@@ -193,7 +196,7 @@ function assignmentsForOverride(
 ): CampfireDuplicateAssignment[] {
   const assignments: CampfireDuplicateAssignment[] = [];
 
-  if (override.campfireUrl && campfireMeetupId(override.campfireUrl)) {
+  if (override.campfireUrl) {
     assignments.push({
       eventID: override.eventID,
       eventName: override.name,
@@ -203,10 +206,6 @@ function assignmentsForOverride(
   }
 
   for (const meetup of override.campfireMeetups ?? []) {
-    if (!campfireMeetupId(meetup.url)) {
-      continue;
-    }
-
     assignments.push({
       eventID: override.eventID,
       eventName: override.name,
@@ -218,15 +217,47 @@ function assignmentsForOverride(
   return assignments;
 }
 
-export function findCampfireDuplicateAssignments(
+async function canonicalForAssignment(
+  assignment: CampfireDuplicateAssignment,
+  fetchImpl: typeof fetch,
+  cache: Map<string, string | null>,
+): Promise<string | null> {
+  const cached = cache.get(assignment.url);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const canonical = await resolveCampfireMeetupUrl(
+      assignment.url,
+      fetchImpl,
+      `Campfire link for ${assignment.eventName}`,
+    );
+    cache.set(assignment.url, canonical);
+    return canonical;
+  } catch {
+    // An older/broken stored link should not prevent an unrelated event save.
+    cache.set(assignment.url, null);
+    return null;
+  }
+}
+
+export async function findCampfireDuplicateAssignments(
   savedEventID: string,
   overrides: EventOverride[],
-): CampfireDuplicateAssignment[][] {
+  fetchImpl: typeof fetch = fetch,
+): Promise<CampfireDuplicateAssignment[][]> {
   const byMeetup = new Map<string, CampfireDuplicateAssignment[]>();
+  const canonicalCache = new Map<string, string | null>();
 
   for (const override of overrides) {
     for (const assignment of assignmentsForOverride(override)) {
-      const meetupID = campfireMeetupId(assignment.url);
+      const canonical = await canonicalForAssignment(
+        assignment,
+        fetchImpl,
+        canonicalCache,
+      );
+      const meetupID = canonical ? campfireMeetupId(canonical) : null;
       if (!meetupID) continue;
 
       const group = byMeetup.get(meetupID) ?? [];
