@@ -9,6 +9,12 @@ export const DAILY_RAID_SUMMARY_KIND = "DAILY_18:00";
 
 const DELIVERY_HISTORY_MS = 3 * 24 * 60 * 60 * 1000;
 
+export interface DailyRaidSummaryBoss {
+  name: string;
+  maxUnboostedCp: number | null;
+  maxBoostedCp: number | null;
+}
+
 export interface DailyRaidSummaryResult {
   configured: boolean;
   due: boolean;
@@ -16,8 +22,8 @@ export interface DailyRaidSummaryResult {
   failed: number;
   removed: number;
   alreadySent: number;
-  fiveStarBosses: string[];
-  eventBosses: string[];
+  fiveStarBosses: DailyRaidSummaryBoss[];
+  eventBosses: DailyRaidSummaryBoss[];
   reason: string | null;
 }
 
@@ -98,72 +104,107 @@ function displayNameForCategory(name: string, item: RaidBossTickerItem): string 
   return trimmed;
 }
 
-function tickerBossNames(item: RaidBossTickerItem): string[] {
+function tickerBosses(item: RaidBossTickerItem): DailyRaidSummaryBoss[] {
   if (item.catchCp && item.catchCp.length > 0) {
     return item.catchCp
-      .map((boss) => displayNameForCategory(boss.boss, item))
-      .filter(Boolean);
+      .map((boss) => ({
+        name: displayNameForCategory(boss.boss, item),
+        maxUnboostedCp: boss.maxUnboostedCp,
+        maxBoostedCp: boss.maxBoostedCp,
+      }))
+      .filter((boss) => Boolean(boss.name));
   }
 
   return item.boss
     .replace(/\s+(?:and|&)\s+/gi, ",")
     .replace(/\s*\/\s*/g, ",")
     .split(",")
-    .map((name) => displayNameForCategory(name, item))
-    .filter(Boolean);
+    .map((name) => ({
+      name: displayNameForCategory(name, item),
+      maxUnboostedCp: null,
+      maxBoostedCp: null,
+    }))
+    .filter((boss) => Boolean(boss.name));
 }
 
-function uniqueNames(names: string[]): string[] {
-  const seen = new Set<string>();
-  return names.filter((name) => {
-    const key = normaliseName(name);
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+function uniqueBosses(bosses: DailyRaidSummaryBoss[]): DailyRaidSummaryBoss[] {
+  const byName = new Map<string, DailyRaidSummaryBoss>();
+
+  for (const boss of bosses) {
+    const key = normaliseName(boss.name);
+    if (!key) continue;
+
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, boss);
+      continue;
+    }
+
+    const existingHasCp =
+      Number.isFinite(existing.maxUnboostedCp) && Number.isFinite(existing.maxBoostedCp);
+    const incomingHasCp =
+      Number.isFinite(boss.maxUnboostedCp) && Number.isFinite(boss.maxBoostedCp);
+    if (!existingHasCp && incomingHasCp) {
+      byName.set(key, boss);
+    }
+  }
+
+  return Array.from(byName.values());
 }
 
 export function selectDailyRaidSummaryBosses(items: RaidBossTickerItem[]): {
-  fiveStarBosses: string[];
-  eventBosses: string[];
+  fiveStarBosses: DailyRaidSummaryBoss[];
+  eventBosses: DailyRaidSummaryBoss[];
 } {
   const current = items.filter((item) => item.state === "current");
-  const fiveStarBosses = uniqueNames(
+  const fiveStarBosses = uniqueBosses(
     current
       .filter((item) => item.category === "five-star")
-      .flatMap(tickerBossNames),
+      .flatMap(tickerBosses),
   );
-  const fiveStarKeys = new Set(fiveStarBosses.map(normaliseName));
+  const fiveStarKeys = new Set(fiveStarBosses.map((boss) => normaliseName(boss.name)));
 
   // Derived raid-schedule entries use --raid- IDs. These are event-specific
   // rotations such as Mega Ascension or GO Fest habitat raid pools.
-  const eventBosses = uniqueNames(
+  const eventBosses = uniqueBosses(
     current
       .filter((item) => item.eventID.includes("--raid-"))
-      .flatMap(tickerBossNames)
-      .filter((name) => !fiveStarKeys.has(normaliseName(name))),
+      .flatMap(tickerBosses)
+      .filter((boss) => !fiveStarKeys.has(normaliseName(boss.name))),
   );
 
   return { fiveStarBosses, eventBosses };
 }
 
-function compactBossList(names: string[], maxNames = 12): string {
-  if (names.length <= maxNames) return names.join(", ");
-  return `${names.slice(0, maxNames).join(", ")} +${names.length - maxNames} more`;
+function bossCpLine(boss: DailyRaidSummaryBoss): string {
+  const hasCp =
+    Number.isFinite(boss.maxUnboostedCp) && Number.isFinite(boss.maxBoostedCp);
+  if (!hasCp) return `${boss.name} — CP pending`;
+  return `${boss.name} — Hundo ${boss.maxUnboostedCp} CP • WB ${boss.maxBoostedCp} CP`;
+}
+
+function compactBossLines(bosses: DailyRaidSummaryBoss[], maxBosses = 12): string[] {
+  const visible = bosses.slice(0, maxBosses).map(bossCpLine);
+  if (bosses.length > maxBosses) {
+    visible.push(`+${bosses.length - maxBosses} more — open Raid Bosses`);
+  }
+  return visible;
 }
 
 export function buildDailyRaidSummaryPayload(
   dateKey: string,
-  fiveStarBosses: string[],
-  eventBosses: string[],
+  fiveStarBosses: DailyRaidSummaryBoss[],
+  eventBosses: DailyRaidSummaryBoss[],
   test = false,
 ) {
   const lines: string[] = [];
   if (fiveStarBosses.length > 0) {
-    lines.push(`5★: ${compactBossList(fiveStarBosses)}`);
+    lines.push("5★");
+    lines.push(...compactBossLines(fiveStarBosses));
   }
   if (eventBosses.length > 0) {
-    lines.push(`Event: ${compactBossList(eventBosses)}`);
+    lines.push("Event raids");
+    lines.push(...compactBossLines(eventBosses));
   }
   if (lines.length === 0) return null;
 
