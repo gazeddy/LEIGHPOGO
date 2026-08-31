@@ -39,6 +39,61 @@ function buildRaidSearchString(weaknesses: RaidTypeMatchup[]): string {
   return uniqueTypes.map((type) => `@${type}`).join(",");
 }
 
+function normaliseDisplayedBossName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[’']/g, "")
+    .replace(/^\s*(?:mega|shadow)\s+/i, "")
+    .replace(/[^a-z0-9♀♂]+/gi, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function declaredRotationBosses(value: string): string[] {
+  return value
+    .replace(/\s+(?:and|&)\s+/gi, ",")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function displayBossesForRotation(rotation: RaidRotationData): RaidBossProfileData[] {
+  const declared = declaredRotationBosses(rotation.boss);
+  if (declared.length === 0) return rotation.bosses;
+
+  const remaining = [...rotation.bosses];
+  const ordered = declared.map((name) => {
+    const target = normaliseDisplayedBossName(name);
+    const index = remaining.findIndex((profile) => {
+      const candidate = normaliseDisplayedBossName(profile.name);
+      return candidate === target || candidate.includes(target) || target.includes(candidate);
+    });
+
+    if (index >= 0) {
+      return remaining.splice(index, 1)[0];
+    }
+
+    return {
+      key: `pending|${rotation.eventID}|${target}`,
+      category: rotation.category,
+      name,
+      pokemonId: null,
+      form: null,
+      tier: null,
+      types: [],
+      weaknesses: [],
+      resistances: [],
+      boostedWeather: [],
+      maxUnboostedCp: null,
+      maxBoostedCp: null,
+      possibleShiny: null,
+      refreshedAt: null,
+    } satisfies RaidBossProfileData;
+  });
+
+  return [...ordered, ...remaining];
+}
+
 function CopySearchButton({ searchString }: { searchString: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -100,6 +155,11 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
   const heavyResists = boss.resistances.filter((item) => item.multiplier < 0.624);
   const resistances = boss.resistances.filter((item) => item.multiplier >= 0.624);
   const searchString = buildRaidSearchString(boss.weaknesses);
+  const detailsPending =
+    boss.types.length === 0 &&
+    boss.maxUnboostedCp === null &&
+    boss.maxBoostedCp === null &&
+    boss.weaknesses.length === 0;
 
   return (
     <section className={styles.bossDetails} aria-label={`${boss.name} raid information`}>
@@ -114,6 +174,10 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
           <span className={styles.shiny} title="Shiny available">✨ Shiny</span>
         )}
       </div>
+
+      {detailsPending && (
+        <p className={styles.missingDetails}>Detailed raid data is still updating.</p>
+      )}
 
       <div className={styles.cpGrid}>
         <div>
@@ -152,6 +216,8 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
 }
 
 function RotationCard({ rotation }: { rotation: RaidRotationData }) {
+  const displayedBosses = displayBossesForRotation(rotation);
+
   return (
     <article
       id={rotation.anchor}
@@ -168,9 +234,9 @@ function RotationCard({ rotation }: { rotation: RaidRotationData }) {
         </div>
       </header>
 
-      {rotation.bosses.length > 0 ? (
+      {displayedBosses.length > 0 ? (
         <div className={styles.bossList}>
-          {rotation.bosses.map((boss) => (
+          {displayedBosses.map((boss) => (
             <BossDetails key={boss.key} boss={boss} />
           ))}
         </div>
