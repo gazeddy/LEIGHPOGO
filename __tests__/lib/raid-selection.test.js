@@ -1,6 +1,7 @@
 const {
   selectCurrentRaidBosses,
   selectNextRaidBosses,
+  selectRaidBossEvents,
 } = require("../../lib/event-selection");
 const { calculateTypeMatchups } = require("../../lib/raid-detail-source");
 
@@ -14,6 +15,20 @@ function raidEvent({ id, name, start, end }) {
     image: null,
     start,
     end,
+  };
+}
+
+function nestedRaidEvent({ id, name, start, end, raidSchedule }) {
+  return {
+    eventID: id,
+    name,
+    eventType: "event",
+    heading: "Event",
+    link: "https://example.test/event",
+    image: null,
+    start,
+    end,
+    raidSchedule,
   };
 }
 
@@ -61,6 +76,112 @@ describe("raid rotation visibility", () => {
       new Date("2026-08-19T05:00:00.000Z"),
     );
     expect(current.map((item) => item.boss)).toContain("Lunala");
+  });
+});
+
+describe("nested ScrapedDuck raid schedules", () => {
+  const megaAscension = nestedRaidEvent({
+    id: "mega-ascension",
+    name: "Mega Ascension",
+    start: "2026-08-31T10:00:00.000",
+    end: "2026-09-04T23:59:00.000",
+    raidSchedule: [
+      {
+        date: "Monday, August 31",
+        time: null,
+        label: null,
+        bosses: [
+          { name: "Mega Victreebel", image: null, canBeShiny: true, raidType: "Mega" },
+          { name: "Mega Dragonite", image: null, canBeShiny: true, raidType: "Mega" },
+          { name: "Mega Malamar", image: null, canBeShiny: true, raidType: "Mega" },
+        ],
+      },
+      {
+        date: "Tuesday, September 1",
+        time: null,
+        label: null,
+        bosses: [
+          { name: "Mega Falinks", image: null, canBeShiny: true, raidType: "Mega" },
+        ],
+      },
+    ],
+  });
+
+  it("turns a dated nested schedule into raid rotations and strips duplicate Mega prefixes", () => {
+    const rotations = selectRaidBossEvents([megaAscension]);
+    expect(rotations).toHaveLength(2);
+    expect(rotations[0]).toMatchObject({
+      category: "mega",
+      boss: "Victreebel, Dragonite, Malamar",
+      start: "2026-08-31T10:00:00.000",
+      end: "2026-09-01T00:00:00.000",
+    });
+    expect(rotations[1]).toMatchObject({
+      category: "mega",
+      boss: "Falinks",
+      start: "2026-09-01T00:00:00.000",
+      end: "2026-09-02T00:00:00.000",
+    });
+  });
+
+  it("shows today's simultaneous Mega Ascension bosses as current", () => {
+    const current = selectCurrentRaidBosses(
+      [megaAscension],
+      new Date("2026-08-31T11:00:00.000Z"),
+    );
+    expect(current).toHaveLength(1);
+    expect(current[0].boss).toBe("Victreebel, Dragonite, Malamar");
+  });
+
+  it("shows the following dated rotation inside the existing 24-hour next window", () => {
+    const next = selectNextRaidBosses(
+      [megaAscension],
+      new Date("2026-08-31T11:00:00.000Z"),
+    );
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({
+      category: "mega",
+      boss: "Falinks",
+      state: "next",
+      start: "2026-09-01T00:00:00.000",
+    });
+  });
+
+  it("resolves weekday-only timed raid slots inside a parent event", () => {
+    const finale = nestedRaidEvent({
+      id: "pokemon-go-fest-2026-mega-finale",
+      name: "Pokémon GO Fest 2026: Mega Finale",
+      start: "2026-09-05T10:00:00.000",
+      end: "2026-09-06T18:00:00.000",
+      raidSchedule: [
+        {
+          date: "Saturday",
+          time: "10:00 a.m. to 11:00 a.m.",
+          label: "Verdant Overgrowth",
+          bosses: [
+            { name: "Mega Beedrill", image: null, canBeShiny: true, raidType: "Mega" },
+            { name: "Mega Victreebel", image: null, canBeShiny: true, raidType: "Mega" },
+            { name: "Mega Pinsir", image: null, canBeShiny: true, raidType: "Mega" },
+            { name: "Mega Abomasnow", image: null, canBeShiny: true, raidType: "Mega" },
+          ],
+        },
+      ],
+    });
+
+    const rotations = selectRaidBossEvents([finale]);
+    expect(rotations).toHaveLength(1);
+    expect(rotations[0]).toMatchObject({
+      boss: "Beedrill, Victreebel, Pinsir, Abomasnow",
+      start: "2026-09-05T10:00:00.000",
+      end: "2026-09-05T11:00:00.000",
+    });
+
+    const current = selectCurrentRaidBosses(
+      [finale],
+      new Date("2026-09-05T09:30:00.000Z"),
+    );
+    expect(current).toHaveLength(1);
+    expect(current[0].boss).toContain("Victreebel");
   });
 });
 
