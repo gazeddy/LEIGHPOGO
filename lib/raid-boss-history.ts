@@ -5,7 +5,10 @@ import {
   selectNextRaidBosses,
   selectRaidBossEvents,
 } from "./event-selection";
-import { getEventsPageData } from "./events-server";
+import {
+  getEventsPageData,
+  getImportedEventsForAdmin,
+} from "./events-server";
 import {
   getCurrentRaidBossProfiles,
 } from "./raid-detail-source";
@@ -56,6 +59,25 @@ function eventDate(value: string): Date {
 
 function eventById(events: PokemonGoEventSummary[]): Map<string, PokemonGoEventSummary> {
   return new Map(events.map((event) => [event.eventID, event]));
+}
+
+function mergeRaidSourceEvents(
+  importedEvents: PokemonGoEventSummary[],
+  pageEvents: PokemonGoEventSummary[],
+): PokemonGoEventSummary[] {
+  const merged = new Map<string, PokemonGoEventSummary>();
+
+  for (const event of importedEvents) {
+    merged.set(event.eventID, event);
+  }
+
+  for (const event of pageEvents) {
+    if (event.source === "local" || !merged.has(event.eventID)) {
+      merged.set(event.eventID, event);
+    }
+  }
+
+  return Array.from(merged.values());
 }
 
 async function syncRaidRotations(events: PokemonGoEventSummary[]): Promise<void> {
@@ -353,13 +375,18 @@ async function currentTickerItems(items: RaidBossTickerItem[]): Promise<RaidBoss
 }
 
 export async function getRaidToolsData(now: Date = new Date()): Promise<RaidToolsData> {
-  const eventData = await getEventsPageData(240);
-  await syncRaidRotations(eventData.events);
+  const [eventData, importedData] = await Promise.all([
+    getEventsPageData(500),
+    getImportedEventsForAdmin(500),
+  ]);
+  const raidSourceEvents = mergeRaidSourceEvents(importedData.events, eventData.events);
 
-  const current = selectCurrentRaidBosses(eventData.events, now);
+  await syncRaidRotations(raidSourceEvents);
+
+  const current = selectCurrentRaidBosses(raidSourceEvents, now);
   await Promise.all(current.map((item) => enrichActiveRotation(item, now)));
 
-  const next = selectNextRaidBosses(eventData.events, now).map((item) => ({
+  const next = selectNextRaidBosses(raidSourceEvents, now).map((item) => ({
     ...item,
     state: "next" as const,
     link: nextTickerLink(item),
@@ -380,7 +407,7 @@ export async function getRaidToolsData(now: Date = new Date()): Promise<RaidTool
       ...(await currentTickerItems(current)),
       ...next,
     ],
-    fetchedAt: eventData.fetchedAt,
-    warning: eventData.warning,
+    fetchedAt: importedData.fetchedAt,
+    warning: importedData.warning ?? eventData.warning,
   };
 }
