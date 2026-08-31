@@ -51,6 +51,10 @@ export interface GymImportSummary {
   sourceFile: string;
 }
 
+interface WriteGymStateOptions {
+  excludePushOwnerId?: number | null;
+}
+
 const EMPTY_STATE: GymState = {
   version: 1,
   importedAt: null,
@@ -158,13 +162,35 @@ export async function readGymState(): Promise<GymState> {
   }
 }
 
-export async function writeGymState(state: GymState): Promise<void> {
+export async function writeGymState(
+  state: GymState,
+  options: WriteGymStateOptions = {},
+): Promise<void> {
+  const previous = await readGymState();
   const directory = path.dirname(GYM_DATA_FILE);
   const temporaryFile = `${GYM_DATA_FILE}.tmp-${process.pid}-${Date.now()}`;
 
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(temporaryFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
   await fs.rename(temporaryFile, GYM_DATA_FILE);
+
+  const previousIds = new Set(previous.gyms.map((gym) => gym.id));
+  const addedGyms = state.gyms.filter((gym) => !previousIds.has(gym.id));
+  const initialImportedBaseline = previous.importedAt === null && state.importedAt !== null;
+
+  if (addedGyms.length > 0 && !initialImportedBaseline) {
+    try {
+      const { sendNewGymPush } = await import("./new-gym-push");
+      await sendNewGymPush(addedGyms, {
+        excludeOwnerId: options.excludePushOwnerId ?? null,
+      });
+    } catch (error) {
+      console.error(
+        "Unable to send new-gym push notification",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
 }
 
 export function getGymDisplayName(gym: Pick<GymRecord, "name" | "alias">): string {
