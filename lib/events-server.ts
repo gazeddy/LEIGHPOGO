@@ -12,7 +12,7 @@ import { localEventToSummary, readLocalEvents } from "./local-events";
 const EVENTS_FEED_URL =
   "https://raw.githubusercontent.com/Drumstix42/ScrapedDuck/refs/heads/data/events.min.json";
 const EVENTS_CACHE_VERSION = 2;
-const EVENTS_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
+const EVENTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const EVENTS_CACHE_PATH =
   process.env.EVENTS_CACHE_PATH?.trim() ||
   path.join(process.cwd(), "data", "events-cache.json");
@@ -323,8 +323,8 @@ async function loadUsableCache(): Promise<{
 
       warning =
         error instanceof Error
-          ? `The hourly refresh failed: ${error.message}`
-          : "The hourly refresh failed.";
+          ? `The daily refresh failed: ${error.message}`
+          : "The daily refresh failed.";
     }
   }
 
