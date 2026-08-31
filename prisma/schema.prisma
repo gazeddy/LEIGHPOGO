@@ -26,6 +26,7 @@ model User {
   friendCodeCopies            FriendCodeGrabNotification[] @relation("FriendCodeGrabActor")
   usageEvents                 UsageEvent[]
   tickerPreferences           UserTickerPreference[]
+  privacyAcceptances          PrivacyAcceptance[]
 }
 
 model UserTickerPreference {
@@ -242,6 +243,22 @@ model PushSubscription {
   updatedAt               DateTime @updatedAt
 
   @@index([ownerId])
+}
+
+model PrivacyAcceptance {
+  id            Int      @id @default(autoincrement())
+  ownerId       Int
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  policyVersion String
+  acceptedAt    DateTime @default(now())
+
+  @@unique([ownerId, policyVersion])
+  @@index([ownerId, acceptedAt])
+}
+
+model AccountRevocation {
+  userId    Int      @id
+  revokedAt DateTime @default(now())
 }
 
 model RaidBossProfile {

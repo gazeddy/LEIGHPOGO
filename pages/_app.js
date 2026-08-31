@@ -1,4 +1,5 @@
 import Head from "next/head"
+import Link from "next/link"
 import { SessionProvider } from "next-auth/react"
 import { useRouter } from "next/router"
 import "leaflet/dist/leaflet.css"
@@ -13,6 +14,7 @@ import "../styles/wanted-trades.css"
 import "../styles/notifications.css"
 import "../styles/pokedex-selection.css"
 import "../styles/pwa.css"
+import "../styles/privacy.css"
 import Navbar from "../components/Navbar"
 import PokemonRegionalAdmin from "../components/admin/PokemonRegionalAdmin"
 import TickerStack from "../components/tickers/TickerStack"
@@ -22,6 +24,7 @@ import PwaBootstrap from "../components/PwaBootstrap"
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
   const showPokemonRegionalAdmin = router.pathname === "/admin/pokedex"
+  const privacyGate = router.pathname === "/privacy/accept"
 
   return (
     <SessionProvider session={session}>
@@ -37,12 +40,15 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
       </Head>
-      <PwaBootstrap />
-      <PokedexCatalogFetchGuard />
-      <Navbar />
-      <TickerStack />
+      {!privacyGate && <PwaBootstrap />}
+      {!privacyGate && <PokedexCatalogFetchGuard />}
+      {!privacyGate && <Navbar />}
+      {!privacyGate && <TickerStack />}
       <Component {...pageProps} />
-      {showPokemonRegionalAdmin && <PokemonRegionalAdmin />}
+      {!privacyGate && showPokemonRegionalAdmin && <PokemonRegionalAdmin />}
+      <footer className="site-footer">
+        <Link href="/privacy">Privacy Policy</Link>
+      </footer>
     </SessionProvider>
   )
 }

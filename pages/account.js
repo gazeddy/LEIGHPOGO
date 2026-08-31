@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { getServerSession } from "next-auth/next"
+import { signOut } from "next-auth/react"
 import { authOptions } from "./api/auth/[...nextauth]"
 import prisma from "../lib/prisma"
 import TeamBadge from "../components/TeamBadge"
@@ -17,6 +18,10 @@ export default function Account({ entry }) {
   )
   const [team, setTeam] = useState(entry?.team || "MYSTIC")
   const [profileStatus, setProfileStatus] = useState({ type: "", message: "" })
+  const [deletePassword, setDeletePassword] = useState("")
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  const [deleteStatus, setDeleteStatus] = useState({ type: "", message: "" })
+  const [deleting, setDeleting] = useState(false)
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault()
@@ -72,6 +77,43 @@ export default function Account({ entry }) {
     }
 
     setProfileStatus({ type: "success", message: "Trainer profile updated" })
+  }
+
+  const handleDeleteAccount = async (event) => {
+    event.preventDefault()
+    setDeleteStatus({ type: "", message: "" })
+
+    if (deleteConfirmation !== "DELETE") {
+      setDeleteStatus({ type: "error", message: "Type DELETE exactly to confirm." })
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: deletePassword,
+          confirmation: deleteConfirmation,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setDeleteStatus({
+          type: "error",
+          message: data.error || "Unable to delete account",
+        })
+        return
+      }
+
+      await signOut({ callbackUrl: "/" })
+    } catch {
+      setDeleteStatus({ type: "error", message: "Unable to delete account. Please try again." })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -163,6 +205,49 @@ export default function Account({ entry }) {
           )}
         </form>
       </section>
+
+      <section className="danger-zone">
+        <h2>Delete account</h2>
+        <p>
+          Permanently deletes your LeighPogo account and account-linked friend-code, Pokédex, trade,
+          notification, preference and import data. This cannot be undone.
+        </p>
+        <form onSubmit={handleDeleteAccount} className="stack">
+          <label>
+            Current password
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={deletePassword}
+              onChange={(event) => setDeletePassword(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Type DELETE to confirm
+            <input
+              type="text"
+              autoComplete="off"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              placeholder="DELETE"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="danger"
+            disabled={deleting || !deletePassword || deleteConfirmation !== "DELETE"}
+          >
+            {deleting ? "Deleting account…" : "Delete my account"}
+          </button>
+          {deleteStatus.message && (
+            <p className={deleteStatus.type === "error" ? "form-error" : "status"}>
+              {deleteStatus.message}
+            </p>
+          )}
+        </form>
+      </section>
     </div>
   )
 }
@@ -170,7 +255,7 @@ export default function Account({ entry }) {
 export async function getServerSideProps(context) {
   const session = await getServerSession(context.req, context.res, authOptions)
 
-  if (!session) {
+  if (!session?.user?.id) {
     return {
       redirect: { destination: "/login", permanent: false },
     }

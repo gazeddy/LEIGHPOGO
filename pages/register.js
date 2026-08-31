@@ -7,6 +7,8 @@ export default function Register() {
   const [name, setName] = useState("")
   const [ign, setIgn] = useState("")
   const [password, setPassword] = useState("")
+  const [over13, setOver13] = useState(false)
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const router = useRouter()
@@ -19,7 +21,7 @@ export default function Register() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, ign, password }),
+      body: JSON.stringify({ name, ign, password, over13, privacyAcknowledged }),
     })
 
     const data = await res.json()
@@ -33,6 +35,8 @@ export default function Register() {
     setPassword("")
     setName("")
     setIgn("")
+    setOver13(false)
+    setPrivacyAcknowledged(false)
     setTimeout(() => router.push("/login"), 1000)
   }
 
@@ -67,13 +71,36 @@ export default function Register() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
             required
           />
         </label>
 
-        <button type="submit">Register</button>
+        <label className="checkbox consent-checkbox">
+          <input
+            type="checkbox"
+            checked={over13}
+            onChange={(e) => setOver13(e.target.checked)}
+            required
+          />
+          <span>I am 13 or over.</span>
+        </label>
 
-        {error && <p style={{ color: "red" }}>{error}</p>}
+        <label className="checkbox consent-checkbox">
+          <input
+            type="checkbox"
+            checked={privacyAcknowledged}
+            onChange={(e) => setPrivacyAcknowledged(e.target.checked)}
+            required
+          />
+          <span>
+            I have read and understand the <Link href="/privacy">LeighPogo Privacy Policy</Link>.
+          </span>
+        </label>
+
+        <button type="submit" disabled={!over13 || !privacyAcknowledged}>Register</button>
+
+        {error && <p className="form-error">{error}</p>}
         {success && <p style={{ color: "green" }}>{success}</p>}
       </form>
 
