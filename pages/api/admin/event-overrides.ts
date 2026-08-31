@@ -48,20 +48,20 @@ export default async function handler(
     }
 
     if (req.method === "POST") {
-      const canonicalInput = await canonicaliseEventOverrideCampfireLinks(
+      const verifiedInput = await canonicaliseEventOverrideCampfireLinks(
         req.body as EventOverrideInput,
       );
-      const override = await saveEventOverride(canonicalInput);
+      const override = await saveEventOverride(verifiedInput);
       const overrides = await readEventOverrides();
       const duplicateWarning = formatCampfireDuplicateWarning(
-        findCampfireDuplicateAssignments(override.eventID, overrides),
+        await findCampfireDuplicateAssignments(override.eventID, overrides),
       );
 
       return res.status(200).json({
         override,
         message: duplicateWarning
           ? `Event feed override saved. ${duplicateWarning}`
-          : "Event feed override saved. Campfire meetup links were verified and stored as canonical Campfire URLs.",
+          : "Event feed override saved. Campfire meetup links were verified; cmpf.re share links were preserved for Campfire app hand-off.",
       });
     }
 
