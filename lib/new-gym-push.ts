@@ -12,13 +12,11 @@ export interface NewGymPushResult {
 }
 
 export function buildNewGymPushPayload(gyms: GymRecord[]) {
-  const unique = Array.from(
-    new Map(
-      gyms
-        .filter((gym) => gym?.id && gym?.name)
-        .map((gym) => [gym.id, gym]),
-    ).values(),
-  );
+  const byId = new Map<string, GymRecord>();
+  for (const gym of gyms) {
+    if (gym?.id && gym?.name) byId.set(gym.id, gym);
+  }
+  const unique = Array.from(byId.values());
 
   if (unique.length === 0) return null;
 
@@ -61,11 +59,11 @@ export async function sendNewGymPush(
     select: { ownerId: true },
   });
   const ownerIds = Array.from(
-    new Set(
+    new Set<number>(
       subscriptions
         .map((subscription: any) => Number(subscription.ownerId))
-        .filter((ownerId) => Number.isInteger(ownerId))
-        .filter((ownerId) => ownerId !== options.excludeOwnerId),
+        .filter((ownerId: number) => Number.isInteger(ownerId))
+        .filter((ownerId: number) => ownerId !== options.excludeOwnerId),
     ),
   );
 
