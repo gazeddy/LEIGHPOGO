@@ -108,7 +108,7 @@ describe("generic Mega raid fallback", () => {
     expect(profiles[0].boostedWeather).toEqual(["Rainy", "Windy"]);
   });
 
-  it("does not create a fallback card for a boss already covered by primary raid data", () => {
+  it("does not create a fallback card for a boss already covered by primary Mega raid data", () => {
     const existing: RaidBossProfileData = {
       key: "mega|futuremon|normal|mega",
       category: "mega",
@@ -127,5 +127,28 @@ describe("generic Mega raid fallback", () => {
     };
 
     expect(buildMegaFallbackProfiles(item("Futuremon"), [existing], source())).toEqual([]);
+  });
+
+  it("does not mistake an old same-name non-Mega raid profile for official Mega data", () => {
+    const existing: RaidBossProfileData = {
+      key: "mega|futuremon|normal|5",
+      category: "mega",
+      name: "Futuremon",
+      pokemonId: 999,
+      form: "Normal",
+      tier: "5",
+      types: ["Water"],
+      weaknesses: [],
+      resistances: [],
+      boostedWeather: [],
+      maxUnboostedCp: 471,
+      maxBoostedCp: 590,
+      possibleShiny: true,
+      refreshedAt: "2026-08-31T09:30:00.000Z",
+    };
+
+    const profiles = buildMegaFallbackProfiles(item("Futuremon"), [existing], source());
+    expect(profiles).toHaveLength(1);
+    expect(isProvisionalMegaProfileKey(profiles[0].key)).toBe(true);
   });
 });
