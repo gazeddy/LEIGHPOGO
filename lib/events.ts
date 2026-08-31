@@ -3,6 +3,20 @@ export const EVENT_DATA_CREDITS = {
   scrapedDuckUrl: "https://github.com/bigfoott/ScrapedDuck",
 };
 
+export interface PokemonGoRaidScheduleBoss {
+  name: string;
+  image: string | null;
+  canBeShiny: boolean | null;
+  raidType: string | null;
+}
+
+export interface PokemonGoRaidScheduleEntry {
+  date: string;
+  time: string | null;
+  label: string | null;
+  bosses: PokemonGoRaidScheduleBoss[];
+}
+
 export interface PokemonGoEventSummary {
   eventID: string;
   name: string;
@@ -15,6 +29,7 @@ export interface PokemonGoEventSummary {
   tags?: string[];
   description?: string | null;
   campfireUrl?: string | null;
+  raidSchedule?: PokemonGoRaidScheduleEntry[];
   source?: "feed" | "local";
 }
 
