@@ -154,6 +154,8 @@ function itemBossParts(value: string): string[] {
 }
 
 function profileCoversPart(profile: RaidBossProfileData, part: string): boolean {
+  const tier = String(profile.tier ?? "").toLowerCase();
+  if (!tier.includes("mega")) return false;
   const name = normaliseBossName(profile.name);
   return name === part || name.includes(part) || part.includes(name);
 }
