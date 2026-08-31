@@ -155,6 +155,8 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
   const heavyResists = boss.resistances.filter((item) => item.multiplier < 0.624);
   const resistances = boss.resistances.filter((item) => item.multiplier >= 0.624);
   const searchString = buildRaidSearchString(boss.weaknesses);
+  const provisional =
+    boss.key.startsWith("mega-provisional|") || boss.tier === "mega-provisional";
   const detailsPending =
     boss.types.length === 0 &&
     boss.maxUnboostedCp === null &&
@@ -174,6 +176,12 @@ function BossDetails({ boss }: { boss: RaidBossProfileData }) {
           <span className={styles.shiny} title="Shiny available">✨ Shiny</span>
         )}
       </div>
+
+      {provisional && (
+        <p className={styles.missingDetails}>
+          <strong>⚠ Provisional data.</strong> Mega-specific data is not yet available from PoGoAPI. Catch CP and matchup data are derived from the base Pokémon and will update automatically when official Mega data becomes available.
+        </p>
+      )}
 
       {detailsPending && (
         <p className={styles.missingDetails}>Detailed raid data is still updating.</p>
