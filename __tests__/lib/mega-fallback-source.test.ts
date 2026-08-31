@@ -151,4 +151,18 @@ describe("generic Mega raid fallback", () => {
     expect(profiles).toHaveLength(1);
     expect(isProvisionalMegaProfileKey(profiles[0].key)).toBe(true);
   });
+
+  it("keeps simultaneous provisional Mega forms distinct", () => {
+    const profiles = buildMegaFallbackProfiles(
+      item("Futuremon X, Futuremon Y"),
+      [],
+      source(),
+      "2026-08-31T09:30:00.000Z",
+    );
+
+    expect(profiles).toHaveLength(2);
+    expect(profiles.map((profile) => profile.name)).toEqual(["Futuremon X", "Futuremon Y"]);
+    expect(new Set(profiles.map((profile) => profile.key)).size).toBe(2);
+    expect(profiles.every((profile) => isProvisionalMegaProfileKey(profile.key))).toBe(true);
+  });
 });
