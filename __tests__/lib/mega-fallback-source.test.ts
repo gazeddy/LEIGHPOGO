@@ -1,4 +1,5 @@
 import {
+  applyMegaEncounterDetails,
   buildMegaFallbackProfiles,
   isProvisionalMegaProfileKey,
   type MegaFallbackSourceData,
@@ -79,7 +80,7 @@ describe("generic Mega raid fallback", () => {
     expect(profiles[0].weaknesses).toContainEqual({ type: "Electric", multiplier: 1.6 });
   });
 
-  it("uses official Mega typing and drops the provisional marker once PoGoAPI has a Mega record", () => {
+  it("uses official Mega typing but base encounter weather once PoGoAPI has a Mega record", () => {
     const profiles = buildMegaFallbackProfiles(
       item("Futuremon"),
       [],
@@ -105,7 +106,48 @@ describe("generic Mega raid fallback", () => {
       maxBoostedCp: 590,
     });
     expect(isProvisionalMegaProfileKey(profiles[0].key)).toBe(false);
-    expect(profiles[0].boostedWeather).toEqual(["Rainy", "Windy"]);
+    expect(profiles[0].boostedWeather).toEqual(["Rainy"]);
+  });
+
+  it("overrides Mega-form CP with the base Pokémon catch encounter without changing raid typing", () => {
+    const existing: RaidBossProfileData = {
+      key: "mega|futuremon|normal|mega",
+      category: "mega",
+      name: "Mega Futuremon",
+      pokemonId: 999,
+      form: "Normal",
+      tier: "mega",
+      types: ["Water", "Dragon"],
+      weaknesses: [{ type: "Dragon", multiplier: 1.6 }],
+      resistances: [],
+      boostedWeather: ["Rainy", "Windy"],
+      maxUnboostedCp: 9999,
+      maxBoostedCp: 9999,
+      possibleShiny: true,
+      refreshedAt: "2026-08-31T09:30:00.000Z",
+    };
+
+    applyMegaEncounterDetails(
+      item("Futuremon"),
+      [existing],
+      source([
+        {
+          pokemon_id: 999,
+          pokemon_name: "Futuremon",
+          mega_name: "Mega Futuremon",
+          form: "Normal",
+          type: ["Water", "Dragon"],
+        },
+      ]),
+    );
+
+    expect(existing).toMatchObject({
+      types: ["Water", "Dragon"],
+      maxUnboostedCp: 471,
+      maxBoostedCp: 590,
+      boostedWeather: ["Rainy"],
+      possibleShiny: true,
+    });
   });
 
   it("does not create a fallback card for a boss already covered by primary Mega raid data", () => {
