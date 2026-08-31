@@ -157,6 +157,24 @@ Generate a reusable weekly graphic from scheduled LeighPogo data showing, where 
 - [ ] notable weekly activities
 - [ ] local/special events where appropriate
 
+## 11. Production deployment hardening
+
+V4 deployment must preserve production runtime state and must not repeat the V3 production outage caused by permissions, an incomplete `.next` build, and missing VAPID configuration.
+
+- [ ] Treat `/etc/leighpogo/leighpogo-push.env` as persistent production secret state
+- [ ] Back up the existing production VAPID environment file before any release promotion/cutover
+- [ ] Restore/reuse the same VAPID key pair after deployment; never rotate keys automatically when a valid pair exists
+- [ ] Validate `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` before starting production
+- [ ] Verify the `leighpogo.service` systemd drop-in still loads the production push environment file
+- [ ] Preserve production `.env`, SQLite database, runtime event/gym data, guide content/uploads and other persistent state during release promotion
+- [ ] Enforce the correct non-root ownership of the LIVE checkout before Git/build operations
+- [ ] Stop production before replacing build output and restart only after a successful `npm run build`
+- [ ] Do not leave systemd restart-looping against a missing or failed `.next` production build
+- [ ] Add a local origin health check on `127.0.0.1:3000` before considering deployment successful
+- [ ] Add an external HTTPS health check after the local origin passes
+- [ ] Keep a rollback snapshot of code/build/runtime configuration so a failed promotion can return to the previous working release
+- [ ] Keep `main` feature-frozen between releases; only break-glass production/security fixes may land outside the planned V4 release
+
 ## Scope boundaries
 
 ### In scope for V4
@@ -169,6 +187,7 @@ Generate a reusable weekly graphic from scheduled LeighPogo data showing, where 
 - infographic generation
 - future/upcoming social graphics
 - weekly overview graphics
+- production deployment hardening and persistent push/VAPID preservation
 
 ### Keep out unless directly required
 
@@ -201,6 +220,7 @@ Generate a reusable weekly graphic from scheduled LeighPogo data showing, where 
 - mobile/PWA polish
 - template refinement
 - publishing/regeneration tests
+- deployment/persistence/rollback tests
 - feature freeze
 - release candidate and production checks
 
@@ -223,3 +243,5 @@ V4 is ready when LeighPogo can:
 - [ ] generate future-event teasers/countdowns before events start
 - [ ] generate weekly look-ahead social graphics
 - [ ] run the infographic system comfortably on the existing server hardware
+- [ ] promote V4 to production without losing the existing VAPID key pair or forcing users to re-enable push notifications
+- [ ] fail/roll back safely if build, service startup or health checks do not pass
