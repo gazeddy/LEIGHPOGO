@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { sendDailyRaidSummary } from "../../../lib/raid-daily-summary";
 import {
   sendRaidEventPushes,
   type RaidEventPushResult,
@@ -46,7 +47,21 @@ export default async function handler(
   }
 
   try {
-    const result = await sendRaidEventPushes(new Date());
+    const now = new Date();
+    const result = await sendRaidEventPushes(now);
+
+    // The existing 15-minute scheduler also drives the 18:00 daily raid
+    // summary. Daily delivery is independently deduplicated per device/day,
+    // so repeated checks during the 18:00 hour cannot send duplicates.
+    try {
+      await sendDailyRaidSummary(now);
+    } catch (error) {
+      console.error(
+        "Daily raid summary job failed",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
     return res.status(200).json(result);
   } catch (error) {
     console.error("Raid event push job failed", error);
