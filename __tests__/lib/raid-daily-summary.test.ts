@@ -3,6 +3,7 @@ import {
   hasActiveEventRaidBosses,
   isDailyRaidSummaryDue,
   isLondonWednesday,
+  isLondonWeekend,
   selectDailyRaidSummaryBosses,
   shouldSendDailyRaidSummary,
 } from "../../lib/raid-daily-summary";
@@ -40,15 +41,19 @@ describe("daily raid summary timing", () => {
     expect(isDailyRaidSummaryDue(new Date("2026-12-01T17:00:00.000Z"))).toBe(false);
   });
 
-  it("recognises Wednesday in Europe/London", () => {
+  it("recognises Wednesday and weekends in Europe/London", () => {
     expect(isLondonWednesday(new Date("2026-09-02T17:00:00.000Z"))).toBe(true);
     expect(isLondonWednesday(new Date("2026-09-03T17:00:00.000Z"))).toBe(false);
+    expect(isLondonWeekend(new Date("2026-09-05T17:00:00.000Z"))).toBe(true);
+    expect(isLondonWeekend(new Date("2026-09-06T17:00:00.000Z"))).toBe(true);
+    expect(isLondonWeekend(new Date("2026-09-07T17:00:00.000Z"))).toBe(false);
   });
 });
 
 describe("daily raid summary event trigger", () => {
   const monday = new Date("2026-08-31T17:00:00.000Z");
   const wednesday = new Date("2026-09-02T17:00:00.000Z");
+  const saturday = new Date("2026-09-05T17:00:00.000Z");
 
   it("does not trigger for ordinary five-star or Mega rotations on a normal non-Wednesday night", () => {
     const items = [
@@ -77,7 +82,7 @@ describe("daily raid summary event trigger", () => {
     ).toBe(false);
   });
 
-  it("triggers for an active event-derived Mega raid schedule on any day", () => {
+  it("triggers for an active weekday event-derived Mega raid schedule", () => {
     const items = [
       item("mega-ascension--raid-2026-08-31-slot-mega", "mega", "Malamar"),
     ];
@@ -85,17 +90,34 @@ describe("daily raid summary event trigger", () => {
     expect(shouldSendDailyRaidSummary(items, monday)).toBe(true);
   });
 
-  it("triggers for a five-star-only event raid schedule", () => {
+  it("triggers for a weekday five-star-only event raid schedule", () => {
     const items = [
-      item("festival--raid-2026-09-05-slot-five-star", "five-star", "Armored Mewtwo"),
+      item("festival--raid-2026-08-31-slot-five-star", "five-star", "Armored Mewtwo"),
     ];
     expect(hasActiveEventRaidBosses(items)).toBe(true);
     expect(shouldSendDailyRaidSummary(items, monday)).toBe(true);
   });
 
-  it("does not trigger for an event-derived Shadow raid schedule", () => {
+  it("never sends the 18:00 summary on a weekend event day", () => {
     const items = [
-      item("rocket-event--raid-2026-08-31-slot-shadow", "shadow", "Mewtwo"),
+      item("go-fest--raid-saturday-slot-mega", "mega", "Rayquaza"),
+      item("go-fest--raid-saturday-slot-five-star", "five-star", "Mewtwo"),
+    ];
+    expect(hasActiveEventRaidBosses(items)).toBe(true);
+    expect(shouldSendDailyRaidSummary(items, saturday)).toBe(false);
+  });
+
+  it("allows an explicitly named Shadow raid event on a weekday", () => {
+    const items = [
+      item("shadow-raid-event--raid-2026-08-31-slot-shadow", "shadow", "Mewtwo"),
+    ];
+    expect(hasActiveEventRaidBosses(items)).toBe(true);
+    expect(shouldSendDailyRaidSummary(items, monday)).toBe(true);
+  });
+
+  it("does not treat a generic event Shadow schedule as a Shadow raid event", () => {
+    const items = [
+      item("rocket-takeover--raid-2026-08-31-slot-shadow", "shadow", "Mewtwo"),
     ];
     expect(hasActiveEventRaidBosses(items)).toBe(false);
     expect(shouldSendDailyRaidSummary(items, monday)).toBe(false);
@@ -163,18 +185,31 @@ describe("daily raid summary boss selection", () => {
     expect(result.eventBosses).toEqual([]);
   });
 
-  it("excludes Shadow raids even when they are event-derived", () => {
+  it("includes Shadow bosses only for explicitly named Shadow raid events", () => {
     const result = selectDailyRaidSummaryBosses([
       item(
-        "rocket-event--raid-2026-08-31-slot-shadow",
+        "shadow-raid-event--raid-2026-08-31-slot-shadow",
         "shadow",
         "Mewtwo",
         [
           { boss: "Shadow Mewtwo", maxUnboostedCp: 2387, maxBoostedCp: 2984, possibleShiny: true },
         ],
       ),
+      item(
+        "rocket-takeover--raid-2026-08-31-slot-shadow",
+        "shadow",
+        "Lugia",
+        [
+          { boss: "Shadow Lugia", maxUnboostedCp: 2115, maxBoostedCp: 2645, possibleShiny: true },
+        ],
+      ),
     ]);
-    expect(result).toEqual({ fiveStarBosses: [], eventBosses: [] });
+    expect(result).toEqual({
+      fiveStarBosses: [],
+      eventBosses: [
+        { name: "Shadow Mewtwo", maxUnboostedCp: 2387, maxBoostedCp: 2984 },
+      ],
+    });
   });
 
   it("ignores next rotations", () => {
