@@ -1,6 +1,10 @@
 import prisma from "./prisma";
 import { getRaidToolsData } from "./raid-boss-history";
 import type { RaidBossTickerItem } from "./events";
+import {
+  PUSH_PREFERENCE_KEYS,
+  enabledPushOwnerIds,
+} from "./pushPreferences";
 import { isWebPushConfigured, sendWebPush } from "./webPush";
 
 export const DAILY_RAID_SUMMARY_USAGE_TYPE = "DAILY_RAID_SUMMARY_SENT";
@@ -84,23 +88,42 @@ export function isDailyRaidSummaryDue(now: Date = new Date()): boolean {
   return londonClock(now).hour === DAILY_RAID_SUMMARY_HOUR;
 }
 
-export function isLondonWednesday(now: Date = new Date()): boolean {
+function londonWeekday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
     weekday: "short",
-  }).format(now) === "Wed";
+  }).format(now);
 }
 
-function isSummaryCategory(item: RaidBossTickerItem): boolean {
-  return item.category === "five-star" || item.category === "mega";
+export function isLondonWednesday(now: Date = new Date()): boolean {
+  return londonWeekday(now) === "Wed";
+}
+
+export function isLondonWeekend(now: Date = new Date()): boolean {
+  const weekday = londonWeekday(now);
+  return weekday === "Sat" || weekday === "Sun";
+}
+
+function isExplicitShadowEventItem(item: RaidBossTickerItem): boolean {
+  return (
+    item.category === "shadow" &&
+    item.eventID.includes("--raid-") &&
+    /shadow/i.test(item.eventID)
+  );
+}
+
+function isEventSummaryItem(item: RaidBossTickerItem): boolean {
+  if (!item.eventID.includes("--raid-")) return false;
+  return (
+    item.category === "five-star" ||
+    item.category === "mega" ||
+    isExplicitShadowEventItem(item)
+  );
 }
 
 export function hasActiveEventRaidBosses(items: RaidBossTickerItem[]): boolean {
   return items.some(
-    (item) =>
-      item.state === "current" &&
-      item.eventID.includes("--raid-") &&
-      isSummaryCategory(item),
+    (item) => item.state === "current" && isEventSummaryItem(item),
   );
 }
 
@@ -108,6 +131,10 @@ export function shouldSendDailyRaidSummary(
   items: RaidBossTickerItem[],
   now: Date = new Date(),
 ): boolean {
+  // Weekend raid events are notified before their actual event start instead
+  // of generating an evening summary after the event has already begun.
+  if (isLondonWeekend(now)) return false;
+
   if (hasActiveEventRaidBosses(items)) return true;
   if (!isLondonWednesday(now)) return false;
   return items.some(
@@ -128,6 +155,9 @@ function displayNameForCategory(name: string, item: RaidBossTickerItem): string 
   const trimmed = name.trim();
   if (item.category === "mega" && !/^mega\b/i.test(trimmed)) {
     return `Mega ${trimmed}`;
+  }
+  if (item.category === "shadow" && !/^shadow\b/i.test(trimmed)) {
+    return `Shadow ${trimmed}`;
   }
   return trimmed;
 }
@@ -184,22 +214,15 @@ export function selectDailyRaidSummaryBosses(items: RaidBossTickerItem[]): {
   fiveStarBosses: DailyRaidSummaryBoss[];
   eventBosses: DailyRaidSummaryBoss[];
 } {
-  const current = items.filter(
-    (item) => item.state === "current" && isSummaryCategory(item),
+  const currentFiveStar = items.filter(
+    (item) => item.state === "current" && item.category === "five-star",
   );
-  const fiveStarBosses = uniqueBosses(
-    current
-      .filter((item) => item.category === "five-star")
-      .flatMap(tickerBosses),
-  );
+  const fiveStarBosses = uniqueBosses(currentFiveStar.flatMap(tickerBosses));
   const fiveStarKeys = new Set(fiveStarBosses.map((boss) => normaliseName(boss.name)));
 
-  // Derived raid-schedule entries use --raid- IDs. Only 5-star and Mega
-  // event raids belong in the evening summary; Shadow raids are deliberately
-  // excluded even when an event schedule contains them.
   const eventBosses = uniqueBosses(
-    current
-      .filter((item) => item.eventID.includes("--raid-"))
+    items
+      .filter((item) => item.state === "current" && isEventSummaryItem(item))
       .flatMap(tickerBosses)
       .filter((boss) => !fiveStarKeys.has(normaliseName(boss.name))),
   );
@@ -297,9 +320,17 @@ export async function sendDailyRaidSummary(
     return emptyResult(
       true,
       due,
-      "No Wednesday 5-star Raid Hour or active event 5-star/Mega raid lineup was found; evening raid summary suppressed.",
+      "No weekday event raid lineup or Wednesday 5-star Raid Hour was found; evening raid summary suppressed.",
     );
   }
+
+  const enabledOwners = await enabledPushOwnerIds(
+    subscriptions.map((subscription: any) => subscription.ownerId),
+    PUSH_PREFERENCE_KEYS.RAIDS,
+  );
+  const eligibleSubscriptions = subscriptions.filter((subscription: any) =>
+    enabledOwners.has(subscription.ownerId),
+  );
 
   const { fiveStarBosses, eventBosses } = selectDailyRaidSummaryBosses(
     raidTools.tickerItems,
@@ -314,14 +345,14 @@ export async function sendDailyRaidSummary(
 
   if (!payload) {
     return {
-      ...emptyResult(true, due, "A qualifying raid night is active, but no 5-star or Mega raid bosses could be resolved."),
+      ...emptyResult(true, due, "A qualifying raid night is active, but no supported raid bosses could be resolved."),
       fiveStarBosses,
       eventBosses,
     };
   }
-  if (subscriptions.length === 0) {
+  if (eligibleSubscriptions.length === 0) {
     return {
-      ...emptyResult(true, due, "No devices are subscribed to push notifications."),
+      ...emptyResult(true, due, "No subscribed devices have Raid alerts enabled."),
       fiveStarBosses,
       eventBosses,
     };
@@ -353,7 +384,7 @@ export async function sendDailyRaidSummary(
   let removed = 0;
   let alreadySent = 0;
 
-  for (const subscription of subscriptions as any[]) {
+  for (const subscription of eligibleSubscriptions as any[]) {
     if (recordDelivery && sentSubscriptionIds.has(subscription.id)) {
       alreadySent += 1;
       continue;
