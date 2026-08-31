@@ -22,11 +22,17 @@ const PUSH_OPTIONS = [
     label: "Trade alerts",
     description: "Wanted-trade and listing-match notifications.",
   },
+  {
+    key: "PUSH_NEW_GYMS",
+    label: "New gym alerts",
+    description: "Notifications when a new gym is added to the community map.",
+  },
 ]
 
 const DEFAULT_PUSH_PREFERENCES = {
   PUSH_RAIDS: true,
   PUSH_TRADES: true,
+  PUSH_NEW_GYMS: true,
 }
 
 const browserTimeZone = () => {
