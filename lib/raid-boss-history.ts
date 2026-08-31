@@ -52,9 +52,53 @@ function categoryAnchor(category: RaidCategory): string {
   return `raid-${category}`;
 }
 
-function eventDate(value: string): Date {
-  const includesTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
-  return new Date(includesTimeZone ? value : `${value}Z`);
+function hasExplicitTimeZone(value: string): boolean {
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+}
+
+function londonOffsetMs(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)]),
+  );
+  const londonAsUtc = Date.UTC(
+    values.year,
+    values.month - 1,
+    values.day,
+    values.hour,
+    values.minute,
+    values.second,
+    date.getUTCMilliseconds(),
+  );
+  return londonAsUtc - date.getTime();
+}
+
+export function raidStorageDate(value: string): Date {
+  if (hasExplicitTimeZone(value)) {
+    return new Date(value);
+  }
+
+  const wallClockMs = Date.parse(`${value}Z`);
+  if (!Number.isFinite(wallClockMs)) {
+    return new Date(Number.NaN);
+  }
+
+  let instant = new Date(wallClockMs);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    instant = new Date(wallClockMs - londonOffsetMs(instant));
+  }
+  return instant;
 }
 
 function eventById(events: PokemonGoEventSummary[]): Map<string, PokemonGoEventSummary> {
@@ -99,8 +143,8 @@ async function syncRaidRotations(events: PokemonGoEventSummary[]): Promise<void>
     const data = {
       category: item.category,
       boss: item.boss,
-      start: eventDate(item.start),
-      end: eventDate(item.end),
+      start: raidStorageDate(item.start),
+      end: raidStorageDate(item.end),
       startRaw: item.start,
       endRaw: item.end,
       sourceUrl: item.link,
@@ -119,6 +163,8 @@ async function syncRaidRotations(events: PokemonGoEventSummary[]): Promise<void>
       existing.boss === data.boss &&
       existing.startRaw === data.startRaw &&
       existing.endRaw === data.endRaw &&
+      new Date(existing.start).getTime() === data.start.getTime() &&
+      new Date(existing.end).getTime() === data.end.getTime() &&
       (existing.sourceUrl ?? null) === data.sourceUrl &&
       (existing.imageUrl ?? null) === data.imageUrl;
 
