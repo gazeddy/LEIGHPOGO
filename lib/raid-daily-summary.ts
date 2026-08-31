@@ -84,6 +84,12 @@ export function isDailyRaidSummaryDue(now: Date = new Date()): boolean {
   return londonClock(now).hour === DAILY_RAID_SUMMARY_HOUR;
 }
 
+export function hasActiveEventRaidBosses(items: RaidBossTickerItem[]): boolean {
+  return items.some(
+    (item) => item.state === "current" && item.eventID.includes("--raid-"),
+  );
+}
+
 function normaliseName(value: string): string {
   return value
     .normalize("NFKD")
@@ -261,6 +267,15 @@ export async function sendDailyRaidSummary(
       },
     }),
   ]);
+
+  if (!hasActiveEventRaidBosses(raidTools.tickerItems)) {
+    return emptyResult(
+      true,
+      due,
+      "No active event-specific raid bosses were found; daily raid summary suppressed.",
+    );
+  }
+
   const { fiveStarBosses, eventBosses } = selectDailyRaidSummaryBosses(
     raidTools.tickerItems,
   );
@@ -274,7 +289,7 @@ export async function sendDailyRaidSummary(
 
   if (!payload) {
     return {
-      ...emptyResult(true, due, "No current five-star or event raid bosses were found."),
+      ...emptyResult(true, due, "An event raid is active, but no raid bosses could be resolved."),
       fiveStarBosses,
       eventBosses,
     };
