@@ -296,10 +296,15 @@ async function categoryHistory(category: RaidCategory, now: Date): Promise<RaidR
       end: { gt: previousCutoff },
     },
     orderBy: { start: "desc" },
-    take: 2,
   });
 
-  return Promise.all(rows.map(async (row: any) => ({
+  const activeRows = rows.filter(
+    (row: any) => new Date(row.start) <= now && new Date(row.end) > now,
+  );
+  const previousRow = rows.find((row: any) => new Date(row.end) <= now);
+  const visibleRows = previousRow ? [...activeRows, previousRow] : activeRows;
+
+  return Promise.all(visibleRows.map(async (row: any) => ({
     eventID: row.eventId,
     category,
     label: raidCategoryLabel(category),
