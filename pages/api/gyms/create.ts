@@ -72,21 +72,11 @@ export default async function handler(
       firstSeenAt: createdAt,
     };
     const state = await readGymState();
-    const creatorOwnerId = Number(
-      (session.user as { id?: string | number } | undefined)?.id,
-    );
 
-    await writeGymState(
-      {
-        ...state,
-        gyms: sortGyms([...state.gyms, gym]),
-      },
-      {
-        excludePushOwnerId: Number.isInteger(creatorOwnerId)
-          ? creatorOwnerId
-          : null,
-      },
-    );
+    await writeGymState({
+      ...state,
+      gyms: sortGyms([...state.gyms, gym]),
+    });
 
     res.setHeader("Cache-Control", "private, no-store");
     return res.status(201).json({
