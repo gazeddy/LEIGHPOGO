@@ -54,14 +54,14 @@ function londonWallClockMs(now: Date): number {
   );
 }
 
-function eventStartComparison(event: PokemonGoEventSummary, now: Date): {
+function wallClockComparison(startValue: string, now: Date): {
   startMs: number;
   nowMs: number;
 } {
   const startMs = new Date(
-    hasExplicitTimeZone(event.start) ? event.start : `${event.start}Z`,
+    hasExplicitTimeZone(startValue) ? startValue : `${startValue}Z`,
   ).getTime();
-  const nowMs = hasExplicitTimeZone(event.start)
+  const nowMs = hasExplicitTimeZone(startValue)
     ? now.getTime()
     : londonWallClockMs(now);
   return { startMs, nowMs };
@@ -100,6 +100,14 @@ function supportedScheduledItems(event: PokemonGoEventSummary): RaidBossTickerIt
   );
 }
 
+export function raidEventReminderStart(event: PokemonGoEventSummary): string {
+  const scheduled = supportedScheduledItems(event);
+  if (scheduled.length === 0) return event.start;
+  return scheduled
+    .map((item) => item.start)
+    .sort((left, right) => left.localeCompare(right))[0];
+}
+
 export function isSupportedRaidEvent(event: PokemonGoEventSummary): boolean {
   const type = event.eventType.trim().toLowerCase();
   if (type === "raid-hour" || type === "raid-day") return true;
@@ -123,7 +131,7 @@ export function isRaidEventReminderDue(
   leadMinutes: number = RAID_EVENT_REMINDER_LEAD_MINUTES,
 ): boolean {
   if (!isSupportedRaidEvent(event)) return false;
-  const { startMs, nowMs } = eventStartComparison(event, now);
+  const { startMs, nowMs } = wallClockComparison(raidEventReminderStart(event), now);
   if (!Number.isFinite(startMs) || !Number.isFinite(nowMs)) return false;
 
   const remainingMs = startMs - nowMs;
@@ -178,9 +186,7 @@ export function inferRaidCategory(boss: string): RaidCategory {
 export function raidEventBossItems(event: PokemonGoEventSummary): RaidBossTickerItem[] {
   const scheduled = supportedScheduledItems(event);
   if (scheduled.length > 0) {
-    const earliestStart = scheduled
-      .map((item) => item.start)
-      .sort((left, right) => left.localeCompare(right))[0];
+    const earliestStart = raidEventReminderStart(event);
     return scheduled.filter((item) => item.start === earliestStart);
   }
 
@@ -280,6 +286,6 @@ export function buildRaidEventPushPayload(
 }
 
 export function raidEventDateKey(event: PokemonGoEventSummary): string {
-  const match = event.start.match(/^(\d{4}-\d{2}-\d{2})/);
+  const match = raidEventReminderStart(event).match(/^(\d{4}-\d{2}-\d{2})/);
   return match?.[1] || event.eventID;
 }
