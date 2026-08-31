@@ -3,6 +3,7 @@ const {
   selectNextRaidBosses,
   selectRaidBossEvents,
 } = require("../../lib/event-selection");
+const { raidStorageDate } = require("../../lib/raid-boss-history");
 const { calculateTypeMatchups } = require("../../lib/raid-detail-source");
 
 function raidEvent({ id, name, start, end }) {
@@ -76,6 +77,20 @@ describe("raid rotation visibility", () => {
       new Date("2026-08-19T05:00:00.000Z"),
     );
     expect(current.map((item) => item.boss)).toContain("Lunala");
+  });
+});
+
+describe("raid storage timezone conversion", () => {
+  it("stores summer London wall-clock times as BST instants", () => {
+    expect(raidStorageDate("2026-08-31T10:00:00.000").toISOString()).toBe(
+      "2026-08-31T09:00:00.000Z",
+    );
+  });
+
+  it("stores winter London wall-clock times as GMT instants", () => {
+    expect(raidStorageDate("2026-12-01T10:00:00.000").toISOString()).toBe(
+      "2026-12-01T10:00:00.000Z",
+    );
   });
 });
 
