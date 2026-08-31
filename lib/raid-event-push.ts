@@ -1,7 +1,7 @@
 import prisma from "./prisma";
 import { getEventsPageData } from "./events-server";
 import { getRaidToolsData } from "./raid-boss-history";
-import { getCurrentRaidBossProfiles } from "./raid-detail-source";
+import { getResolvedRaidBossProfiles } from "./raid-profile-resolver";
 import {
   RAID_EVENT_REMINDER_KIND,
   buildRaidEventPushPayload,
@@ -117,7 +117,7 @@ async function bossSummariesForTickerItem(
   }
 
   try {
-    const profiles = await getCurrentRaidBossProfiles(item);
+    const profiles = await getResolvedRaidBossProfiles(item);
     if (profiles.length > 0) {
       return profiles.map((profile) => ({
         name: profile.name,
@@ -338,7 +338,7 @@ export async function sendRaidEventPushes(
           sentKeys.add(key);
           sent += 1;
 
-          if (isEasterEggRecipient) {
+          if (isEasterEggRecipient && !result.suppressed) {
             const dateKey = raidEventDateKey(event);
             successfulEasterEggs.set(`${subscription.ownerId}|${event.eventID}`, {
               ownerId: subscription.ownerId,
