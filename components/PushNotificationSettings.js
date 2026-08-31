@@ -11,6 +11,24 @@ const urlBase64ToUint8Array = (value) => {
 const unsupportedMessage =
   "Push notifications are not available in this browser. On iPhone or iPad, install LEIGHPOGO to the Home Screen first."
 
+const PUSH_OPTIONS = [
+  {
+    key: "PUSH_RAIDS",
+    label: "Raid alerts",
+    description: "Raid Hour, Raid Day and event raid notifications.",
+  },
+  {
+    key: "PUSH_TRADES",
+    label: "Trade alerts",
+    description: "Wanted-trade and listing-match notifications.",
+  },
+]
+
+const DEFAULT_PUSH_PREFERENCES = {
+  PUSH_RAIDS: true,
+  PUSH_TRADES: true,
+}
+
 const browserTimeZone = () => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"
@@ -38,6 +56,8 @@ export default function PushNotificationSettings() {
   const [subscribed, setSubscribed] = useState(false)
   const [activeAction, setActiveAction] = useState("")
   const [message, setMessage] = useState("")
+  const [preferences, setPreferences] = useState(DEFAULT_PUSH_PREFERENCES)
+  const [savingPreference, setSavingPreference] = useState("")
 
   const busy = Boolean(activeAction)
 
@@ -63,9 +83,10 @@ export default function PushNotificationSettings() {
       setPermission(Notification.permission)
 
       try {
-        const [registration, configResponse] = await Promise.all([
+        const [registration, configResponse, preferenceResponse] = await Promise.all([
           navigator.serviceWorker.ready,
           fetch("/api/push/config", { cache: "no-store" }),
+          fetch("/api/push/preferences", { cache: "no-store" }),
         ])
 
         if (!configResponse.ok) {
@@ -73,6 +94,9 @@ export default function PushNotificationSettings() {
         }
 
         const config = await configResponse.json()
+        const preferenceBody = preferenceResponse.ok
+          ? await preferenceResponse.json()
+          : { preferences: DEFAULT_PUSH_PREFERENCES }
         const existingSubscription = await registration.pushManager.getSubscription()
 
         if (existingSubscription) {
@@ -85,6 +109,10 @@ export default function PushNotificationSettings() {
           setConfigured(Boolean(config.configured && config.publicKey))
           setPublicKey(config.publicKey || "")
           setSubscribed(Boolean(existingSubscription))
+          setPreferences({
+            ...DEFAULT_PUSH_PREFERENCES,
+            ...(preferenceBody.preferences || {}),
+          })
           if (!config.configured) {
             setMessage(
               "Push is wired into V3, but the server VAPID configuration is not complete yet.",
@@ -197,6 +225,33 @@ export default function PushNotificationSettings() {
     }
   }
 
+  const updatePreference = async (key, enabled) => {
+    if (savingPreference) return
+
+    const previous = preferences[key]
+    setSavingPreference(key)
+    setPreferences((current) => ({ ...current, [key]: enabled }))
+    setMessage("")
+
+    try {
+      const response = await fetch("/api/push/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, enabled }),
+      })
+      const body = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to save notification preference.")
+      }
+    } catch (error) {
+      setPreferences((current) => ({ ...current, [key]: previous }))
+      setMessage(error.message || "Unable to save notification preference.")
+    } finally {
+      setSavingPreference("")
+    }
+  }
+
   const sendTestPush = async () => {
     if (!subscribed || busy) return
 
@@ -235,12 +290,33 @@ export default function PushNotificationSettings() {
             Get LEIGHPOGO alerts even when the site is not open. Permission is only requested when you choose Enable.
           </p>
           <p className="muted">
-            Push-enabled devices receive raid-event reminders about 30 minutes before Raid Hours and Raid Days, including the boss and hundo CPs when that data is available.
+            Raid alerts follow the event schedule: Raid Hour reminders are sent around the evening raid window, while Raid Days and major weekend events are sent before their actual start time.
           </p>
         </div>
         <span className={`push-status ${subscribed ? "enabled" : "disabled"}`}>
           {statusLabel}
         </span>
+      </div>
+
+      <div className="push-preference-list">
+        <h3>Choose your alerts</h3>
+        {PUSH_OPTIONS.map((option) => (
+          <label key={option.key} className="push-preference-option">
+            <input
+              type="checkbox"
+              checked={preferences[option.key] !== false}
+              disabled={checking || Boolean(savingPreference)}
+              onChange={(event) => updatePreference(option.key, event.target.checked)}
+            />
+            <span>
+              <strong>{option.label}</strong>
+              <span className="muted"> — {option.description}</span>
+            </span>
+          </label>
+        ))}
+        <p className="muted">
+          Pokédex import completion alerts are kept separate because they report the result of an import you started yourself.
+        </p>
       </div>
 
       {permission === "denied" && (
