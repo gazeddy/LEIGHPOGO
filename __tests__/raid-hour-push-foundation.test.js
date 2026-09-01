@@ -21,15 +21,19 @@ describe("V3 raid event push wiring", () => {
     expect(migration).toContain('ADD COLUMN "lastRaidHourReminderKey"')
   })
 
-  it("syncs the browser timezone and describes raid-event reminders", () => {
+  it("syncs the browser timezone and keeps raid-event reminders at 30 minutes", () => {
     const component = fs.readFileSync(
       path.join(process.cwd(), "components/PushNotificationSettings.js"),
+      "utf8",
+    )
+    const reminder = fs.readFileSync(
+      path.join(process.cwd(), "lib/raid-event-reminder.ts"),
       "utf8",
     )
 
     expect(component).toContain("resolvedOptions().timeZone")
     expect(component).toContain("timeZone: browserTimeZone()")
-    expect(component).toContain("raid-event reminders about 30 minutes before Raid Hours and Raid Days")
+    expect(reminder).toContain("RAID_EVENT_REMINDER_LEAD_MINUTES = 30")
   })
 
   it("protects the generic raid-event scheduler endpoint with a server-side secret", () => {
