@@ -1,6 +1,6 @@
 {
   "name": "pokemon-go-friend-codes",
-  "version": "1.0.0",
+  "version": "4.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbo -p 3001 -H 0.0.0.0",
@@ -12,7 +12,10 @@
     "db:status": "prisma migrate status",
     "db:deploy": "prisma migrate deploy",
     "pogoapi:update": "node scripts/updateReleasedPokemonCache.js",
-    "push:keys": "node scripts/generateVapidKeys.js"
+    "push:keys": "node scripts/generateVapidKeys.js",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
