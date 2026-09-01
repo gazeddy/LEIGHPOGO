@@ -13,6 +13,8 @@ const publicPaths = [
   "/register",
   "/privacy",
   "/privacy/accept",
+  "/robots.txt",
+  "/sitemap.xml",
   "/favicon.ico",
 ]
 
@@ -26,6 +28,19 @@ function isPublicPath(pathname) {
     pathname.startsWith("/privacy/") ||
     pathname.startsWith("/_next/")
   )
+}
+
+function legacyEventRedirect(req) {
+  if (req.nextUrl.pathname !== "/events") return null
+
+  const eventID = req.nextUrl.searchParams.get("event")?.trim()
+  if (!eventID) return null
+
+  const destination = req.nextUrl.clone()
+  destination.pathname = `/events/${encodeURIComponent(eventID)}`
+  destination.searchParams.delete("event")
+
+  return NextResponse.redirect(destination, 308)
 }
 
 function isPrivacyExemptApi(pathname) {
@@ -48,6 +63,11 @@ function privacyRedirect(req) {
 export async function middleware(req) {
   const { pathname } = req.nextUrl
   const isApiRequest = pathname.startsWith("/api/")
+  const eventRedirect = legacyEventRedirect(req)
+
+  if (eventRedirect) {
+    return eventRedirect
+  }
 
   const token = await getToken({
     req,

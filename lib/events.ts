@@ -45,7 +45,7 @@ export interface PokemonGoEventSummary {
 export function getEventDestination(
   event: Pick<PokemonGoEventSummary, "eventID">,
 ): string {
-  return `/events?event=${encodeURIComponent(event.eventID)}`;
+  return `/events/${encodeURIComponent(event.eventID)}`;
 }
 
 export interface EventsPageData {

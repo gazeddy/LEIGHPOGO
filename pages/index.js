@@ -13,19 +13,19 @@ export default function Home({ isLoggedIn, isAdmin, hasFriendCode, campfireUrl }
   return (
     <>
       <Head>
-        <title>Leigh Pokémon Go Community</title>
+        <title>Pokémon GO Leigh, Greater Manchester | LeighPogo</title>
         <meta
           name="description"
-          content="Friend codes, events, guides and community tools for Pokémon GO players around Leigh."
+          content="Pokémon GO events, friend codes and community tools for players in Leigh, Greater Manchester."
         />
       </Head>
 
       <main className={`container ${styles.page}`}>
         <header className={styles.hero}>
           <p className={styles.eyebrow}>Leigh Pokémon GO Community</p>
-          <h1>Community hub</h1>
+          <h1>Pokémon GO in Leigh, Greater Manchester</h1>
           <p className={styles.intro}>
-            Open the tools and information available to your account from one place.
+            Local Pokémon GO events, friend codes and community tools for players in Leigh and the surrounding area.
           </p>
         </header>
 
