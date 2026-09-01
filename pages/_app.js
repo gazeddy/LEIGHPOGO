@@ -17,6 +17,7 @@ import "../styles/pwa.css"
 import "../styles/privacy.css"
 import Navbar from "../components/Navbar"
 import PokemonRegionalAdmin from "../components/admin/PokemonRegionalAdmin"
+import PushPermissionPrompt from "../components/PushPermissionPrompt"
 import TickerStack from "../components/tickers/TickerStack"
 import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
 import PwaBootstrap from "../components/PwaBootstrap"
@@ -44,6 +45,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       {!privacyGate && <PokedexCatalogFetchGuard />}
       {!privacyGate && <Navbar />}
       {!privacyGate && <TickerStack />}
+      {!privacyGate && <PushPermissionPrompt />}
       <Component {...pageProps} />
       {!privacyGate && showPokemonRegionalAdmin && <PokemonRegionalAdmin />}
       <footer className="site-footer">
