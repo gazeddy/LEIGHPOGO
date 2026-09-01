@@ -22,14 +22,62 @@ import TickerStack from "../components/tickers/TickerStack"
 import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
 import PwaBootstrap from "../components/PwaBootstrap"
 
+const PAGE_TITLES = {
+  "/": "Leigh Pokémon Go Community",
+  "/account": "Account | LEIGHPOGO",
+  "/admin": "Admin | LEIGHPOGO",
+  "/entries": "Friend Codes | LEIGHPOGO",
+  "/friend-codes": "Friend Codes | LEIGHPOGO",
+  "/gyms": "Gym Map | LEIGHPOGO",
+  "/login": "Sign In | LEIGHPOGO",
+  "/notifications": "Notifications | LEIGHPOGO",
+  "/pokedex": "Pokédex | LEIGHPOGO",
+  "/pokedex-import": "Pokédex Import | LEIGHPOGO",
+  "/privacy": "Privacy Policy | LEIGHPOGO",
+  "/privacy/accept": "Privacy Policy | LEIGHPOGO",
+  "/register": "Sign Up | LEIGHPOGO",
+  "/raid-bosses": "Raid Bosses | LEIGHPOGO",
+  "/trades": "Trades | LEIGHPOGO",
+  "/trades/wanted": "Wanted Trades | LEIGHPOGO",
+}
+
+const TITLE_WORDS = {
+  api: "API",
+  cp: "CP",
+  pogo: "PoGo",
+  pokedex: "Pokédex",
+  pokemon: "Pokémon",
+  pwa: "PWA",
+}
+
+const routeTitle = (pathname) => {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname]
+
+  const segment = pathname
+    .split("/")
+    .filter((part) => part && !part.startsWith("["))
+    .at(-1)
+
+  if (!segment) return "LEIGHPOGO"
+
+  const label = segment
+    .split("-")
+    .map((word) => TITLE_WORDS[word.toLowerCase()] || `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(" ")
+
+  return `${label} | LEIGHPOGO`
+}
+
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter()
   const showPokemonRegionalAdmin = router.pathname === "/admin/pokedex"
   const privacyGate = router.pathname === "/privacy/accept"
+  const pageTitle = routeTitle(router.pathname)
 
   return (
     <SessionProvider session={session}>
       <Head>
+        <title>{pageTitle}</title>
         <meta name="theme-color" content="#0d1117" />
         <meta name="application-name" content="LEIGHPOGO" />
         <meta name="mobile-web-app-capable" content="yes" />
