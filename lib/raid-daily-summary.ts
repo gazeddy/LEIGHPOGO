@@ -105,11 +105,13 @@ export function isLondonWeekend(now: Date = new Date()): boolean {
 }
 
 function isExplicitShadowEventItem(item: RaidBossTickerItem): boolean {
-  return (
-    item.category === "shadow" &&
-    item.eventID.includes("--raid-") &&
-    /shadow/i.test(item.eventID)
-  );
+  if (item.category !== "shadow") return false;
+
+  const raidMarkerIndex = item.eventID.indexOf("--raid-");
+  if (raidMarkerIndex < 0) return false;
+
+  const eventId = item.eventID.slice(0, raidMarkerIndex);
+  return /shadow/i.test(eventId);
 }
 
 function isEventSummaryItem(item: RaidBossTickerItem): boolean {
