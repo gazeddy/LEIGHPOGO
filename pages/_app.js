@@ -15,6 +15,7 @@ import "../styles/pokedex-selection.css"
 import "../styles/pwa.css"
 import Navbar from "../components/Navbar"
 import PokemonRegionalAdmin from "../components/admin/PokemonRegionalAdmin"
+import PushPermissionPrompt from "../components/PushPermissionPrompt"
 import TickerStack from "../components/tickers/TickerStack"
 import PokedexCatalogFetchGuard from "../components/PokedexCatalogFetchGuard"
 import PwaBootstrap from "../components/PwaBootstrap"
@@ -41,6 +42,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       <PokedexCatalogFetchGuard />
       <Navbar />
       <TickerStack />
+      <PushPermissionPrompt />
       <Component {...pageProps} />
       {showPokemonRegionalAdmin && <PokemonRegionalAdmin />}
     </SessionProvider>
