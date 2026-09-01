@@ -78,12 +78,9 @@ export default function EventPage({
       <Head>
         <title>{event.name} – Pokémon GO Event | LeighPogo</title>
         <meta name="description" content={description} />
-        <link rel="canonical" href={canonicalUrl} />
         <meta property="og:type" content="article" />
-        <meta property="og:site_name" content="LeighPogo" />
         <meta property="og:title" content={`${event.name} – Pokémon GO Event`} />
         <meta property="og:description" content={description} />
-        <meta property="og:url" content={canonicalUrl} />
         {event.image && <meta property="og:image" content={event.image} />}
         <script
           type="application/ld+json"

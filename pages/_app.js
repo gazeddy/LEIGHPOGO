@@ -97,6 +97,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
   const pageOwnsDescription =
     router.pathname === "/" ||
     router.pathname === "/events" ||
+    router.pathname === "/friend-codes" ||
     router.pathname.startsWith("/events/")
   const eventLinks =
     router.pathname === "/events" && Array.isArray(pageProps.events)
@@ -114,7 +115,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
           name="robots"
           content={indexable ? "index,follow" : "noindex,nofollow"}
         />
-        <link rel="canonical" href={canonicalUrl} />
+        <link rel="canonical" href={canonicalUrl} key="canonical" />
         <meta name="theme-color" content="#0d1117" />
         <meta name="application-name" content="LEIGHPOGO" />
         <meta name="mobile-web-app-capable" content="yes" />
