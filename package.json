@@ -1,6 +1,6 @@
 {
   "name": "pokemon-go-friend-codes",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "private": true,
   "scripts": {
     "dev": "next dev --turbo -p 3001 -H 0.0.0.0",
