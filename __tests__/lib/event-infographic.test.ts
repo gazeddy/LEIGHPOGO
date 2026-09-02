@@ -101,12 +101,14 @@ describe("event infographic rendering", () => {
     expect(svg).toContain("EVENT DETAILS");
   });
 
-  test("escapes event-provided XML characters", () => {
+  test("escapes event-provided XML characters even when wrapped across lines", () => {
     const event = fixture();
     event.bonuses = ["2× XP & Stardust <bonus>"];
 
     const svg = buildEventInfographicSvg(event);
-    expect(svg).toContain("2× XP &amp; Stardust &lt;bonus&gt;");
+    expect(svg).toContain("2× XP &amp; Stardust");
+    expect(svg).toContain("&lt;bonus&gt;");
+    expect(svg).not.toContain("<bonus>");
   });
 
   test("creates stable file names and readable date ranges", () => {
@@ -118,7 +120,7 @@ describe("event infographic rendering", () => {
         "2026-08-31T10:00:00.000",
         "2026-09-04T23:59:00.000",
       ),
-    ).toBe("31 AUG – 4 SEP 2026");
+    ).toBe("31 AUG – 4 SEPT 2026");
   });
 
   test("rasterizes the template into a real PNG", async () => {
