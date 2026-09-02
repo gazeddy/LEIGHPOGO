@@ -27,6 +27,8 @@ interface TypeSummary {
   count: number;
 }
 
+type ReminderMode = "on" | "auto" | "off";
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
@@ -63,6 +65,15 @@ function eventTypeSummaries(events: PokemonGoEventSummary[]): TypeSummary[] {
         eventType,
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function reminderMode(
+  settings: CampfireReminderSettings,
+  eventType: string,
+): ReminderMode {
+  if (settings.eventTypes.includes(eventType)) return "on";
+  if (settings.excludedEventTypes.includes(eventType)) return "off";
+  return "auto";
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async (context) => {
@@ -122,13 +133,37 @@ export default function CampfireReminderAdminPage({
     [initialEvents, initialOverrides, settings, keywords],
   );
 
-  function toggleEventType(eventType: string) {
-    setSettings((current) => ({
-      ...current,
-      eventTypes: current.eventTypes.includes(eventType)
-        ? current.eventTypes.filter((value) => value !== eventType)
-        : [...current.eventTypes, eventType],
-    }));
+  function cycleEventType(eventType: string) {
+    setSettings((current) => {
+      const mode = reminderMode(current, eventType);
+
+      if (mode === "on") {
+        return {
+          ...current,
+          eventTypes: current.eventTypes.filter((value) => value !== eventType),
+          excludedEventTypes: Array.from(
+            new Set([...current.excludedEventTypes, eventType]),
+          ),
+        };
+      }
+
+      if (mode === "off") {
+        return {
+          ...current,
+          excludedEventTypes: current.excludedEventTypes.filter(
+            (value) => value !== eventType,
+          ),
+        };
+      }
+
+      return {
+        ...current,
+        eventTypes: Array.from(new Set([...current.eventTypes, eventType])),
+        excludedEventTypes: current.excludedEventTypes.filter(
+          (value) => value !== eventType,
+        ),
+      };
+    });
     setMessage(null);
     setError(null);
   }
@@ -137,6 +172,9 @@ export default function CampfireReminderAdminPage({
     setSettings({
       ...DEFAULT_CAMPFIRE_REMINDER_SETTINGS,
       eventTypes: [...DEFAULT_CAMPFIRE_REMINDER_SETTINGS.eventTypes],
+      excludedEventTypes: [
+        ...DEFAULT_CAMPFIRE_REMINDER_SETTINGS.excludedEventTypes,
+      ],
       nameKeywords: [...DEFAULT_CAMPFIRE_REMINDER_SETTINGS.nameKeywords],
     });
     setKeywords(DEFAULT_CAMPFIRE_REMINDER_SETTINGS.nameKeywords.join(", "));
@@ -155,6 +193,7 @@ export default function CampfireReminderAdminPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           eventTypes: settings.eventTypes,
+          excludedEventTypes: settings.excludedEventTypes,
           nameKeywords: keywords
             .split(",")
             .map((value) => value.trim())
@@ -208,10 +247,15 @@ export default function CampfireReminderAdminPage({
       {message && <p className="notice success">{message}</p>}
       {error && <p className="notice error">{error}</p>}
 
-      <section className={`reminder-summary${missingEvents.length > 0 ? " attention" : " clear"}`}>
+      <section
+        className={`reminder-summary${missingEvents.length > 0 ? " attention" : " clear"}`}
+      >
         <div>
           <strong>{missingEvents.length}</strong>
-          <span>upcoming event{missingEvents.length === 1 ? "" : "s"} currently need a Campfire meetup</span>
+          <span>
+            upcoming event{missingEvents.length === 1 ? "" : "s"} currently need a
+            Campfire meetup
+          </span>
         </div>
         <Link href="/admin/events">Open event feed</Link>
       </section>
@@ -237,8 +281,8 @@ export default function CampfireReminderAdminPage({
           <div>
             <h2>Reminder rules</h2>
             <p>
-              An event triggers a reminder when it matches any selected event type,
-              any keyword, or the weekend rule.
+              Event types can be forced ON, forced OFF, or left on AUTO so keywords
+              and the weekend rule can decide.
             </p>
           </div>
           <button type="button" onClick={useRecommendedDefaults}>
@@ -259,7 +303,9 @@ export default function CampfireReminderAdminPage({
           />
           <span>
             <strong>Weekend events</strong>
-            <small>Warn for any event whose date range includes a Saturday or Sunday.</small>
+            <small>
+              Warn for AUTO event types whose date range includes a Saturday or Sunday.
+            </small>
           </span>
         </label>
 
@@ -268,35 +314,40 @@ export default function CampfireReminderAdminPage({
           <input
             value={keywords}
             onChange={(event) => setKeywords(event.target.value)}
-            placeholder="raid hour, raid day, go fest"
+            placeholder="go fest"
           />
           <small>
-            Comma separated. This catches special event families even when their feed
-            event type is generic.
+            Comma separated. Keywords apply only to AUTO event types; OFF always wins.
           </small>
         </label>
 
         <fieldset>
           <legend>Imported event types</legend>
-          <p>Tap an event type to turn its Campfire reminder requirement on or off.</p>
+          <p>
+            Tap a type to cycle ON → OFF → AUTO. ON always reminds. OFF never reminds.
+            AUTO uses the keyword and weekend rules above.
+          </p>
           <div className="type-grid">
             {summaries.map((summary) => {
-              const selected = settings.eventTypes.includes(summary.eventType);
+              const mode = reminderMode(settings, summary.eventType);
 
               return (
                 <button
                   key={summary.eventType}
                   type="button"
-                  className={`type-toggle${selected ? " selected" : ""}`}
-                  aria-pressed={selected}
-                  onClick={() => toggleEventType(summary.eventType)}
+                  className={`type-toggle ${mode}`}
+                  data-mode={mode}
+                  aria-label={`${summary.label}: ${mode.toUpperCase()}`}
+                  onClick={() => cycleEventType(summary.eventType)}
                 >
                   <span className="type-toggle-state" aria-hidden="true">
-                    {selected ? "ON" : "OFF"}
+                    {mode.toUpperCase()}
                   </span>
                   <span className="type-toggle-copy">
                     <strong>{summary.label}</strong>
-                    <small>{summary.eventType} · {summary.count} upcoming</small>
+                    <small>
+                      {summary.eventType} · {summary.count} upcoming
+                    </small>
                   </span>
                 </button>
               );
@@ -305,7 +356,12 @@ export default function CampfireReminderAdminPage({
         </fieldset>
 
         <div className="actions">
-          <button type="button" className="primary" disabled={saving} onClick={saveSettings}>
+          <button
+            type="button"
+            className="primary"
+            disabled={saving}
+            onClick={saveSettings}
+          >
             {saving ? "Saving…" : "Save reminder rules"}
           </button>
         </div>
@@ -353,9 +409,13 @@ export default function CampfireReminderAdminPage({
         .type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; margin-top: 12px; }
         .type-toggle { display: flex; align-items: center; gap: 10px; min-height: 58px; width: 100%; padding: 10px 12px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; color: #f0f6fc; text-align: left; touch-action: manipulation; }
         .type-toggle:hover, .type-toggle:focus-visible { border-color: #58a6ff; }
-        .type-toggle.selected { border-color: #238636; background: rgba(35,134,54,.18); box-shadow: inset 0 0 0 1px rgba(63,185,80,.2); }
-        .type-toggle-state { flex: 0 0 42px; padding: 5px 4px; border-radius: 999px; background: #30363d; color: #8b949e; font-size: .68rem; font-weight: 900; text-align: center; }
-        .type-toggle.selected .type-toggle-state { background: #238636; color: #fff; }
+        .type-toggle.on { border-color: #238636; background: rgba(35,134,54,.18); box-shadow: inset 0 0 0 1px rgba(63,185,80,.2); }
+        .type-toggle.off { border-color: #da3633; background: rgba(248,81,73,.12); box-shadow: inset 0 0 0 1px rgba(248,81,73,.15); }
+        .type-toggle.auto { border-color: #6e7681; background: rgba(110,118,129,.08); }
+        .type-toggle-state { flex: 0 0 48px; padding: 5px 4px; border-radius: 999px; background: #30363d; color: #c9d1d9; font-size: .66rem; font-weight: 900; text-align: center; }
+        .type-toggle.on .type-toggle-state { background: #238636; color: #fff; }
+        .type-toggle.off .type-toggle-state { background: #da3633; color: #fff; }
+        .type-toggle.auto .type-toggle-state { background: #30363d; color: #c9d1d9; }
         .type-toggle-copy { display: grid; gap: 3px; min-width: 0; }
         .type-toggle-copy strong { color: #f0f6fc; }
         .type-toggle-copy small { overflow-wrap: anywhere; }
