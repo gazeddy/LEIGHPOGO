@@ -53,8 +53,21 @@ function normaliseSettings(value: unknown): CampfireReminderSettings | null {
       ? new Date(candidate.updatedAt).toISOString()
       : null;
 
+  const eventTypes = normaliseEventTypes(candidate.eventTypes);
+  const hasExplicitExclusions = Array.isArray(candidate.excludedEventTypes);
+  const excludedEventTypes = hasExplicitExclusions
+    ? normaliseEventTypes(candidate.excludedEventTypes)
+    : updatedAt
+      ? DEFAULT_CAMPFIRE_REMINDER_SETTINGS.eventTypes.filter(
+          (eventType) => !eventTypes.includes(eventType),
+        )
+      : [];
+
   return {
-    eventTypes: normaliseEventTypes(candidate.eventTypes),
+    eventTypes,
+    excludedEventTypes: excludedEventTypes.filter(
+      (eventType) => !eventTypes.includes(eventType),
+    ),
     nameKeywords: normaliseKeywords(candidate.nameKeywords),
     includeWeekendEvents: candidate.includeWeekendEvents === true,
     updatedAt,
@@ -78,8 +91,12 @@ export async function readCampfireReminderSettings(): Promise<CampfireReminderSe
 export async function saveCampfireReminderSettings(
   input: CampfireReminderSettingsInput,
 ): Promise<CampfireReminderSettings> {
+  const eventTypes = normaliseEventTypes(input.eventTypes);
   const settings: CampfireReminderSettings = {
-    eventTypes: normaliseEventTypes(input.eventTypes),
+    eventTypes,
+    excludedEventTypes: normaliseEventTypes(input.excludedEventTypes).filter(
+      (eventType) => !eventTypes.includes(eventType),
+    ),
     nameKeywords: normaliseKeywords(input.nameKeywords),
     includeWeekendEvents: input.includeWeekendEvents === true,
     updatedAt: new Date().toISOString(),
