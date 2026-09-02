@@ -125,6 +125,21 @@ function assetFor(assets: EventInfographicAssets, name: string): string | null {
   return assets.pokemon?.[normaliseKey(name)] || null;
 }
 
+export function infographicPokemonFallbackMark(name: string): string {
+  const cleaned = name
+    .replace(/^mega\s+/i, "")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parts = cleaned.split(" ").filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
+  }
+
+  return (parts[0] || name).slice(0, 2).toUpperCase();
+}
+
 export function summariseInfographicRaidSchedule(
   event: PokemonGoEventSummary,
 ): InfographicRaidScheduleSummary {
@@ -192,21 +207,24 @@ function sectionFrame(
 
 function bonusSection(bonuses: string[], y: number, height: number): string {
   const shown = bonuses.slice(0, MAX_BONUSES);
-  const columns = shown.length === 1 ? 1 : 2;
-  const rowHeight = 68;
+  const single = shown.length === 1;
+  const columns = single ? 1 : 2;
+  const rowHeight = single ? 110 : 72;
 
   const cells = shown.map((bonus, index) => {
     const row = Math.floor(index / columns);
     const column = index % columns;
     const x = 72 + column * 470;
     const top = y + 82 + row * rowHeight;
-    const lines = wrapText(bonus, columns === 1 ? 52 : 24, 2);
-    const textWidth = columns === 1 ? 830 : 385;
+    const lines = wrapText(bonus, single ? 58 : 28, single ? 4 : 3);
+    const textWidth = single ? 830 : 385;
+    const fontSize = single ? 17 : 15;
+    const lineHeight = single ? 27 : 23;
 
     return `
       <circle cx="${x + 17}" cy="${top + 20}" r="16" fill="#6f36a7" stroke="#cf91ff" stroke-width="2"/>
       ${svgVectorText("*", x + 17, top + 28, 16, { fill: "#ffffff", anchor: "middle" })}
-      ${vectorLines(lines, x + 48, top + 18, 18, 28, textWidth, "#f4edff")}
+      ${vectorLines(lines, x + 48, top + 18, fontSize, lineHeight, textWidth, "#f4edff")}
     `;
   });
 
@@ -228,13 +246,13 @@ function pokemonListSection(
   const hidden = Math.max(0, deduped.length - shown.length);
   const columns = 4;
   const cellWidth = 232;
-  const rowHeight = 82;
+  const rowHeight = 78;
 
   const cells = shown.map((pokemon, index) => {
     const row = Math.floor(index / columns);
     const column = index % columns;
     const x = 72 + column * cellWidth;
-    const top = y + 79 + row * rowHeight;
+    const top = y + 77 + row * rowHeight;
     const image = assetFor(assets, pokemon.name);
     const nameLines = wrapText(pokemon.name, 13, 2);
 
@@ -242,7 +260,7 @@ function pokemonListSection(
       <circle cx="${x + 31}" cy="${top + 31}" r="31" fill="#11233f" stroke="#526b98" stroke-width="2"/>
       ${image
         ? `<image href="${image}" x="${x + 4}" y="${top + 4}" width="54" height="54" preserveAspectRatio="xMidYMid meet"/>`
-        : svgVectorText(pokemon.name.slice(0, 1), x + 31, top + 40, 20, { fill: "#a7b9d8", anchor: "middle" })}
+        : svgVectorText(infographicPokemonFallbackMark(pokemon.name), x + 31, top + 38, 13, { fill: "#a7b9d8", anchor: "middle" })}
       ${pokemon.canBeShiny === true ? svgVectorText("*", x + 55, top + 13, 12, { fill: "#ffe681", anchor: "middle" }) : ""}
       ${vectorLines(nameLines, x + 72, top + 28, 15, 23, 145, "#f6f9ff")}
     `;
@@ -268,7 +286,7 @@ function raidDayIcon(
     <circle cx="${x}" cy="${cy}" r="22" fill="#182644" stroke="#6d5f92" stroke-width="1.5"/>
     ${image
       ? `<image href="${image}" x="${x - 19}" y="${cy - 19}" width="38" height="38" preserveAspectRatio="xMidYMid meet"/>`
-      : svgVectorText(boss.name.slice(0, 1), x, cy + 7, 14, { fill: "#d6c9ed", anchor: "middle" })}
+      : svgVectorText(infographicPokemonFallbackMark(boss.name), x, cy + 5, 10, { fill: "#d6c9ed", anchor: "middle" })}
   `;
 }
 
@@ -294,7 +312,7 @@ function raidScheduleSection(
   const commonHeight = summary.commonBosses.length > 0 ? 58 : 0;
   const rowsTop = y + 78 + commonHeight;
   const available = Math.max(180, height - 92 - commonHeight);
-  const rowHeight = Math.max(42, Math.min(55, Math.floor(available / Math.max(1, summary.days.length))));
+  const rowHeight = Math.max(45, Math.min(58, Math.floor(available / Math.max(1, summary.days.length))));
 
   const common = summary.commonBosses.length > 0
     ? `
@@ -308,14 +326,14 @@ function raidScheduleSection(
     const top = rowsTop + index * rowHeight;
     const cy = top + Math.floor(rowHeight / 2);
     const names = day.bosses.length > 0 ? bossNames(day.bosses) : "Same raid lineup";
-    const label = wrapText(day.label.replace(/,/g, ""), 20, 1)[0] || day.label;
+    const label = day.label.replace(/,/g, "");
 
     return `
       ${index > 0 ? `<line x1="72" y1="${top}" x2="1008" y2="${top}" stroke="#2f3551" stroke-width="1"/>` : ""}
-      ${fittedVectorText(label, 84, cy + 7, 16, 190, "#d7a7ff")}
-      ${raidDayIcon(day.bosses[0], 298, cy, assets)}
-      ${raidDayIcon(day.bosses[1], 346, cy, assets)}
-      ${fittedVectorText(names, 384, cy + 7, 16, 610, "#f7f3ff")}
+      ${fittedVectorText(label, 84, cy + 6, 14, 238, "#d7a7ff")}
+      ${raidDayIcon(day.bosses[0], 350, cy, assets)}
+      ${raidDayIcon(day.bosses[1], 398, cy, assets)}
+      ${fittedVectorText(names, 435, cy + 6, 15, 565, "#f7f3ff")}
     `;
   });
 
@@ -354,7 +372,7 @@ export function buildEventInfographicSocialSvg(
   }
 
   if (wild.length > 0) {
-    const wildHeight = 250;
+    const wildHeight = 238;
     sections += pokemonListSection("WILD SPAWNS", "#73d13d", wild, cursor, wildHeight, assets);
     cursor += wildHeight + gap;
   }
