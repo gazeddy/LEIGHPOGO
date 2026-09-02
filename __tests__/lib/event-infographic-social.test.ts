@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import {
   buildEventInfographicSocialSvg,
+  infographicPokemonFallbackMark,
   summariseInfographicRaidSchedule,
 } from "../../lib/event-infographic-social";
 import type { PokemonGoEventSummary } from "../../lib/events";
@@ -77,23 +78,29 @@ describe("information-led event infographic", () => {
     ]);
   });
 
-  test("burns all infographic copy into vector paths instead of SVG text nodes", () => {
+  test("uses useful form-aware fallback marks when a raid sprite is unavailable", () => {
+    expect(infographicPokemonFallbackMark("Mega Raichu X")).toBe("RX");
+    expect(infographicPokemonFallbackMark("Mega Raichu Y")).toBe("RY");
+    expect(infographicPokemonFallbackMark("Mega Starmie")).toBe("ST");
+  });
+
+  test("puts readable event information into vector paths rather than font-dependent text", () => {
     const svg = buildEventInfographicSocialSvg(fixture());
 
     expect(svg).toContain('data-vector-text="EVENT BONUSES"');
-    expect(svg).toContain("Remote Raid Pass limit increased");
+    expect(svg).toContain('data-vector-text="REMOTE RAID PASS LIMIT INCREASED TO 30 FROM MONDAY, AUGUST"');
+    expect(svg).toContain('data-vector-text="31, TO FRIDAY, SEPTEMBER 4, 2026"');
     expect(svg).toContain('data-vector-text="WILD SPAWNS"');
-    expect(svg).toContain('data-vector-text="Bellsprout"');
+    expect(svg).toContain('data-vector-text="BELLSPROUT"');
     expect(svg).toContain('data-vector-text="RAID SCHEDULE"');
     expect(svg).toContain('data-vector-text="EVERY DAY"');
-    expect(svg).toContain("Mega Latias * Mega Latios");
-    expect(svg).toContain("Monday August 31");
-    expect(svg).toContain("Mega Dragonite");
+    expect(svg).toContain('data-vector-text="MEGA LATIAS * MEGA LATIOS"');
+    expect(svg).toContain('data-vector-text="MONDAY AUGUST 31"');
+    expect(svg).toContain('data-vector-text="MEGA DRAGONITE"');
     expect(svg).not.toContain("<text");
-    expect((svg.match(/<path /g) ?? []).length).toBeGreaterThan(10);
   });
 
-  test("rasterizes the path-based infographic to a real 1080 by 1350 PNG", async () => {
+  test("rasterizes the path-only infographic to a real 1080 by 1350 PNG", async () => {
     const svg = buildEventInfographicSocialSvg(fixture());
     const png = await sharp(Buffer.from(svg, "utf8")).png().toBuffer();
     const metadata = await sharp(png).metadata();
