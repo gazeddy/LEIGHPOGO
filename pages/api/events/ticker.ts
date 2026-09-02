@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { EventTickerItem, PokemonGoEventSummary } from "../../../lib/events";
 import { shouldShowInEventTicker } from "../../../lib/event-selection";
+import { startEventInfographicAutomation } from "../../../lib/event-infographic-automation";
 import { getEventsPageData } from "../../../lib/events-server";
 import { getAllGuides, type GuideSummary } from "../../../lib/guides";
 
@@ -54,6 +55,8 @@ export default async function handler(
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  startEventInfographicAutomation();
 
   try {
     const [eventData, guides] = await Promise.all([
