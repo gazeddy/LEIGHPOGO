@@ -129,10 +129,16 @@ export default function CampfireReminderAdminPage({
         ? current.eventTypes.filter((value) => value !== eventType)
         : [...current.eventTypes, eventType],
     }));
+    setMessage(null);
+    setError(null);
   }
 
   function useRecommendedDefaults() {
-    setSettings(DEFAULT_CAMPFIRE_REMINDER_SETTINGS);
+    setSettings({
+      ...DEFAULT_CAMPFIRE_REMINDER_SETTINGS,
+      eventTypes: [...DEFAULT_CAMPFIRE_REMINDER_SETTINGS.eventTypes],
+      nameKeywords: [...DEFAULT_CAMPFIRE_REMINDER_SETTINGS.nameKeywords],
+    });
     setKeywords(DEFAULT_CAMPFIRE_REMINDER_SETTINGS.nameKeywords.join(", "));
     setMessage(null);
     setError(null);
@@ -272,21 +278,29 @@ export default function CampfireReminderAdminPage({
 
         <fieldset>
           <legend>Imported event types</legend>
-          <p>Select any feed categories that should always require a Campfire reminder.</p>
+          <p>Tap an event type to turn its Campfire reminder requirement on or off.</p>
           <div className="type-grid">
-            {summaries.map((summary) => (
-              <label key={summary.eventType}>
-                <input
-                  type="checkbox"
-                  checked={settings.eventTypes.includes(summary.eventType)}
-                  onChange={() => toggleEventType(summary.eventType)}
-                />
-                <span>
-                  <strong>{summary.label}</strong>
-                  <small>{summary.eventType} · {summary.count} upcoming</small>
-                </span>
-              </label>
-            ))}
+            {summaries.map((summary) => {
+              const selected = settings.eventTypes.includes(summary.eventType);
+
+              return (
+                <button
+                  key={summary.eventType}
+                  type="button"
+                  className={`type-toggle${selected ? " selected" : ""}`}
+                  aria-pressed={selected}
+                  onClick={() => toggleEventType(summary.eventType)}
+                >
+                  <span className="type-toggle-state" aria-hidden="true">
+                    {selected ? "ON" : "OFF"}
+                  </span>
+                  <span className="type-toggle-copy">
+                    <strong>{summary.label}</strong>
+                    <small>{summary.eventType} · {summary.count} upcoming</small>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </fieldset>
 
@@ -329,15 +343,22 @@ export default function CampfireReminderAdminPage({
         .settings-heading h2 { margin: 0 0 5px; }
         .settings-heading p, fieldset > p { margin: 0; color: #8b949e; line-height: 1.5; }
         .weekend-toggle { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid #30363d; border-radius: 8px; }
-        .weekend-toggle input, .type-grid input { width: auto; margin-top: 3px; }
-        .weekend-toggle span, .type-grid span { display: grid; gap: 3px; }
+        .weekend-toggle input { width: auto; margin-top: 3px; }
+        .weekend-toggle span { display: grid; gap: 3px; }
         small { color: #8b949e; font-weight: 400; line-height: 1.4; }
         .keywords { display: grid; gap: 7px; font-weight: 800; }
         input { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #30363d; border-radius: 7px; background: #0d1117; color: #f0f6fc; font: inherit; }
         fieldset { padding: 14px; border: 1px solid #30363d; border-radius: 8px; }
         legend { padding: 0 5px; font-weight: 900; }
-        .type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin-top: 12px; }
-        .type-grid label { display: flex; gap: 8px; padding: 9px; border: 1px solid #30363d; border-radius: 7px; background: #0d1117; }
+        .type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; margin-top: 12px; }
+        .type-toggle { display: flex; align-items: center; gap: 10px; min-height: 58px; width: 100%; padding: 10px 12px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; color: #f0f6fc; text-align: left; touch-action: manipulation; }
+        .type-toggle:hover, .type-toggle:focus-visible { border-color: #58a6ff; }
+        .type-toggle.selected { border-color: #238636; background: rgba(35,134,54,.18); box-shadow: inset 0 0 0 1px rgba(63,185,80,.2); }
+        .type-toggle-state { flex: 0 0 42px; padding: 5px 4px; border-radius: 999px; background: #30363d; color: #8b949e; font-size: .68rem; font-weight: 900; text-align: center; }
+        .type-toggle.selected .type-toggle-state { background: #238636; color: #fff; }
+        .type-toggle-copy { display: grid; gap: 3px; min-width: 0; }
+        .type-toggle-copy strong { color: #f0f6fc; }
+        .type-toggle-copy small { overflow-wrap: anywhere; }
         .actions { display: flex; gap: 8px; }
         button { border: 1px solid #30363d; border-radius: 7px; padding: 9px 12px; background: #21262d; color: #f0f6fc; font-weight: 800; cursor: pointer; }
         button:hover { border-color: #58a6ff; }
@@ -346,6 +367,8 @@ export default function CampfireReminderAdminPage({
         @media (max-width: 700px) {
           .page-header, .settings-heading, .reminder-summary { flex-direction: column; align-items: stretch; }
           .reminder-summary div { align-items: flex-start; }
+          .type-grid { grid-template-columns: 1fr; }
+          .type-toggle { min-height: 64px; }
         }
       `}</style>
     </main>
