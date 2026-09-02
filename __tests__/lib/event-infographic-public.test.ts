@@ -7,7 +7,7 @@ import {
   publicEventInfographicUrl,
   writePublicEventInfographic,
 } from "../../lib/event-infographic-public";
-import { cachedInfographicEventsFromJson } from "../../lib/event-infographic-automation";
+import { isInfographicRuntimeFile } from "../../lib/event-infographic-automation";
 
 function event(overrides: Partial<PokemonGoEventSummary> = {}): PokemonGoEventSummary {
   return {
@@ -86,13 +86,10 @@ describe("public event infographic generation", () => {
     );
   });
 
-  test("reads generated cache events for startup and file-watch backfill", () => {
-    const parsed = cachedInfographicEventsFromJson(
-      JSON.stringify({ version: 4, fetchedAt: "2026-09-02T11:00:00Z", events: [event()] }),
-    );
-
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0].eventID).toBe("mega-ascension");
-    expect(parsed[0].bonuses).toEqual(["Double catch XP"]);
+  test("watches both the event cache and event override runtime files", () => {
+    expect(isInfographicRuntimeFile("events-cache.json")).toBe(true);
+    expect(isInfographicRuntimeFile("event-overrides.json")).toBe(true);
+    expect(isInfographicRuntimeFile("events-cache.json.123.tmp")).toBe(false);
+    expect(isInfographicRuntimeFile("unrelated.json")).toBe(false);
   });
 });
