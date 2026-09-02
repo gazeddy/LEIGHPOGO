@@ -3,7 +3,7 @@ import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import type { PokemonGoEventSummary } from "../../lib/events";
-import { getEventsPageData } from "../../lib/events-server";
+import { getInfographicEventsData } from "../../lib/infographic-events-server";
 import { authOptions } from "../api/auth/[...nextauth]";
 
 interface InfographicsAdminProps {
@@ -53,7 +53,7 @@ export const getServerSideProps: GetServerSideProps<InfographicsAdminProps> = as
     };
   }
 
-  const data = await getEventsPageData(240);
+  const data = await getInfographicEventsData(240);
   const events = data.events.filter((event) => (event.bonuses?.length ?? 0) > 0);
 
   return {
@@ -77,9 +77,9 @@ export default function InfographicsAdminPage({
           <p className="eyebrow">Admin tools</p>
           <h1>Event infographics</h1>
           <p>
-            Generate a 1080 × 1350 LeighPogo social graphic from the event data
-            already shown on the site. Only events with imported bonuses are listed
-            here for the first version.
+            Generate a 1080 × 1350 LeighPogo social graphic from freshly enriched
+            event details. Bonuses, wild spawns and raid bosses shown below are the
+            same data passed to the PNG renderer.
           </p>
         </div>
         <div className="header-links">
@@ -93,12 +93,12 @@ export default function InfographicsAdminPage({
           <strong>{events.length}</strong>
           <span>events ready for infographic generation</span>
         </div>
-        <small>Event data fetched {formatDate(fetchedAt)}</small>
+        <small>Primary event data fetched {formatDate(fetchedAt)}</small>
       </section>
 
       {warning && (
         <p className="notice warning">
-          The event feed is using cached data: {warning}
+          Infographic data warning: {warning}
         </p>
       )}
 
