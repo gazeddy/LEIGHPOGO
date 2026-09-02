@@ -3,6 +3,7 @@ import type { PokemonGoEventSummary } from "./events";
 
 export interface CampfireReminderSettings {
   eventTypes: string[];
+  excludedEventTypes: string[];
   nameKeywords: string[];
   includeWeekendEvents: boolean;
   updatedAt: string | null;
@@ -10,13 +11,15 @@ export interface CampfireReminderSettings {
 
 export interface CampfireReminderSettingsInput {
   eventTypes?: string[];
+  excludedEventTypes?: string[];
   nameKeywords?: string[];
   includeWeekendEvents?: boolean;
 }
 
 export const DEFAULT_CAMPFIRE_REMINDER_SETTINGS: CampfireReminderSettings = {
   eventTypes: ["raid-hour", "raid-day"],
-  nameKeywords: ["raid hour", "raid day", "go fest"],
+  excludedEventTypes: [],
+  nameKeywords: ["go fest"],
   includeWeekendEvents: true,
   updatedAt: null,
 };
@@ -89,8 +92,13 @@ export function eventMatchesCampfireReminderSettings(
   const configuredTypes = new Set(
     settings.eventTypes.map((value) => value.trim().toLowerCase()).filter(Boolean),
   );
+  const excludedTypes = new Set(
+    settings.excludedEventTypes.map((value) => value.trim().toLowerCase()).filter(Boolean),
+  );
 
+  // Explicit type choices take priority over broad keyword/weekend rules.
   if (configuredTypes.has(eventType)) return true;
+  if (excludedTypes.has(eventType)) return false;
 
   const searchable = [
     event.name,
