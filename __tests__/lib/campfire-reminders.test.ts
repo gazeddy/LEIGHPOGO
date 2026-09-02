@@ -83,6 +83,7 @@ describe("Campfire meetup reminder rules", () => {
   it("allows admins to replace the defaults with arbitrary event types and keywords", () => {
     const settings: CampfireReminderSettings = {
       eventTypes: ["community-day"],
+      excludedEventTypes: [],
       nameKeywords: ["research spectacular"],
       includeWeekendEvents: false,
       updatedAt: null,
@@ -106,6 +107,56 @@ describe("Campfire meetup reminder rules", () => {
         settings,
       ),
     ).toBe(false);
+  });
+
+  it("treats an explicitly OFF event type as authoritative over keywords and weekends", () => {
+    const settings: CampfireReminderSettings = {
+      eventTypes: [],
+      excludedEventTypes: ["raid-day"],
+      nameKeywords: ["raid day"],
+      includeWeekendEvents: true,
+      updatedAt: null,
+    };
+
+    expect(
+      eventMatchesCampfireReminderSettings(
+        event({
+          eventType: "raid-day",
+          name: "Mega Raid Day",
+          start: "2026-09-05T10:00:00.000Z",
+          end: "2026-09-05T18:00:00.000Z",
+        }),
+        settings,
+      ),
+    ).toBe(false);
+  });
+
+  it("leaves AUTO event types available to keyword and weekend rules", () => {
+    const settings: CampfireReminderSettings = {
+      eventTypes: [],
+      excludedEventTypes: [],
+      nameKeywords: ["go fest"],
+      includeWeekendEvents: true,
+      updatedAt: null,
+    };
+
+    expect(
+      eventMatchesCampfireReminderSettings(
+        event({ eventType: "event", name: "Pokémon GO Fest 2026" }),
+        settings,
+      ),
+    ).toBe(true);
+    expect(
+      eventMatchesCampfireReminderSettings(
+        event({
+          eventType: "event",
+          name: "Saturday Special",
+          start: "2026-09-05T10:00:00.000Z",
+          end: "2026-09-05T18:00:00.000Z",
+        }),
+        settings,
+      ),
+    ).toBe(true);
   });
 
   it("clears the reminder when a feed, legacy override or scheduled meetup exists", () => {
