@@ -1,10 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
-import {
-  infographicFilename,
-  renderEventInfographicPng,
-} from "../../../lib/event-infographic";
+import { infographicFilename } from "../../../lib/event-infographic";
+import { renderEventInfographicSocialPng } from "../../../lib/event-infographic-social";
 import { getInfographicEventsData } from "../../../lib/infographic-events-server";
 import { authOptions } from "../auth/[...nextauth]";
 
@@ -53,7 +51,7 @@ export default async function handler(
       return res.status(404).json({ error: "Event not found" });
     }
 
-    const png = await renderEventInfographicPng(event);
+    const png = await renderEventInfographicSocialPng(event);
     const disposition = req.query.download === "1" ? "attachment" : "inline";
 
     res.setHeader("Content-Type", "image/png");
