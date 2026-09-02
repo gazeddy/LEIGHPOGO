@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import type { PokemonGoEventSummary } from "./events";
-import { applyEventOverrides } from "./event-overrides";
 import { queueAutomaticEventInfographics } from "./event-infographic-public";
+import { getInfographicEventsData } from "./infographic-events-server";
 
 const EVENTS_CACHE_PATH =
   process.env.EVENTS_CACHE_PATH?.trim() ||
@@ -18,46 +17,9 @@ let debounceTimer: NodeJS.Timeout | null = null;
 let refreshInFlight: Promise<void> | null = null;
 let refreshAgain = false;
 
-interface EventCacheShape {
-  events?: unknown;
-}
-
-function isCachedEvent(value: unknown): value is PokemonGoEventSummary {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const event = value as Partial<PokemonGoEventSummary>;
-  return (
-    typeof event.eventID === "string" &&
-    typeof event.name === "string" &&
-    typeof event.start === "string" &&
-    typeof event.end === "string" &&
-    typeof event.eventType === "string" &&
-    typeof event.heading === "string"
-  );
-}
-
-export function cachedInfographicEventsFromJson(source: string): PokemonGoEventSummary[] {
-  const parsed = JSON.parse(source) as EventCacheShape;
-  if (!Array.isArray(parsed.events)) return [];
-  return parsed.events.filter(isCachedEvent);
-}
-
-async function readCachedEvents(): Promise<PokemonGoEventSummary[]> {
-  try {
-    return cachedInfographicEventsFromJson(
-      await fsp.readFile(EVENTS_CACHE_PATH, "utf8"),
-    );
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || error instanceof SyntaxError) return [];
-    throw error;
-  }
-}
-
 async function regenerateFromCurrentCache(reason: string): Promise<void> {
-  const events = await readCachedEvents();
-  if (events.length === 0) return;
-  const overridden = await applyEventOverrides(events);
-  queueAutomaticEventInfographics(overridden, reason);
+  const data = await getInfographicEventsData(240);
+  queueAutomaticEventInfographics(data.events, reason);
 }
 
 function requestRegeneration(reason: string): void {
@@ -88,7 +50,7 @@ function scheduleRegeneration(reason: string): void {
   debounceTimer.unref?.();
 }
 
-function watchedFileChanged(filename: string | Buffer | null): boolean {
+export function isInfographicRuntimeFile(filename: string | Buffer | null): boolean {
   if (!filename) return true;
   const value = filename.toString();
   return (
@@ -109,22 +71,25 @@ export function startEventInfographicAutomation(): void {
     return;
   }
 
-  void fsp.mkdir(directory, { recursive: true }).then(() => {
-    if (watcher) return;
+  void fsp
+    .mkdir(directory, { recursive: true })
+    .then(() => {
+      if (watcher) return;
 
-    watcher = fs.watch(directory, { persistent: false }, (_eventType, filename) => {
-      if (watchedFileChanged(filename)) {
-        scheduleRegeneration("event cache or override update");
-      }
-    });
-    watcher.on("error", (error) => {
-      console.error("Event infographic runtime watcher failed", error);
-      watcher?.close();
-      watcher = null;
-    });
+      watcher = fs.watch(directory, { persistent: false }, (_eventType, filename) => {
+        if (isInfographicRuntimeFile(filename)) {
+          scheduleRegeneration("event cache or override update");
+        }
+      });
+      watcher.on("error", (error) => {
+        console.error("Event infographic runtime watcher failed", error);
+        watcher?.close();
+        watcher = null;
+      });
 
-    requestRegeneration("service startup");
-  }).catch((error) => {
-    console.error("Event infographic automation could not start", error);
-  });
+      requestRegeneration("service startup");
+    })
+    .catch((error) => {
+      console.error("Event infographic automation could not start", error);
+    });
 }
