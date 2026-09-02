@@ -5,6 +5,7 @@ import {
   infographicDateRange,
   infographicFilename,
   infographicRaidPokemon,
+  renderEventInfographicPng,
 } from "../../lib/event-infographic";
 import type { PokemonGoEventSummary } from "../../lib/events";
 
@@ -118,5 +119,21 @@ describe("event infographic rendering", () => {
         "2026-09-04T23:59:00.000",
       ),
     ).toBe("31 AUG – 4 SEP 2026");
+  });
+
+  test("rasterizes the template into a real PNG", async () => {
+    const png = await renderEventInfographicPng(fixture());
+
+    expect(png.length).toBeGreaterThan(10_000);
+    expect(Array.from(png.subarray(0, 8))).toEqual([
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+    ]);
   });
 });
