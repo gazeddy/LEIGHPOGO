@@ -135,6 +135,10 @@ export default function Admin({ users, entries, searchStrings }) {
             <span>Gym data</span>
             <span className="admin-navbtn-caret">→</span>
           </Link>
+          <Link href="/admin/infographics" className="admin-navbtn admin-navlink">
+            <span>Event infographics</span>
+            <span className="admin-navbtn-caret">→</span>
+          </Link>
         </aside>
 
         {/* RIGHT: content */}
