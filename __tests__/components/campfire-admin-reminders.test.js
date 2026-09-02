@@ -27,4 +27,12 @@ describe("Campfire meetup reminder admin UI", () => {
     expect(settingsPage).toContain("Use recommended defaults")
     expect(settingsPage).toContain('fetch("/api/admin/campfire-reminder-settings"')
   })
+
+  it("uses explicit tap-friendly ON/OFF buttons for imported event types", () => {
+    expect(settingsPage).toContain('aria-pressed={selected}')
+    expect(settingsPage).toContain('className={`type-toggle${selected ? " selected" : ""}`}')
+    expect(settingsPage).toContain('{selected ? "ON" : "OFF"}')
+    expect(settingsPage).toContain('onClick={() => toggleEventType(summary.eventType)}')
+    expect(settingsPage).toContain('.type-toggle.selected')
+  })
 })
