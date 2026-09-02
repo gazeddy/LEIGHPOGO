@@ -16,6 +16,7 @@ import "../styles/pokedex-selection.css"
 import "../styles/pwa.css"
 import "../styles/privacy.css"
 import Navbar from "../components/Navbar"
+import CampfireReminderBanner from "../components/admin/CampfireReminderBanner"
 import PokemonRegionalAdmin from "../components/admin/PokemonRegionalAdmin"
 import PushPermissionPrompt from "../components/PushPermissionPrompt"
 import TickerStack from "../components/tickers/TickerStack"
@@ -142,6 +143,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       {!privacyGate && <Navbar />}
       {!privacyGate && <TickerStack />}
       {!privacyGate && <PushPermissionPrompt />}
+      {!privacyGate && <CampfireReminderBanner />}
       <Component {...pageProps} />
       {eventLinks.length > 0 && (
         <nav className="seo-event-links container" aria-label="Upcoming Pokémon GO event pages">
