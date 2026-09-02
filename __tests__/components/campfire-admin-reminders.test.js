@@ -28,11 +28,15 @@ describe("Campfire meetup reminder admin UI", () => {
     expect(settingsPage).toContain('fetch("/api/admin/campfire-reminder-settings"')
   })
 
-  it("uses explicit tap-friendly ON/OFF buttons for imported event types", () => {
-    expect(settingsPage).toContain('aria-pressed={selected}')
-    expect(settingsPage).toContain('className={`type-toggle${selected ? " selected" : ""}`}')
-    expect(settingsPage).toContain('{selected ? "ON" : "OFF"}')
-    expect(settingsPage).toContain('onClick={() => toggleEventType(summary.eventType)}')
-    expect(settingsPage).toContain('.type-toggle.selected')
+  it("uses explicit tap-friendly ON, OFF and AUTO modes for imported event types", () => {
+    expect(settingsPage).toContain('type ReminderMode = "on" | "auto" | "off"')
+    expect(settingsPage).toContain("excludedEventTypes")
+    expect(settingsPage).toContain('data-mode={mode}')
+    expect(settingsPage).toContain('{mode.toUpperCase()}')
+    expect(settingsPage).toContain('onClick={() => cycleEventType(summary.eventType)}')
+    expect(settingsPage).toContain('.type-toggle.on')
+    expect(settingsPage).toContain('.type-toggle.off')
+    expect(settingsPage).toContain('.type-toggle.auto')
+    expect(settingsPage).toContain("OFF always wins")
   })
 })
