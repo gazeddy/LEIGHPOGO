@@ -84,19 +84,20 @@ describe("information-led event infographic", () => {
     expect(infographicPokemonFallbackMark("Mega Starmie")).toBe("ST");
   });
 
-  test("puts readable event information into vector paths rather than font-dependent text", () => {
+  test("puts complete readable event information into vector paths rather than font-dependent text", () => {
     const svg = buildEventInfographicSocialSvg(fixture());
 
     expect(svg).toContain('data-vector-text="EVENT BONUSES"');
-    expect(svg).toContain('data-vector-text="REMOTE RAID PASS LIMIT INCREASED TO 30 FROM MONDAY, AUGUST"');
-    expect(svg).toContain('data-vector-text="31, TO FRIDAY, SEPTEMBER 4, 2026"');
+    expect(svg).toContain("Remote Raid Pass limit increased");
+    expect(svg).toContain("September 4, 2026");
+    expect(svg).not.toContain("AUGUST...");
     expect(svg).toContain('data-vector-text="WILD SPAWNS"');
-    expect(svg).toContain('data-vector-text="BELLSPROUT"');
+    expect(svg).toContain('data-vector-text="Bellsprout"');
     expect(svg).toContain('data-vector-text="RAID SCHEDULE"');
     expect(svg).toContain('data-vector-text="EVERY DAY"');
-    expect(svg).toContain('data-vector-text="MEGA LATIAS * MEGA LATIOS"');
-    expect(svg).toContain('data-vector-text="MONDAY AUGUST 31"');
-    expect(svg).toContain('data-vector-text="MEGA DRAGONITE"');
+    expect(svg).toContain('data-vector-text="Mega Latias * Mega Latios"');
+    expect(svg).toContain('data-vector-text="Monday August 31"');
+    expect(svg).toContain("Mega Dragonite");
     expect(svg).not.toContain("<text");
   });
 
