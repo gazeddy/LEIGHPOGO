@@ -42,7 +42,7 @@ describe("ticker regression wiring", () => {
     expect(eventCard).toContain("View meetup on Campfire");
     expect(eventCard).toContain("Wild spawns");
     expect(eventCard).toContain("Event boosts");
-    expect(eventsLib).toContain("/events?event=${encodeURIComponent(event.eventID)}");
+    expect(eventsLib).toContain("/events/${encodeURIComponent(event.eventID)}");
     expect(eventSelection).toContain("const link = getEventDestination(event);");
     expect(eventSelection).toContain("link,");
   });
