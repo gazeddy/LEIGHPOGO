@@ -1,4 +1,5 @@
 import Image, { type ImageLoaderProps } from "next/image";
+import { useEffect, useState } from "react";
 import type {
   PokemonGoEventPokemon,
   PokemonGoEventSummary,
@@ -31,6 +32,18 @@ function canOptimizeEventImage(src: string): boolean {
   } catch {
     return false;
   }
+}
+
+function eventInfographicUrl(eventID: string): string {
+  const safe =
+    eventID
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100) || "event";
+
+  return `/generated/events/${safe}-leighpogo.png`;
 }
 
 function dateForDisplay(value: string): {
@@ -158,6 +171,8 @@ function PokemonTiles({ items }: { items: PokemonGoEventPokemon[] }) {
 export default function EventCard({ event }: EventCardProps) {
   const tags = event.tags ?? [];
   const campfireUrl = event.campfireUrl?.trim() || null;
+  const infographicUrl = eventInfographicUrl(event.eventID);
+  const [hasInfographic, setHasInfographic] = useState(false);
   const optimizeEventImage = event.image
     ? canOptimizeEventImage(event.image)
     : false;
@@ -171,6 +186,49 @@ export default function EventCard({ event }: EventCardProps) {
   const hiddenRaids = raids.slice(POKEMON_PREVIEW_LIMIT);
   const visibleBonuses = bonuses.slice(0, BONUS_PREVIEW_LIMIT);
   const hiddenBonuses = bonuses.slice(BONUS_PREVIEW_LIMIT);
+
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const controller = new AbortController();
+    const retryDelays = [0, 5000, 15000];
+
+    async function checkInfographic(attempt: number): Promise<void> {
+      try {
+        const response = await fetch(infographicUrl, {
+          method: "HEAD",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (cancelled) return;
+
+        if (response.ok && response.headers.get("content-type")?.includes("image/png")) {
+          setHasInfographic(true);
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+      }
+
+      const nextAttempt = attempt + 1;
+      if (nextAttempt < retryDelays.length) {
+        retryTimer = setTimeout(
+          () => void checkInfographic(nextAttempt),
+          retryDelays[nextAttempt],
+        );
+      }
+    }
+
+    setHasInfographic(false);
+    void checkInfographic(0);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [infographicUrl]);
 
   return (
     <article className="event-card">
@@ -192,17 +250,30 @@ export default function EventCard({ event }: EventCardProps) {
       <div className="event-content">
         <div className="event-heading-row">
           <p className="event-type">{event.heading}</p>
-          {campfireUrl && (
-            <a
-              href={campfireUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="event-campfire-pill"
-              aria-label="View meetup on Campfire"
-            >
-              Campfire <span aria-hidden="true">↗</span>
-            </a>
-          )}
+          <div className="event-heading-actions">
+            {hasInfographic && (
+              <a
+                href={infographicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="event-infographic-pill"
+                aria-label={`View ${event.name} infographic`}
+              >
+                Infographic <span aria-hidden="true">↗</span>
+              </a>
+            )}
+            {campfireUrl && (
+              <a
+                href={campfireUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="event-campfire-pill"
+                aria-label="View meetup on Campfire"
+              >
+                Campfire <span aria-hidden="true">↗</span>
+              </a>
+            )}
+          </div>
         </div>
         <h2>{event.name}</h2>
         <p className="event-time">{formatEventRange(event.start, event.end)}</p>
@@ -317,12 +388,21 @@ export default function EventCard({ event }: EventCardProps) {
         .event-heading-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
           gap: 10px;
           margin-bottom: 10px;
         }
 
+        .event-heading-actions {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 6px;
+          margin-left: auto;
+        }
+
         .event-type,
+        .event-infographic-pill,
         .event-campfire-pill {
           margin: 0;
           padding: 5px 9px;
@@ -333,17 +413,30 @@ export default function EventCard({ event }: EventCardProps) {
           font-weight: 800;
           letter-spacing: 0.04em;
           text-transform: uppercase;
+          white-space: nowrap;
         }
 
         .event-type {
           color: #79c0ff;
         }
 
+        .event-infographic-pill {
+          border-color: rgba(182, 108, 255, 0.55);
+          color: #d8b4ff;
+          text-decoration: none;
+        }
+
+        .event-infographic-pill:hover,
+        .event-infographic-pill:focus-visible {
+          border-color: #b66cff;
+          color: #f0dcff;
+          text-decoration: underline;
+        }
+
         .event-campfire-pill {
           border-color: rgba(63, 185, 80, 0.45);
           color: #7ee787;
           text-decoration: none;
-          white-space: nowrap;
         }
 
         .event-campfire-pill:hover,
@@ -447,6 +540,23 @@ export default function EventCard({ event }: EventCardProps) {
           color: #c9d1d9;
           font-size: 0.72rem;
         }
+
+        @media (max-width: 430px) {
+          .event-heading-row {
+            align-items: flex-start;
+          }
+
+          .event-heading-actions {
+            gap: 5px;
+          }
+
+          .event-type,
+          .event-infographic-pill,
+          .event-campfire-pill {
+            padding: 5px 7px;
+            font-size: 0.64rem;
+          }
+        }
       `}</style>
 
       <style jsx global>{`
@@ -510,6 +620,10 @@ export default function EventCard({ event }: EventCardProps) {
           font-weight: 700;
           line-height: 1.2;
           text-overflow: ellipsis;
+        }
+
+        .event-target > .event-infographic-link {
+          display: none !important;
         }
 
         @media (max-width: 420px) {
