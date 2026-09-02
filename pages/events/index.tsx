@@ -47,6 +47,18 @@ function eventTargetId(eventID: string): string {
   return `event-${encodeURIComponent(eventID)}`;
 }
 
+function eventInfographicUrl(eventID: string): string {
+  const safe =
+    eventID
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100) || "event";
+
+  return `/generated/events/${safe}-leighpogo.png`;
+}
+
 function formatFetchedAt(value: string | null): string | null {
   if (!value) {
     return null;
@@ -257,6 +269,7 @@ export default function EventsPage({
           <section className="events-grid" aria-label="Upcoming events">
             {visibleEvents.map((event) => {
               const isSelected = event.eventID === selectedEventID;
+              const hasInfographic = (event.bonuses?.length ?? 0) > 0;
 
               return (
                 <div
@@ -266,6 +279,17 @@ export default function EventsPage({
                   tabIndex={-1}
                 >
                   <EventCard event={event} />
+                  {hasInfographic && (
+                    <a
+                      href={eventInfographicUrl(event.eventID)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="event-infographic-link"
+                      aria-label={`View ${event.name} infographic`}
+                    >
+                      Infographic <span aria-hidden="true">↗</span>
+                    </a>
+                  )}
                 </div>
               );
             })}
@@ -412,10 +436,13 @@ export default function EventsPage({
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
           gap: 16px;
+          align-items: stretch;
         }
 
         .event-target {
+          display: flex;
           min-width: 0;
+          flex-direction: column;
           border-radius: 12px;
           scroll-margin-top: 160px;
           outline: 3px solid transparent;
@@ -431,6 +458,31 @@ export default function EventsPage({
         .event-target.selected {
           outline-color: #58a6ff;
           box-shadow: 0 0 0 5px rgba(88, 166, 255, 0.2);
+        }
+
+        .event-infographic-link {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          margin-top: 8px;
+          padding: 11px 14px;
+          border: 1px solid rgba(182, 108, 255, 0.55);
+          border-radius: 10px;
+          background: linear-gradient(135deg, rgba(182, 108, 255, 0.16), rgba(88, 166, 255, 0.12));
+          color: #d8b4ff;
+          font-size: 0.82rem;
+          font-weight: 900;
+          letter-spacing: 0.035em;
+          text-decoration: none;
+          text-transform: uppercase;
+        }
+
+        .event-infographic-link:hover,
+        .event-infographic-link:focus-visible {
+          border-color: #b66cff;
+          background: linear-gradient(135deg, rgba(182, 108, 255, 0.26), rgba(88, 166, 255, 0.2));
+          color: #f0dcff;
         }
 
         .events-message {
