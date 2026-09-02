@@ -5,7 +5,7 @@ import {
   infographicFilename,
   renderEventInfographicPng,
 } from "../../../lib/event-infographic";
-import { getEventsPageData } from "../../../lib/events-server";
+import { getInfographicEventsData } from "../../../lib/infographic-events-server";
 import { authOptions } from "../auth/[...nextauth]";
 
 async function isAdmin(
@@ -46,7 +46,7 @@ export default async function handler(
   }
 
   try {
-    const data = await getEventsPageData(240);
+    const data = await getInfographicEventsData(240);
     const event = data.events.find((candidate) => candidate.eventID === eventID);
 
     if (!event) {
