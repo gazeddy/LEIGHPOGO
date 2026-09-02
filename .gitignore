@@ -11,6 +11,7 @@ next-env.d.ts
 /data/local-events.json*
 /data/event-overrides.json*
 /data/event-type-rules.json*
+/data/campfire-reminder-settings.json*
 /data/gyms.json*
 /data/gym-imports/*.csv
 /data/gym-state-backups/*.json
