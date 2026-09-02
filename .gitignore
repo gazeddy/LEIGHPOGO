@@ -16,4 +16,5 @@ next-env.d.ts
 /data/gym-state-backups/*.json
 /data/pokedex-import-queue/
 /public/uploads/guides/*
+/public/generated/events/
 /data/pokemon-availability-overrides.json*
