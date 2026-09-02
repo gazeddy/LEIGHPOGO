@@ -26,6 +26,7 @@ function isPublicPath(pathname) {
     pathname.startsWith("/login/") ||
     pathname.startsWith("/register/") ||
     pathname.startsWith("/privacy/") ||
+    pathname.startsWith("/generated/events/") ||
     pathname.startsWith("/_next/")
   )
 }
