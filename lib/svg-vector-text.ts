@@ -113,8 +113,27 @@ export function measureVectorText(
   return textMetrics(value, fontSize, letterSpacing).width;
 }
 
+function roundedRectPath(x: number, y: number, width: number, height: number, radius: number): string {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const right = x + width;
+  const bottom = y + height;
+
+  return [
+    `M${(x + r).toFixed(2)} ${y.toFixed(2)}`,
+    `H${(right - r).toFixed(2)}`,
+    `Q${right.toFixed(2)} ${y.toFixed(2)} ${right.toFixed(2)} ${(y + r).toFixed(2)}`,
+    `V${(bottom - r).toFixed(2)}`,
+    `Q${right.toFixed(2)} ${bottom.toFixed(2)} ${(right - r).toFixed(2)} ${bottom.toFixed(2)}`,
+    `H${(x + r).toFixed(2)}`,
+    `Q${x.toFixed(2)} ${bottom.toFixed(2)} ${x.toFixed(2)} ${(bottom - r).toFixed(2)}`,
+    `V${(y + r).toFixed(2)}`,
+    `Q${x.toFixed(2)} ${y.toFixed(2)} ${(x + r).toFixed(2)} ${y.toFixed(2)}Z`,
+  ].join("");
+}
+
 function glyphPath(glyph: Glyph, x: number, top: number, scale: number): string {
   const commands: string[] = [];
+  const radius = Math.max(0.18, scale * 0.16);
 
   glyph.forEach((row, rowIndex) => {
     let column = 0;
@@ -129,8 +148,7 @@ function glyphPath(glyph: Glyph, x: number, top: number, scale: number): string 
       const run = column - start;
       const px = x + start * scale;
       const py = top + rowIndex * scale;
-      const width = run * scale;
-      commands.push(`M${px.toFixed(2)} ${py.toFixed(2)}h${width.toFixed(2)}v${scale.toFixed(2)}h-${width.toFixed(2)}z`);
+      commands.push(roundedRectPath(px, py, run * scale, scale, radius));
     }
   });
 
