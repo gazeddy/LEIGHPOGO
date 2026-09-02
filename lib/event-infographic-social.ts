@@ -10,6 +10,11 @@ import {
   prepareEventInfographicAssets,
   type EventInfographicAssets,
 } from "./event-infographic";
+import {
+  measureVectorText,
+  svgVectorText,
+  type VectorTextAnchor,
+} from "./svg-vector-text";
 
 const MAX_BONUSES = 4;
 const MAX_WILD = 8;
@@ -26,15 +31,6 @@ export interface InfographicRaidScheduleSummary {
   days: InfographicRaidDay[];
   hiddenDays: number;
   fallbackBosses: PokemonGoEventPokemon[];
-}
-
-function xml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }
 
 function normaliseKey(value: string): string {
@@ -73,22 +69,44 @@ function wrapText(value: string, maxCharacters: number, maxLines: number): strin
   return lines;
 }
 
-function textLines(
+function fittedVectorText(
+  value: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  maxWidth: number,
+  fill: string,
+  anchor: VectorTextAnchor = "start",
+): string {
+  const measured = measureVectorText(value, fontSize);
+  const fittedSize = measured > maxWidth && measured > 0
+    ? Math.max(8, fontSize * (maxWidth / measured))
+    : fontSize;
+
+  return svgVectorText(value, x, y, fittedSize, { fill, anchor });
+}
+
+function vectorLines(
   lines: string[],
   x: number,
   y: number,
   fontSize: number,
   lineHeight: number,
-  options: { weight?: number; fill?: string; anchor?: "start" | "middle" } = {},
+  maxWidth: number,
+  fill: string,
+  anchor: VectorTextAnchor = "start",
 ): string {
-  const weight = options.weight ?? 700;
-  const fill = options.fill ?? "#f7fbff";
-  const anchor = options.anchor ?? "start";
-
   return lines
-    .map(
-      (line, index) =>
-        `<text x="${x}" y="${y + index * lineHeight}" fill="${fill}" font-family="Arial, DejaVu Sans, sans-serif" font-size="${fontSize}" font-weight="${weight}" text-anchor="${anchor}">${xml(line)}</text>`,
+    .map((line, index) =>
+      fittedVectorText(
+        line,
+        x,
+        y + index * lineHeight,
+        fontSize,
+        maxWidth,
+        fill,
+        anchor,
+      ),
     )
     .join("");
 }
@@ -167,15 +185,14 @@ function sectionFrame(
   return `
     <rect x="42" y="${y}" width="996" height="${height}" rx="24" fill="#0c1730" fill-opacity="0.97" stroke="${accent}" stroke-width="2"/>
     <rect x="42" y="${y}" width="996" height="68" rx="24" fill="${accent}" fill-opacity="0.13"/>
-    <text x="70" y="${y + 46}" fill="#ffffff" font-family="Arial, DejaVu Sans, sans-serif" font-size="30" font-weight="900">${xml(title)}</text>
-    ${note ? `<text x="1000" y="${y + 44}" fill="${accent}" font-family="Arial, DejaVu Sans, sans-serif" font-size="18" font-weight="800" text-anchor="end">${xml(note)}</text>` : ""}
+    ${fittedVectorText(title, 70, y + 48, 27, 610, "#ffffff")}
+    ${note ? fittedVectorText(note, 1000, y + 46, 17, 250, accent, "end") : ""}
   `;
 }
 
 function bonusSection(bonuses: string[], y: number, height: number): string {
   const shown = bonuses.slice(0, MAX_BONUSES);
   const columns = shown.length === 1 ? 1 : 2;
-  const cellWidth = columns === 1 ? 920 : 448;
   const rowHeight = 68;
 
   const cells = shown.map((bonus, index) => {
@@ -183,17 +200,19 @@ function bonusSection(bonuses: string[], y: number, height: number): string {
     const column = index % columns;
     const x = 72 + column * 470;
     const top = y + 82 + row * rowHeight;
-    const lines = wrapText(bonus, columns === 1 ? 84 : 43, 2);
+    const lines = wrapText(bonus, columns === 1 ? 52 : 24, 2);
+    const textWidth = columns === 1 ? 830 : 385;
 
     return `
       <circle cx="${x + 17}" cy="${top + 20}" r="16" fill="#6f36a7" stroke="#cf91ff" stroke-width="2"/>
-      <text x="${x + 17}" y="${top + 27}" fill="#ffffff" font-family="Arial, DejaVu Sans, sans-serif" font-size="20" font-weight="900" text-anchor="middle">★</text>
-      ${textLines(lines, x + 48, top + 15, 24, 28, { weight: 800, fill: "#f4edff" })}
+      ${svgVectorText("*", x + 17, top + 28, 16, { fill: "#ffffff", anchor: "middle" })}
+      ${vectorLines(lines, x + 48, top + 18, 18, 28, textWidth, "#f4edff")}
     `;
   });
 
   const hidden = Math.max(0, bonuses.length - shown.length);
-  return `${sectionFrame(y, height, "EVENT BONUSES", "#b66cff", `${bonuses.length} total`)}${cells.join("")}${hidden > 0 ? `<text x="1000" y="${y + height - 20}" fill="#bfa2df" font-family="Arial, DejaVu Sans, sans-serif" font-size="17" font-weight="700" text-anchor="end">+${hidden} more bonus${hidden === 1 ? "" : "es"} on LeighPogo</text>` : ""}`;
+  const hiddenLabel = `+${hidden} more bonus${hidden === 1 ? "" : "es"} on LeighPogo`;
+  return `${sectionFrame(y, height, "EVENT BONUSES", "#b66cff", `${bonuses.length} total`)}${cells.join("")}${hidden > 0 ? fittedVectorText(hiddenLabel, 1000, y + height - 20, 15, 360, "#bfa2df", "end") : ""}`;
 }
 
 function pokemonListSection(
@@ -204,8 +223,9 @@ function pokemonListSection(
   height: number,
   assets: EventInfographicAssets,
 ): string {
-  const shown = dedupePokemon(items).slice(0, MAX_WILD);
-  const hidden = Math.max(0, dedupePokemon(items).length - shown.length);
+  const deduped = dedupePokemon(items);
+  const shown = deduped.slice(0, MAX_WILD);
+  const hidden = Math.max(0, deduped.length - shown.length);
   const columns = 4;
   const cellWidth = 232;
   const rowHeight = 82;
@@ -216,21 +236,24 @@ function pokemonListSection(
     const x = 72 + column * cellWidth;
     const top = y + 79 + row * rowHeight;
     const image = assetFor(assets, pokemon.name);
-    const nameLines = wrapText(pokemon.name, 15, 2);
+    const nameLines = wrapText(pokemon.name, 13, 2);
 
     return `
       <circle cx="${x + 31}" cy="${top + 31}" r="31" fill="#11233f" stroke="#526b98" stroke-width="2"/>
-      ${image ? `<image href="${image}" x="${x + 4}" y="${top + 4}" width="54" height="54" preserveAspectRatio="xMidYMid meet"/>` : `<text x="${x + 31}" y="${top + 40}" fill="#a7b9d8" font-family="Arial, DejaVu Sans, sans-serif" font-size="27" font-weight="900" text-anchor="middle">${xml(pokemon.name.slice(0, 1).toUpperCase())}</text>`}
-      ${pokemon.canBeShiny === true ? `<text x="${x + 55}" y="${top + 10}" fill="#ffe681" font-family="Arial, DejaVu Sans, sans-serif" font-size="20" font-weight="900">✦</text>` : ""}
-      ${textLines(nameLines, x + 72, top + 26, 22, 24, { weight: 800, fill: "#f6f9ff" })}
+      ${image
+        ? `<image href="${image}" x="${x + 4}" y="${top + 4}" width="54" height="54" preserveAspectRatio="xMidYMid meet"/>`
+        : svgVectorText(pokemon.name.slice(0, 1), x + 31, top + 40, 20, { fill: "#a7b9d8", anchor: "middle" })}
+      ${pokemon.canBeShiny === true ? svgVectorText("*", x + 55, top + 13, 12, { fill: "#ffe681", anchor: "middle" }) : ""}
+      ${vectorLines(nameLines, x + 72, top + 28, 15, 23, 145, "#f6f9ff")}
     `;
   });
 
-  return `${sectionFrame(y, height, title, accent, `${items.length} listed`)}${cells.join("")}${hidden > 0 ? `<text x="1000" y="${y + height - 18}" fill="#9fb4d5" font-family="Arial, DejaVu Sans, sans-serif" font-size="17" font-weight="700" text-anchor="end">+${hidden} more on LeighPogo</text>` : ""}`;
+  const hiddenLabel = `+${hidden} more on LeighPogo`;
+  return `${sectionFrame(y, height, title, accent, `${items.length} listed`)}${cells.join("")}${hidden > 0 ? fittedVectorText(hiddenLabel, 1000, y + height - 18, 15, 300, "#9fb4d5", "end") : ""}`;
 }
 
 function bossNames(bosses: PokemonGoRaidScheduleBoss[]): string {
-  return bosses.map((boss) => boss.name).join(" • ");
+  return bosses.map((boss) => boss.name).join(" * ");
 }
 
 function raidDayIcon(
@@ -243,7 +266,9 @@ function raidDayIcon(
   const image = assetFor(assets, boss.name);
   return `
     <circle cx="${x}" cy="${cy}" r="22" fill="#182644" stroke="#6d5f92" stroke-width="1.5"/>
-    ${image ? `<image href="${image}" x="${x - 19}" y="${cy - 19}" width="38" height="38" preserveAspectRatio="xMidYMid meet"/>` : `<text x="${x}" y="${cy + 7}" fill="#d6c9ed" font-family="Arial, DejaVu Sans, sans-serif" font-size="18" font-weight="900" text-anchor="middle">${xml(boss.name.slice(0, 1).toUpperCase())}</text>`}
+    ${image
+      ? `<image href="${image}" x="${x - 19}" y="${cy - 19}" width="38" height="38" preserveAspectRatio="xMidYMid meet"/>`
+      : svgVectorText(boss.name.slice(0, 1), x, cy + 7, 14, { fill: "#d6c9ed", anchor: "middle" })}
   `;
 }
 
@@ -274,8 +299,8 @@ function raidScheduleSection(
   const common = summary.commonBosses.length > 0
     ? `
       <rect x="70" y="${y + 78}" width="940" height="50" rx="14" fill="#4a2e67" fill-opacity="0.35"/>
-      <text x="88" y="${y + 110}" fill="#d8a9ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="19" font-weight="900">EVERY DAY</text>
-      ${textLines(wrapText(bossNames(summary.commonBosses), 62, 1), 240, y + 110, 22, 24, { weight: 800, fill: "#f5ecff" })}
+      ${fittedVectorText("EVERY DAY", 88, y + 111, 16, 135, "#d8a9ff")}
+      ${fittedVectorText(bossNames(summary.commonBosses), 240, y + 111, 17, 745, "#f5ecff")}
     `
     : "";
 
@@ -287,19 +312,21 @@ function raidScheduleSection(
 
     return `
       ${index > 0 ? `<line x1="72" y1="${top}" x2="1008" y2="${top}" stroke="#2f3551" stroke-width="1"/>` : ""}
-      <text x="84" y="${cy + 8}" fill="#d7a7ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="22" font-weight="900">${xml(label)}</text>
+      ${fittedVectorText(label, 84, cy + 7, 16, 190, "#d7a7ff")}
       ${raidDayIcon(day.bosses[0], 298, cy, assets)}
       ${raidDayIcon(day.bosses[1], 346, cy, assets)}
-      ${textLines(wrapText(names, 58, 1), 384, cy + 8, 22, 24, { weight: 800, fill: "#f7f3ff" })}
+      ${fittedVectorText(names, 384, cy + 7, 16, 610, "#f7f3ff")}
     `;
   });
 
-  return `${sectionFrame(y, height, "RAID SCHEDULE", "#d477ff", `${summary.days.length + summary.hiddenDays} day${summary.days.length + summary.hiddenDays === 1 ? "" : "s"}`)}${common}${rows.join("")}${summary.hiddenDays > 0 ? `<text x="1000" y="${y + height - 16}" fill="#bba4d3" font-family="Arial, DejaVu Sans, sans-serif" font-size="16" font-weight="700" text-anchor="end">+${summary.hiddenDays} more day${summary.hiddenDays === 1 ? "" : "s"} on LeighPogo</text>` : ""}`;
+  const dayTotal = summary.days.length + summary.hiddenDays;
+  const hiddenLabel = `+${summary.hiddenDays} more day${summary.hiddenDays === 1 ? "" : "s"} on LeighPogo`;
+  return `${sectionFrame(y, height, "RAID SCHEDULE", "#d477ff", `${dayTotal} day${dayTotal === 1 ? "" : "s"}`)}${common}${rows.join("")}${summary.hiddenDays > 0 ? fittedVectorText(hiddenLabel, 1000, y + height - 16, 14, 330, "#bba4d3", "end") : ""}`;
 }
 
 function detailSection(event: PokemonGoEventSummary, y: number, height: number): string {
   const description = event.description?.trim() || "Full event details are available on LeighPogo.";
-  return `${sectionFrame(y, height, "EVENT DETAILS", "#58a6ff")}${textLines(wrapText(description, 76, 7), 74, y + 112, 27, 36, { weight: 650, fill: "#d6e1f2" })}`;
+  return `${sectionFrame(y, height, "EVENT DETAILS", "#58a6ff")}${vectorLines(wrapText(description, 54, 7), 74, y + 112, 18, 34, 900, "#d6e1f2")}`;
 }
 
 export function buildEventInfographicSocialSvg(
@@ -310,8 +337,8 @@ export function buildEventInfographicSocialSvg(
   const wild = dedupePokemon(event.wildSpawns ?? []);
   const raidSummary = summariseInfographicRaidSchedule(event);
   const hasRaids = raidSummary.days.length > 0 || raidSummary.fallbackBosses.length > 0;
-  const titleLines = wrapText(event.name, 24, 2);
-  const descriptionLines = wrapText(event.description ?? "", 48, 2);
+  const titleLines = wrapText(event.name, 15, 2);
+  const descriptionLines = wrapText(event.description ?? "", 38, 2);
   const dateRange = infographicDateRange(event.start, event.end);
   const heroImage = assets.hero || null;
   const brandIcon = assets.brandIcon || null;
@@ -338,6 +365,11 @@ export function buildEventInfographicSocialSvg(
   } else if (remaining >= 160) {
     sections += detailSection(event, cursor, remaining);
   }
+
+  const brandX = brandIcon ? 132 : 68;
+  const brandSize = 22;
+  const brandPogoX = brandX + measureVectorText("LEIGH", brandSize) + 6;
+  const footerPogoX = 58 + measureVectorText("LEIGH", 17) + 5;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${EVENT_INFOGRAPHIC_WIDTH}" height="${EVENT_INFOGRAPHIC_HEIGHT}" viewBox="0 0 ${EVENT_INFOGRAPHIC_WIDTH} ${EVENT_INFOGRAPHIC_HEIGHT}">
@@ -370,22 +402,24 @@ export function buildEventInfographicSocialSvg(
   ${heroImage ? `<rect x="42" y="30" width="996" height="320" rx="28" fill="url(#heroShade)"/>` : ""}
 
   ${brandIcon ? `<image href="${brandIcon}" x="66" y="52" width="52" height="52" preserveAspectRatio="xMidYMid meet"/>` : ""}
-  <text x="${brandIcon ? 132 : 68}" y="88" fill="#ffffff" font-family="Arial, DejaVu Sans, sans-serif" font-size="30" font-weight="900" letter-spacing="1">LEIGH<tspan fill="#ffcf35">POGO</tspan></text>
+  ${svgVectorText("LEIGH", brandX, 89, brandSize, { fill: "#ffffff" })}
+  ${svgVectorText("POGO", brandPogoX, 89, brandSize, { fill: "#ffcf35" })}
   <rect x="716" y="50" width="294" height="52" rx="26" fill="#091327" stroke="#415b8d" stroke-width="2"/>
-  <text x="863" y="84" fill="#f6f9ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="20" font-weight="800" text-anchor="middle">${xml(dateRange)}</text>
+  ${fittedVectorText(dateRange, 863, 86, 17, 245, "#f6f9ff", "middle")}
 
   <rect x="68" y="126" width="208" height="38" rx="19" fill="#152847" stroke="#4c79bd"/>
-  <text x="172" y="152" fill="#8ec8ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="16" font-weight="900" text-anchor="middle" letter-spacing="1">${xml(event.heading.toUpperCase())}</text>
+  ${fittedVectorText(event.heading, 172, 153, 14, 165, "#8ec8ff", "middle")}
 
-  <text x="68" y="218" fill="url(#titleGradient)" font-family="Arial, DejaVu Sans, sans-serif" font-size="58" font-weight="900" letter-spacing="-1">${xml(titleLines[0] || "EVENT")}</text>
-  ${titleLines[1] ? `<text x="68" y="276" fill="url(#titleGradient)" font-family="Arial, DejaVu Sans, sans-serif" font-size="58" font-weight="900" letter-spacing="-1">${xml(titleLines[1])}</text>` : ""}
-  ${descriptionLines.length > 0 ? textLines(descriptionLines, 70, titleLines[1] ? 312 : 274, 22, 28, { weight: 650, fill: "#d5e0ef" }) : ""}
+  ${fittedVectorText(titleLines[0] || "EVENT", 68, 220, 39, 460, "url(#titleGradient)")}
+  ${titleLines[1] ? fittedVectorText(titleLines[1], 68, 270, 39, 460, "url(#titleGradient)") : ""}
+  ${descriptionLines.length > 0 ? vectorLines(descriptionLines, 70, titleLines[1] ? 312 : 274, 15, 26, 455, "#d5e0ef") : ""}
 
   ${sections}
 
   <line x1="50" y1="1280" x2="1030" y2="1280" stroke="#2a426b"/>
-  <text x="58" y="1320" fill="#ffffff" font-family="Arial, DejaVu Sans, sans-serif" font-size="22" font-weight="900">LEIGH<tspan fill="#ffcf35">POGO</tspan></text>
-  <text x="1022" y="1319" fill="#7990b5" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="700" text-anchor="end">Event information generated from LeighPogo data</text>
+  ${svgVectorText("LEIGH", 58, 1321, 17, { fill: "#ffffff" })}
+  ${svgVectorText("POGO", footerPogoX, 1321, 17, { fill: "#ffcf35" })}
+  ${fittedVectorText("Event information generated from LeighPogo data", 1022, 1320, 12, 410, "#7990b5", "end")}
 </svg>`;
 }
 
