@@ -1,8 +1,9 @@
+import fs from "node:fs/promises";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { infographicFilename } from "../../../lib/event-infographic";
-import { renderEventInfographicSocialPng } from "../../../lib/event-infographic-social";
+import { writePublicEventInfographic } from "../../../lib/event-infographic-public";
 import { getInfographicEventsData } from "../../../lib/infographic-events-server";
 import { authOptions } from "../auth/[...nextauth]";
 
@@ -51,7 +52,8 @@ export default async function handler(
       return res.status(404).json({ error: "Event not found" });
     }
 
-    const png = await renderEventInfographicSocialPng(event);
+    const generated = await writePublicEventInfographic(event);
+    const png = await fs.readFile(generated.filePath);
     const disposition = req.query.download === "1" ? "attachment" : "inline";
 
     res.setHeader("Content-Type", "image/png");
@@ -60,6 +62,7 @@ export default async function handler(
       "Content-Disposition",
       `${disposition}; filename="${infographicFilename(event)}"`,
     );
+    res.setHeader("X-LeighPogo-Public-Infographic", generated.publicUrl);
     res.setHeader("Cache-Control", "private, no-store");
     return res.status(200).send(png);
   } catch (error) {
