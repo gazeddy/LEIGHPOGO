@@ -39,4 +39,16 @@ describe("Campfire meetup reminder admin UI", () => {
     expect(settingsPage).toContain('.type-toggle.auto')
     expect(settingsPage).toContain("OFF always wins")
   })
+
+  it("lets admins paste and save a Campfire link directly from each reminder", () => {
+    expect(settingsPage).toContain('placeholder="https://cmpf.re/..."')
+    expect(settingsPage).toContain('fetch("/api/admin/event-overrides"')
+    expect(settingsPage).toContain('campfireUrl,')
+    expect(settingsPage).toContain('campfireMeetups: existing?.campfireMeetups ?? []')
+    expect(settingsPage).toContain('hidden: existing?.hidden ?? false')
+    expect(settingsPage).toContain('hideAt: existing?.hideAt ?? null')
+    expect(settingsPage).toContain('setOverrides((current) => [')
+    expect(settingsPage).toContain('"Save Campfire"')
+    expect(settingsPage).toContain('different Campfire meetups on different days')
+  })
 })
