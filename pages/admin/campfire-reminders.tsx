@@ -112,7 +112,10 @@ export default function CampfireReminderAdminPage({
   warning,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
   const [settings, setSettings] = useState(initialSettings);
+  const [overrides, setOverrides] = useState(initialOverrides);
   const [keywords, setKeywords] = useState(initialSettings.nameKeywords.join(", "));
+  const [campfireLinks, setCampfireLinks] = useState<Record<string, string>>({});
+  const [savingEventID, setSavingEventID] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +124,7 @@ export default function CampfireReminderAdminPage({
     () =>
       eventsMissingCampfireMeetups(
         initialEvents,
-        initialOverrides,
+        overrides,
         {
           ...settings,
           nameKeywords: keywords
@@ -130,7 +133,7 @@ export default function CampfireReminderAdminPage({
             .filter(Boolean),
         },
       ),
-    [initialEvents, initialOverrides, settings, keywords],
+    [initialEvents, overrides, settings, keywords],
   );
 
   function cycleEventType(eventType: string) {
@@ -180,6 +183,66 @@ export default function CampfireReminderAdminPage({
     setKeywords(DEFAULT_CAMPFIRE_REMINDER_SETTINGS.nameKeywords.join(", "));
     setMessage(null);
     setError(null);
+  }
+
+  async function saveCampfireLink(event: PokemonGoEventSummary) {
+    const campfireUrl = (campfireLinks[event.eventID] ?? "").trim();
+    if (!campfireUrl) {
+      setError("Paste a Campfire meetup link before saving.");
+      return;
+    }
+
+    const existing = overrides.find((override) => override.eventID === event.eventID);
+    setSavingEventID(event.eventID);
+    setMessage(null);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/admin/event-overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventID: event.eventID,
+          name: existing?.name ?? event.name,
+          heading: existing?.heading ?? event.heading,
+          description: existing?.description ?? event.description ?? null,
+          campfireUrl,
+          campfireMeetups: existing?.campfireMeetups ?? [],
+          image: existing?.image ?? event.image ?? null,
+          tags: existing?.tags ?? event.tags ?? [],
+          hidden: existing?.hidden ?? false,
+          hideAt: existing?.hideAt ?? null,
+        }),
+      });
+      const payload = (await response.json()) as {
+        override?: EventOverride;
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.override) {
+        throw new Error(payload.error || "Campfire meetup link could not be saved.");
+      }
+
+      setOverrides((current) => [
+        ...current.filter((override) => override.eventID !== payload.override?.eventID),
+        payload.override as EventOverride,
+      ]);
+      setCampfireLinks((current) => {
+        const next = { ...current };
+        delete next[event.eventID];
+        return next;
+      });
+      setMessage(payload.message || `Campfire meetup saved for ${event.name}.`);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Campfire meetup link could not be saved.",
+      );
+    } finally {
+      setSavingEventID(null);
+    }
   }
 
   async function saveSettings() {
@@ -270,9 +333,42 @@ export default function CampfireReminderAdminPage({
                 <h3>{event.name}</h3>
                 <p>{formatDate(event.start)}</p>
                 <code>{event.eventType}</code>
+                <form
+                  className="quick-campfire"
+                  onSubmit={(submitEvent) => {
+                    submitEvent.preventDefault();
+                    void saveCampfireLink(event);
+                  }}
+                >
+                  <input
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    aria-label={`Campfire meetup link for ${event.name}`}
+                    placeholder="https://cmpf.re/..."
+                    value={campfireLinks[event.eventID] ?? ""}
+                    onChange={(inputEvent) =>
+                      setCampfireLinks((current) => ({
+                        ...current,
+                        [event.eventID]: inputEvent.target.value,
+                      }))
+                    }
+                  />
+                  <button
+                    type="submit"
+                    className="quick-save"
+                    disabled={savingEventID === event.eventID}
+                  >
+                    {savingEventID === event.eventID ? "Saving…" : "Save Campfire"}
+                  </button>
+                </form>
               </article>
             ))}
           </div>
+          <p className="multi-day-note">
+            For events with different Campfire meetups on different days, use the Event
+            Feed editor to add the full day-by-day schedule.
+          </p>
         </section>
       )}
 
@@ -388,12 +484,16 @@ export default function CampfireReminderAdminPage({
         .reminder-summary a { color: #79c0ff; font-weight: 800; }
         .missing-events { margin-bottom: 22px; }
         .missing-events h2 { margin-bottom: 10px; }
-        .missing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+        .missing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
         .missing-grid article { padding: 13px; border: 1px solid #d29922; border-radius: 9px; background: #161b22; }
         .missing-grid article > span { color: #f2cc60; font-size: .7rem; font-weight: 900; text-transform: uppercase; }
         .missing-grid h3 { margin: 5px 0; font-size: 1rem; }
         .missing-grid p { margin: 0 0 6px; color: #8b949e; font-size: .82rem; }
         .missing-grid code { color: #79c0ff; font-size: .72rem; }
+        .quick-campfire { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; margin-top: 11px; }
+        .quick-campfire input { min-width: 0; }
+        .quick-save { border-color: #238636; background: #238636; white-space: nowrap; }
+        .multi-day-note { margin: 9px 0 0; color: #8b949e; font-size: .78rem; line-height: 1.45; }
         .settings-panel { display: grid; gap: 18px; padding: 18px; border: 1px solid #30363d; border-radius: 11px; background: #161b22; }
         .settings-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
         .settings-heading h2 { margin: 0 0 5px; }
@@ -429,6 +529,8 @@ export default function CampfireReminderAdminPage({
           .reminder-summary div { align-items: flex-start; }
           .type-grid { grid-template-columns: 1fr; }
           .type-toggle { min-height: 64px; }
+          .quick-campfire { grid-template-columns: 1fr; }
+          .quick-save { width: 100%; }
         }
       `}</style>
     </main>
