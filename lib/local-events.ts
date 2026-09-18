@@ -272,7 +272,7 @@ export function localEventToSummary(event: LocalEvent): PokemonGoEventSummary {
     name: event.name,
     eventType: event.eventType,
     heading: event.heading,
-    link: event.campfireUrl,
+    link: null,
     image: event.image,
     start: event.start,
     end: event.end,
