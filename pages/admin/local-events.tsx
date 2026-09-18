@@ -138,7 +138,7 @@ export default function ManualEventsAdminPage({
       name: draft.name.trim(),
       eventType: draft.eventType.trim() || "local-event",
       heading: draft.heading.trim() || draft.eventType.trim() || "Local Event",
-      link: draft.campfireUrl.trim() || null,
+      link: null,
       image: draft.image.trim() || null,
       start: new Date(draft.start).toISOString(),
       end: new Date(draft.end).toISOString(),
