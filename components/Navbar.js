@@ -272,7 +272,7 @@ export default function Navbar() {
                     <Link href="/admin/site-settings" className="nav-item nav-subitem">Site Settings</Link>
                     <Link href="/admin/usage" className="nav-item nav-subitem">Usage</Link>
                     <Link href="/admin/pokedex" className="nav-item nav-subitem">Pokédex Availability</Link>
-                    <Link href="/admin/events" className="nav-item nav-subitem">Event Feed</Link>
+                    <Link href="/admin/events" className="nav-item nav-subitem">Event Feed</Link>\n                    <Link href="/admin/local-events" className="nav-item nav-subitem">Manual Event Cards</Link>
                     <Link href="/admin/event-types" className="nav-item nav-subitem">Event Types</Link>
                     <Link href="/admin/content" className="nav-item nav-subitem">Guide Creator / Editor</Link>
                     <Link href="/admin/gyms" className="nav-item nav-subitem">Gym Data</Link>
