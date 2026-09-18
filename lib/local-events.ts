@@ -33,6 +33,18 @@ export interface LocalEvent {
   updatedAt: string;
 }
 
+interface NormalisedLocalEventInput {
+  name: string;
+  eventType: string;
+  heading: string;
+  description: string | null;
+  start: string;
+  end: string;
+  campfireUrl: string | null;
+  image: string | null;
+  tags: string[];
+}
+
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${field} is required`);
@@ -88,6 +100,39 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 70);
+}
+
+function normaliseInput(input: LocalEventInput): NormalisedLocalEventInput {
+  const name = requiredString(input.name, "Name");
+  const eventType = slugify(requiredString(input.eventType, "Event type"));
+  const start = requiredString(input.start, "Start");
+  const end = requiredString(input.end, "End");
+  const startTime = Date.parse(start);
+  const endTime = Date.parse(end);
+
+  if (!eventType) {
+    throw new Error("Event type must contain letters or numbers");
+  }
+
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+    throw new Error("Start and end must be valid dates");
+  }
+
+  if (endTime < startTime) {
+    throw new Error("End must be after start");
+  }
+
+  return {
+    name,
+    eventType,
+    heading: optionalString(input.heading) || eventType,
+    description: optionalString(input.description),
+    start,
+    end,
+    campfireUrl: validateUrl(optionalString(input.campfireUrl), "Campfire URL"),
+    image: validateUrl(optionalString(input.image), "Image URL"),
+    tags: normaliseTags(input.tags),
+  };
 }
 
 function normaliseEvent(value: unknown): LocalEvent | null {
@@ -164,37 +209,11 @@ export async function readLocalEvents(): Promise<LocalEvent[]> {
 }
 
 export async function createLocalEvent(input: LocalEventInput): Promise<LocalEvent> {
-  const name = requiredString(input.name, "Name");
-  const eventType = slugify(requiredString(input.eventType, "Event type"));
-  const start = requiredString(input.start, "Start");
-  const end = requiredString(input.end, "End");
-  const startTime = Date.parse(start);
-  const endTime = Date.parse(end);
-
-  if (!eventType) {
-    throw new Error("Event type must contain letters or numbers");
-  }
-
-  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
-    throw new Error("Start and end must be valid dates");
-  }
-
-  if (endTime < startTime) {
-    throw new Error("End must be after start");
-  }
-
+  const fields = normaliseInput(input);
   const now = new Date().toISOString();
   const event: LocalEvent = {
-    id: `local-${slugify(name) || "event"}-${Date.now().toString(36)}`,
-    name,
-    eventType,
-    heading: optionalString(input.heading) || eventType,
-    description: optionalString(input.description),
-    start,
-    end,
-    campfireUrl: validateUrl(optionalString(input.campfireUrl), "Campfire URL"),
-    image: validateUrl(optionalString(input.image), "Image URL"),
-    tags: normaliseTags(input.tags),
+    id: `local-${slugify(fields.name) || "event"}-${Date.now().toString(36)}`,
+    ...fields,
     createdAt: now,
     updatedAt: now,
   };
@@ -205,6 +224,34 @@ export async function createLocalEvent(input: LocalEventInput): Promise<LocalEve
   );
 
   return event;
+}
+
+export async function updateLocalEvent(
+  id: string,
+  input: LocalEventInput,
+): Promise<LocalEvent> {
+  const eventID = requiredString(id, "Local event ID");
+  const fields = normaliseInput(input);
+  const events = await readLocalEvents();
+  const index = events.findIndex((event) => event.id === eventID);
+
+  if (index < 0) {
+    throw new Error("Local event not found");
+  }
+
+  const updated: LocalEvent = {
+    ...events[index],
+    ...fields,
+    updatedAt: new Date().toISOString(),
+  };
+  const next = [...events];
+  next[index] = updated;
+
+  await writeLocalEvents(
+    next.sort((left, right) => left.start.localeCompare(right.start)),
+  );
+
+  return updated;
 }
 
 export async function deleteLocalEvent(id: string): Promise<boolean> {
