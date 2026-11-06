@@ -14,7 +14,7 @@ jest.mock("../../lib/prisma", () => ({
 
 const assigned = {
   code: "CODE-1",
-  claimedAt: new Date("2026-11-06T10:00:00Z"),
+  claimedAt: new Date(),
   batch: { title: "Early expiry batch", expiresAt: new Date("2026-11-20T00:00:00Z") },
 }
 function makeRes() {
@@ -33,7 +33,7 @@ test("anonymous scans cannot claim codes", async () => {
   expect(res.status).toHaveBeenCalledWith(401)
   expect(prisma.$executeRaw).not.toHaveBeenCalled()
 })
-test("repeat claimant sees the same code without allocating another", async () => {
+test("a claim within 24 hours returns its existing code without allocation", async () => {
   prisma.giftCode.findFirst.mockResolvedValue(assigned)
   const res = makeRes()
   await handler({ method: "POST" }, res)
@@ -42,14 +42,14 @@ test("repeat claimant sees the same code without allocating another", async () =
   }))
   expect(prisma.$executeRaw).not.toHaveBeenCalled()
 })
-test("fresh claim issues through atomic earliest-expiry SQL", async () => {
+test("first daily claim issues through atomic earliest-expiry SQL", async () => {
   prisma.giftCode.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(assigned)
   const res = makeRes()
   await handler({ method: "POST" }, res)
   expect(prisma.$executeRaw).toHaveBeenCalledTimes(1)
   const sql = prisma.$executeRaw.mock.calls[0][0].join(" ")
   expect(sql).toMatch(/ORDER BY gb\."expiresAt" ASC/)
-  expect(sql).toMatch(/NOT EXISTS/)
+  expect(sql).toMatch(/NOT EXISTS/)\n  expect(sql).toMatch(/recent\."claimedAt" >/)
   expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
     claim: expect.objectContaining({ code: "CODE-1" }),
   }))
@@ -67,4 +67,29 @@ test("nothing available returns no claim", async () => {
   const res = makeRes()
   await handler({ method: "POST" }, res)
   expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ claim: null, remaining: 0 }))
+})
+
+test("a 25-hour-old claim permits another code, even within the same batch", async () => {
+  const old = { ...assigned, claimedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) }
+  prisma.giftCode.findFirst.mockResolvedValueOnce(old).mockResolvedValueOnce({
+    ...assigned,
+    code: "CODE-2",
+  })
+  const res = makeRes()
+  await handler({ method: "POST" }, res)
+  expect(prisma.$executeRaw).toHaveBeenCalledTimes(1)
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+    claim: expect.objectContaining({ code: "CODE-2" }),
+    canClaim: false,
+  }))
+})
+test("the cooldown is rolling, not reset at midnight", async () => {
+  prisma.giftCode.findFirst.mockResolvedValue(assigned)
+  const res = makeRes()
+  await handler({ method: "POST" }, res)
+  expect(prisma.$executeRaw).not.toHaveBeenCalled()
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+    canClaim: false,
+    nextClaimAt: new Date(assigned.claimedAt.getTime() + 24 * 60 * 60 * 1000),
+  }))
 })
