@@ -32,7 +32,7 @@ export default function CommunityGift() {
       </>}
       {!gift.canClaim && gift.nextClaimAt && <p>Your next code becomes available at <strong>{new Date(gift.nextClaimAt).toLocaleString("en-GB")}</strong> (24 hours after your last claim).</p>}
       {gift.canClaim && (gift.remaining > 0
-        ? <button type="button" disabled={busy} onClick={() => load("POST")}>Claim today's code</button>
+        ? <button type="button" disabled={busy} onClick={() => load("POST")}>Claim today&apos;s code</button>
         : <p>No unclaimed, unexpired gift codes are currently available.</p>)}
     </>}
     {!gift && !error && <p>Loading…</p>}
