@@ -1,7 +1,27 @@
 import { randomUUID } from "node:crypto"
+import { parse } from "csv-parse/sync"
 import { getServerSession } from "next-auth/next"
 import prisma from "../../../../lib/prisma"
 import { authOptions } from "../../auth/[...nextauth]"
+
+export function parseGiftCodes(value, format = "text") {
+  if (typeof value !== "string") throw new Error("Provide redemption codes")
+  if (format !== "csv") return value.split(/[\\r\\n,]+/).map(x => x.trim()).filter(Boolean)
+  let rows
+  try {
+    rows = parse(value.replace(/^\\uFEFF/, ""), { skip_empty_lines: true, relax_quotes: false, trim: true })
+  } catch {
+    throw new Error("Invalid CSV file")
+  }
+  if (!rows.length) return []
+  const headers = rows[0].map(x => x.toLowerCase().trim())
+  const codeIndex = headers.findIndex(x => ["code", "redemption code", "redemption_code", "offer code", "gift code", "passcode"].includes(x))
+  const start = codeIndex >= 0 ? 1 : 0
+  const index = codeIndex >= 0 ? codeIndex : 0
+  if (codeIndex < 0 && rows.some(row => row.length !== 1)) throw new Error("CSV must contain one code column or a named code header")
+  if (rows.some(row => row.length <= index)) throw new Error("CSV rows have missing code columns")
+  return rows.slice(start).map(row => row[index].trim()).filter(Boolean)
+}
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions)
@@ -19,7 +39,7 @@ export default async function handler(req, res) {
     })))
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" })
-  const { title, expiresAt, codes } = req.body || {}
+  const { title, expiresAt, codes, codesFormat } = req.body || {}
   const cleanTitle = typeof title === "string" ? title.trim() : ""
   const expiry = typeof expiresAt === "string" ? new Date(expiresAt) : new Date(NaN)
   const lines = typeof codes === "string" ? codes.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean) : []
