@@ -24,6 +24,8 @@ export default function AdminGifts() {
   const [expiryMinute, setExpiryMinute] = useState("59")
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
   const [codes, setCodes] = useState("")
+  const [codesFormat, setCodesFormat] = useState("text")
+  const [selectedFile, setSelectedFile] = useState("")
   const [batches, setBatches] = useState([])
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -42,18 +44,32 @@ export default function AdminGifts() {
     setCurrentYear(tomorrow.getFullYear())
   }, [])
   const daysInMonth = expiryYear && expiryMonth ? new Date(Number(expiryYear), Number(expiryMonth), 0).getDate() : 31
+  async function importCsv(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setError("")
+    try {
+      if (file.size > 1024 * 1024) throw new Error("CSV file must be 1 MB or smaller")
+      const content = await file.text()
+      setCodes(content)
+      setCodesFormat("csv")
+      setSelectedFile(file.name)
+    } catch (error) {
+      setError(error.message || "Unable to read CSV")
+    }
+  }
   async function upload(event) {
     event.preventDefault(); setBusy(true); setError(""); setMessage("")
     try {
       const expiresAt = makeExpiry(expiryYear, expiryMonth, expiryDay, expiryHour, expiryMinute)
       const response = await fetch("/api/admin/gifts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, expiresAt, codes }),
+        body: JSON.stringify({ title, expiresAt, codes, codesFormat }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Upload failed")
       setMessage("Created " + data.title + ". Its codes are now part of the shared gift QR pool.")
-      setTitle(""); setCodes("")
+      setTitle(""); setCodes(""); setSelectedFile(""); setCodesFormat("text")
       await refresh()
     } catch (e) { setError(e.message) }
     finally { setBusy(false) }
@@ -94,7 +110,13 @@ export default function AdminGifts() {
           </select>
         </label>
       </fieldset>
-      <label>Redemption codes, one per line <textarea required rows={8} value={codes} onChange={e => setCodes(e.target.value)} /></label>
+      <label>Upload redemption codes CSV
+        <input type="file" accept=".csv,text/csv" onChange={importCsv} />
+      </label>
+      {selectedFile && <p>Loaded CSV: {selectedFile}. Its codes will be imported into the selected batch.</p>}
+      <label>Or paste redemption codes (one per line or comma-separated)
+        <textarea required rows={8} value={codes} onChange={e => { setCodes(e.target.value); setCodesFormat("text"); setSelectedFile("") }} />
+      </label>
       <button disabled={busy || !expiryYear || !expiryMonth || !expiryDay} type="submit">Add codes to shared pool</button>
     </form>
     {error && <p role="alert" className="form-error">{error}</p>}
