@@ -46,6 +46,6 @@ export async function getServerSideProps(context) {
   const slug = String(context.params.slug || "")
   const destination = "/gifts/" + encodeURIComponent(slug)
   if (!session) return { redirect: { destination: "/login?next=" + encodeURIComponent(destination), permanent: false } }
-  if (!session.user.privacyPolicyAccepted) return { redirect: { destination: "/privacy?next=" + encodeURIComponent(destination), permanent: false } }
+  if (!session.user.privacyPolicyAccepted) return { redirect: { destination: "/privacy/accept?callbackUrl=" + encodeURIComponent(destination), permanent: false } }
   return { props: {} }
 }
