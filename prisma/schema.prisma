@@ -27,6 +27,7 @@ model User {
   usageEvents                 UsageEvent[]
   tickerPreferences           UserTickerPreference[]
   privacyAcceptances          PrivacyAcceptance[]
+  giftClaims                  GiftCode[]
 }
 
 model UserTickerPreference {
@@ -305,4 +306,28 @@ model SiteSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model GiftBatch {
+  id        String     @id @default(cuid())
+  title     String
+  slug      String     @unique
+  expiresAt DateTime
+  createdAt DateTime   @default(now())
+  codes     GiftCode[]
+
+  @@index([expiresAt])
+}
+
+model GiftCode {
+  id        Int        @id @default(autoincrement())
+  batchId   String
+  batch     GiftBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  code      String     @unique
+  ownerId   Int?
+  owner     User?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  claimedAt DateTime?
+
+  @@unique([batchId, ownerId])
+  @@index([batchId, ownerId])
 }
