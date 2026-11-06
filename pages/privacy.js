@@ -36,6 +36,7 @@ export default function PrivacyPolicy() {
           <li>Your optional display name, Pokémon GO in-game name (IGN), account role and password hash.</li>
           <li>Your trainer team and friend code when you choose to add them.</li>
           <li>Your Pokédex progress, saved search strings, wanted trades, trade listings and related notifications.</li>
+          <li>Community gift redemption batches, the code allocated to your account, and the date it was claimed. Administrators can see which members claimed gifts.</li>
           <li>
             Pokédex screenshots you upload for import. They are stored privately while the import is queued
             or processed and are removed when the import is cleared or your account is deleted.
