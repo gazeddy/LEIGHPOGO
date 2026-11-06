@@ -44,7 +44,7 @@ export default function AdminGifts() {
     {message && <p>{message}</p>}
     <section style={{ border: "1px solid #888", borderRadius: 8, padding: 16, marginBottom: 20 }}>
       <h2>One QR for all gift batches</h2>
-      <p>Print this QR once. All batches share this link; the soonest-expiring available codes are issued first. Each member can claim only one code from the shared pool.</p>
+      <p>Print this QR once. All batches share this link; the soonest-expiring available codes are issued first. Each member can claim one code every rolling 24 hours, with the earliest-expiring available codes issued first.</p>
       <p><a href="/gifts" target="_blank" rel="noreferrer">{typeof window !== "undefined" ? window.location.origin + "/gifts" : "https://leighpogo.co.uk/gifts"}</a></p>
       <img
         src={"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "https://leighpogo.co.uk") + "/gifts")}
