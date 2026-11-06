@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { useEffect, useState } from "react"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../api/auth/[...nextauth]"
@@ -46,7 +47,7 @@ export default function AdminGifts() {
       <h2>One QR for all gift batches</h2>
       <p>Print this QR once. All batches share this link; the soonest-expiring available codes are issued first. Each member can claim one code every rolling 24 hours, with the earliest-expiring available codes issued first.</p>
       <p><a href="/gifts" target="_blank" rel="noreferrer">{typeof window !== "undefined" ? window.location.origin + "/gifts" : "https://leighpogo.co.uk/gifts"}</a></p>
-      <img
+      <Image unoptimized
         src={"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "https://leighpogo.co.uk") + "/gifts")}
         alt="Shared LeighPogo community gift QR"
         width={240} height={240}
