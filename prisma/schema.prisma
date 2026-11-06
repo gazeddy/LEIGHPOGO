@@ -328,6 +328,6 @@ model GiftCode {
   owner     User?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   claimedAt DateTime?
 
-  @@unique([batchId, ownerId])
   @@index([batchId, ownerId])
+  @@index([ownerId, claimedAt])
 }
