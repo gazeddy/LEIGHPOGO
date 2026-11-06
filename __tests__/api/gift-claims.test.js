@@ -49,7 +49,8 @@ test("first daily claim issues through atomic earliest-expiry SQL", async () => 
   expect(prisma.$executeRaw).toHaveBeenCalledTimes(1)
   const sql = prisma.$executeRaw.mock.calls[0][0].join(" ")
   expect(sql).toMatch(/ORDER BY gb\."expiresAt" ASC/)
-  expect(sql).toMatch(/NOT EXISTS/)\n  expect(sql).toMatch(/recent\."claimedAt" >/)
+  expect(sql).toMatch(/NOT EXISTS/)
+  expect(sql).toMatch(/recent\."claimedAt" >/)
   expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
     claim: expect.objectContaining({ code: "CODE-1" }),
   }))
