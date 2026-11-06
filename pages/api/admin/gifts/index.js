@@ -6,10 +6,10 @@ import { authOptions } from "../../auth/[...nextauth]"
 
 export function parseGiftCodes(value, format = "text") {
   if (typeof value !== "string") throw new Error("Provide redemption codes")
-  if (format !== "csv") return value.split(/[\\r\\n,]+/).map(x => x.trim()).filter(Boolean)
+  if (format !== "csv") return value.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean)
   let rows
   try {
-    rows = parse(value.replace(/^\\uFEFF/, ""), { skip_empty_lines: true, relax_quotes: false, trim: true })
+    rows = parse(value.replace(/^\uFEFF/, ""), { skip_empty_lines: true, relax_quotes: false, trim: true })
   } catch {
     throw new Error("Invalid CSV file")
   }
