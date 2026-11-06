@@ -110,7 +110,7 @@ export async function middleware(req) {
   if (!token?.id) {
     const signInUrl = req.nextUrl.clone()
     signInUrl.pathname = "/login"
-    if (/^\/gifts\/[a-zA-Z0-9-]+$/.test(pathname)) {
+    if (pathname === "/gifts" || /^\/gifts\/[a-zA-Z0-9-]+$/.test(pathname)) {
       signInUrl.searchParams.set("next", pathname)
     } else {
       signInUrl.searchParams.set("callbackUrl", req.nextUrl.pathname + req.nextUrl.search)
