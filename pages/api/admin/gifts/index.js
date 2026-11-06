@@ -42,7 +42,12 @@ export default async function handler(req, res) {
   const { title, expiresAt, codes, codesFormat } = req.body || {}
   const cleanTitle = typeof title === "string" ? title.trim() : ""
   const expiry = typeof expiresAt === "string" ? new Date(expiresAt) : new Date(NaN)
-  const lines = typeof codes === "string" ? codes.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean) : []
+  let lines
+  try {
+    lines = parseGiftCodes(codes, codesFormat)
+  } catch (error) {
+    return res.status(400).json({ error: error.message })
+  }
   const unique = [...new Set(lines)]
   if (!cleanTitle || cleanTitle.length > 120 || !Number.isFinite(expiry.getTime()) || expiry <= new Date()) {
     return res.status(400).json({ error: "Provide a title and a future expiry date" })
