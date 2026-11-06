@@ -1,12 +1,28 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useState } from "react"
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+const pad = (value) => String(value).padStart(2, "0")
+
+function makeExpiry(year, month, day, hour, minute) {
+  if (![year, month, day, hour, minute].every(value => value !== "" && Number.isInteger(Number(value)))) throw new Error("Select an expiry date and time.")
+  const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute))
+  if (date.getFullYear() !== Number(year) || date.getMonth() + 1 !== Number(month) || date.getDate() !== Number(day) || date.getHours() !== Number(hour) || date.getMinutes() !== Number(minute)) throw new Error("Select a valid expiry date and time.")
+  if (date <= new Date()) throw new Error("Expiry must be in the future.")
+  return date.toISOString()
+}
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../api/auth/[...nextauth]"
 
 export default function AdminGifts() {
   const [title, setTitle] = useState("")
-  const [expiresAt, setExpiresAt] = useState("")
+  const [expiryYear, setExpiryYear] = useState("")
+  const [expiryMonth, setExpiryMonth] = useState("")
+  const [expiryDay, setExpiryDay] = useState("")
+  const [expiryHour, setExpiryHour] = useState("23")
+  const [expiryMinute, setExpiryMinute] = useState("59")
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
   const [codes, setCodes] = useState("")
   const [batches, setBatches] = useState([])
   const [error, setError] = useState("")
@@ -16,18 +32,28 @@ export default function AdminGifts() {
     const response = await fetch("/api/admin/gifts")
     if (response.ok) setBatches(await response.json())
   }
-  useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    refresh()
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    setExpiryYear(String(tomorrow.getFullYear()))
+    setExpiryMonth(String(tomorrow.getMonth() + 1))
+    setExpiryDay(String(tomorrow.getDate()))
+    setCurrentYear(tomorrow.getFullYear())
+  }, [])
+  const daysInMonth = expiryYear && expiryMonth ? new Date(Number(expiryYear), Number(expiryMonth), 0).getDate() : 31
   async function upload(event) {
     event.preventDefault(); setBusy(true); setError(""); setMessage("")
     try {
+      const expiresAt = makeExpiry(expiryYear, expiryMonth, expiryDay, expiryHour, expiryMinute)
       const response = await fetch("/api/admin/gifts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, expiresAt: new Date(expiresAt).toISOString(), codes }),
+        body: JSON.stringify({ title, expiresAt, codes }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Upload failed")
       setMessage("Created " + data.title + ". Its codes are now part of the shared gift QR pool.")
-      setTitle(""); setCodes(""); setExpiresAt("")
+      setTitle(""); setCodes("")
       await refresh()
     } catch (e) { setError(e.message) }
     finally { setBusy(false) }
@@ -37,9 +63,39 @@ export default function AdminGifts() {
     <p><Link href="/admin">Back to admin</Link></p>
     <form onSubmit={upload} style={{ display: "grid", gap: 12 }}>
       <label>Gift / event name <input required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></label>
-      <label>Batch expiry (local time) <input required type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} /></label>
+      <fieldset style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end" }}>
+        <legend>Batch expiry (your local time)</legend>
+        <label>Day
+          <select aria-label="Expiry day" required value={expiryDay} onChange={e => setExpiryDay(e.target.value)}>
+            <option value="">Day</option>
+            {Array.from({ length: daysInMonth }, (_, index) => index + 1).map(day => <option key={day} value={day}>{day}</option>)}
+          </select>
+        </label>
+        <label>Month
+          <select aria-label="Expiry month" required value={expiryMonth} onChange={e => { setExpiryMonth(e.target.value); setExpiryDay("") }}>
+            <option value="">Month</option>
+            {MONTHS.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
+          </select>
+        </label>
+        <label>Year
+          <select aria-label="Expiry year" required value={expiryYear} onChange={e => { setExpiryYear(e.target.value); setExpiryDay("") }}>
+            <option value="">Year</option>
+            {Array.from({ length: 5 }, (_, index) => currentYear + index).map(year => <option key={year} value={year}>{year}</option>)}
+          </select>
+        </label>
+        <label>Hour
+          <select aria-label="Expiry hour" value={expiryHour} onChange={e => setExpiryHour(e.target.value)}>
+            {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={pad(hour)}>{pad(hour)}</option>)}
+          </select>
+        </label>
+        <label>Minute
+          <select aria-label="Expiry minute" value={expiryMinute} onChange={e => setExpiryMinute(e.target.value)}>
+            {Array.from({ length: 60 }, (_, minute) => <option key={minute} value={pad(minute)}>{pad(minute)}</option>)}
+          </select>
+        </label>
+      </fieldset>
       <label>Redemption codes, one per line <textarea required rows={8} value={codes} onChange={e => setCodes(e.target.value)} /></label>
-      <button disabled={busy || !expiresAt} type="submit">Add codes to shared pool</button>
+      <button disabled={busy || !expiryYear || !expiryMonth || !expiryDay} type="submit">Add codes to shared pool</button>
     </form>
     {error && <p role="alert" className="form-error">{error}</p>}
     {message && <p>{message}</p>}
