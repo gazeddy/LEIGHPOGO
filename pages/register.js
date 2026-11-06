@@ -3,6 +3,8 @@ import { useState } from "react"
 import { getSession } from "next-auth/react"
 import { useRouter } from "next/router"
 
+function isGiftDestination(value) { return value === "/gifts" || /^\/gifts\/[a-zA-Z0-9-]+$/.test(value) }
+
 export default function Register() {
   const [name, setName] = useState("")
   const [ign, setIgn] = useState("")
@@ -12,7 +14,7 @@ export default function Register() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const router = useRouter()
-  const next = typeof router.query.next === "string" && /^\/gifts\/[a-zA-Z0-9-]+$/.test(router.query.next) ? router.query.next : "/"
+  const next = typeof router.query.next === "string" && isGiftDestination(router.query.next) ? router.query.next : "/"
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -116,7 +118,7 @@ export async function getServerSideProps(context) {
   const session = await getSession(context)
   if (session) {
     return {
-      redirect: { destination: typeof context.query.next === "string" && /^\/gifts\/[a-zA-Z0-9-]+$/.test(context.query.next) ? context.query.next : "/", permanent: false },
+      redirect: { destination: typeof context.query.next === "string" && isGiftDestination(context.query.next) ? context.query.next : "/", permanent: false },
     }
   }
 
