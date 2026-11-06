@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/router"
 
 export function giftReturnPath(value) {
-  return typeof value === "string" && /^\/gifts\/[a-zA-Z0-9-]+$/.test(value) ? value : "/"
+  return typeof value === "string" && (value === "/gifts" || /^\/gifts\/[a-zA-Z0-9-]+$/.test(value)) ? value : "/"
 }
 
 export default function Login({ csrfToken }) {
