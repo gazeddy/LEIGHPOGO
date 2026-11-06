@@ -12,6 +12,7 @@ export default function Register() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const router = useRouter()
+  const next = typeof router.query.next === "string" && /^\/gifts\/[a-zA-Z0-9-]+$/.test(router.query.next) ? router.query.next : "/"
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -37,7 +38,7 @@ export default function Register() {
     setIgn("")
     setOver13(false)
     setPrivacyAcknowledged(false)
-    setTimeout(() => router.push("/login"), 1000)
+    setTimeout(() => router.push("/login?next=" + encodeURIComponent(next)), 1000)
   }
 
   return (
@@ -105,7 +106,7 @@ export default function Register() {
       </form>
 
       <p style={{ marginTop: "1rem" }}>
-        Already have an account? <Link href="/login">Login</Link>
+        Already have an account? <Link href={"/login?next=" + encodeURIComponent(next)}>Login</Link>
       </p>
     </div>
   )
@@ -115,7 +116,7 @@ export async function getServerSideProps(context) {
   const session = await getSession(context)
   if (session) {
     return {
-      redirect: { destination: "/", permanent: false },
+      redirect: { destination: typeof context.query.next === "string" && /^\/gifts\/[a-zA-Z0-9-]+$/.test(context.query.next) ? context.query.next : "/", permanent: false },
     }
   }
 
