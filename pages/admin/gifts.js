@@ -59,7 +59,10 @@ export default function AdminGifts() {
     }
   }
   async function upload(event) {
-    event.preventDefault(); setBusy(true); setError(""); setMessage("")
+    event.preventDefault(); setError(""); setMessage("")
+    if (!title.trim()) { setError("Enter a gift / event name."); return }
+    if (!codes.trim()) { setError("Paste or upload at least one redemption code."); return }
+    setBusy(true)
     try {
       const expiresAt = makeExpiry(expiryYear, expiryMonth, expiryDay, expiryHour, expiryMinute)
       const response = await fetch("/api/admin/gifts", {
@@ -77,7 +80,7 @@ export default function AdminGifts() {
   return <main style={{ margin: "2rem auto", maxWidth: 900, padding: "0 1rem" }}>
     <h1>Community gift batches</h1>
     <p><Link href="/admin">Back to admin</Link></p>
-    <form onSubmit={upload} style={{ display: "grid", gap: 12 }}>
+    <form noValidate onSubmit={upload} style={{ display: "grid", gap: 12 }}>
       <label>Gift / event name <input required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></label>
       <fieldset style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end" }}>
         <legend>Batch expiry (your local time)</legend>
@@ -88,13 +91,13 @@ export default function AdminGifts() {
           </select>
         </label>
         <label>Month
-          <select aria-label="Expiry month" required value={expiryMonth} onChange={e => { setExpiryMonth(e.target.value); setExpiryDay("") }}>
+          <select aria-label="Expiry month" required value={expiryMonth} onChange={e => { setExpiryMonth(e.target.value); if (expiryDay && Number(expiryDay) > new Date(Number(expiryYear), Number(e.target.value), 0).getDate()) setExpiryDay(String(new Date(Number(expiryYear), Number(e.target.value), 0).getDate())) }}>
             <option value="">Month</option>
             {MONTHS.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
           </select>
         </label>
         <label>Year
-          <select aria-label="Expiry year" required value={expiryYear} onChange={e => { setExpiryYear(e.target.value); setExpiryDay("") }}>
+          <select aria-label="Expiry year" required value={expiryYear} onChange={e => { setExpiryYear(e.target.value); if (expiryDay && expiryMonth && Number(expiryDay) > new Date(Number(e.target.value), Number(expiryMonth), 0).getDate()) setExpiryDay(String(new Date(Number(e.target.value), Number(expiryMonth), 0).getDate())) }}>
             <option value="">Year</option>
             {Array.from({ length: 5 }, (_, index) => currentYear + index).map(year => <option key={year} value={year}>{year}</option>)}
           </select>
@@ -117,7 +120,7 @@ export default function AdminGifts() {
       <label>Or paste redemption codes (one per line or comma-separated)
         <textarea required rows={8} value={codes} onChange={e => { setCodes(e.target.value); setCodesFormat("text"); setSelectedFile("") }} />
       </label>
-      <button disabled={busy || !expiryYear || !expiryMonth || !expiryDay} type="submit">Add codes to shared pool</button>
+      <button disabled={busy} type="submit">{busy ? "Adding codes…" : "Add codes to shared pool"}</button>
     </form>
     {error && <p role="alert" className="form-error">{error}</p>}
     {message && <p>{message}</p>}
