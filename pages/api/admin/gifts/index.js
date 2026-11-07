@@ -9,18 +9,23 @@ export function parseGiftCodes(value, format = "text") {
   if (format !== "csv") return value.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean)
   let rows
   try {
-    rows = parse(value.replace(/^\uFEFF/, ""), { skip_empty_lines: true, relax_quotes: false, trim: true })
+    rows = parse(value.replace(/^\uFEFF/, ""), { skip_empty_lines: true, relax_quotes: false, relax_column_count: true, trim: true })
   } catch {
     throw new Error("Invalid CSV file")
   }
   if (!rows.length) return []
   const headers = rows[0].map(x => x.toLowerCase().trim())
   const codeIndex = headers.findIndex(x => ["code", "redemption code", "redemption_code", "offer code", "gift code", "passcode"].includes(x))
-  const start = codeIndex >= 0 ? 1 : 0
-  const index = codeIndex >= 0 ? codeIndex : 0
-  if (codeIndex < 0 && rows.some(row => row.length !== 1)) throw new Error("CSV must contain one code column or a named code header")
-  if (rows.some(row => row.length <= index)) throw new Error("CSV rows have missing code columns")
-  return rows.slice(start).map(row => row[index].trim()).filter(Boolean)
+  // A named Code column means other columns contain metadata, not gift codes.
+  if (codeIndex >= 0) {
+    if (rows.slice(1).some(row => row.length <= codeIndex || !row[codeIndex].trim())) {
+      throw new Error("CSV rows have missing redemption codes")
+    }
+    return rows.slice(1).map(row => row[codeIndex].trim())
+  }
+  // Headerless uploads can be one code per row, comma-separated lists,
+  // or a mix of both. In this case every non-empty cell is a gift code.
+  return rows.flatMap(row => row.map(code => code.trim()).filter(Boolean))
 }
 
 export default async function handler(req, res) {
@@ -53,7 +58,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Provide a title and a future expiry date" })
   }
   if (!unique.length || unique.length > 10000 || lines.length !== unique.length || unique.some(x => x.length > 256 || /\s/.test(x))) {
-    return res.status(400).json({ error: "Supply 1–10,000 distinct redemption codes, one per line" })
+    return res.status(400).json({ error: "Supply 1–10,000 distinct redemption codes (comma-separated or one per line)" })
   }
   const slug = randomUUID()
   try {
