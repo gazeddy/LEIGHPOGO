@@ -14,9 +14,17 @@ describe("gift-code CSV imports", () => {
   test("allows BOM and quoted values", () => {
     expect(parseGiftCodes('\uFEFFcode\n"ABC123"\n"DEF456"', "csv")).toEqual(["ABC123", "DEF456"])
   })
-  test("rejects ambiguous multiple-column input", () => {
-    expect(() => parseGiftCodes("ABC123,notes\nDEF456,notes", "csv"))
-      .toThrow("CSV must contain one code column or a named code header")
+  test("accepts comma-separated codes in a headerless CSV", () => {
+    expect(parseGiftCodes("ABC123,DEF456,GHI789", "csv"))
+      .toEqual(["ABC123", "DEF456", "GHI789"])
+  })
+  test("accepts several rows with differing numbers of codes", () => {
+    expect(parseGiftCodes("ABC123,DEF456\nGHI789\nJKL012,MNO345,PQR678", "csv"))
+      .toEqual(["ABC123", "DEF456", "GHI789", "JKL012", "MNO345", "PQR678"])
+  })
+  test("honours quoted headerless CSV cells", () => {
+    expect(parseGiftCodes('"ABC123","DEF456"\n"GHI789"', "csv"))
+      .toEqual(["ABC123", "DEF456", "GHI789"])
   })
   test("preserves manually pasted codes", () => {
     expect(parseGiftCodes("ABC123, DEF456\nGHI789", "text")).toEqual(["ABC123", "DEF456", "GHI789"])
