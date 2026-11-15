@@ -65,7 +65,7 @@ export default async function handler(req, res) {
         if (confirmation !== "DELETE") return res.status(400).json({ error: "Confirm deletion of selected codes" })
         const list = parseGiftCodes(codes)
         const unique = [...new Set(list)]
-        if (!list.length || list.length > 10000 || unique.length !== list.length || unique.some(code => code.length > 256 || /\\s/.test(code))) {
+        if (!list.length || list.length > 10000 || unique.length !== list.length || unique.some(code => code.length > 256 || /\s/.test(code))) {
           return res.status(400).json({ error: "Paste 1–10,000 distinct valid codes to remove" })
         }
         // Only delete exact matches in the selected batch. No partial deletion:
