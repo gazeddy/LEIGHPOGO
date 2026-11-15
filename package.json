@@ -15,7 +15,8 @@
     "push:keys": "node scripts/generateVapidKeys.js",
     "version:patch": "npm version patch --no-git-tag-version",
     "version:minor": "npm version minor --no-git-tag-version",
-    "version:major": "npm version major --no-git-tag-version"
+    "version:major": "npm version major --no-git-tag-version",
+    "start:live": "next start -p 3000 -H 0.0.0.0"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
