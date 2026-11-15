@@ -99,7 +99,7 @@ export default function AdminGifts() {
     const phrase = "DELETE " + batch.title
     const input = window.prompt(
       "Permanently remove batch \"" + batch.title + "\" and ALL " + batch.total +
-      " codes, including " + batch.claimed + " claimed codes? This also erases their claim history.\\n\\nType " + phrase + " to confirm:",
+      " codes, including " + batch.claimed + " claimed codes? This also erases their claim history.\n\nType " + phrase + " to confirm:",
       ""
     )
     if (input === null) return
@@ -108,11 +108,11 @@ export default function AdminGifts() {
   }
   async function deleteSelectedCodes(batch) {
     const codes = removalCodes[batch.id] || ""
-    const count = codes.split(/[\\r\\n,]+/).filter(code => code.trim()).length
+    const count = codes.split(/[\r\n,]+/).filter(code => code.trim()).length
     if (!count) { setError("Paste the exact test codes to remove first."); return }
     const input = window.prompt(
       "Permanently remove " + count + " exact code(s) from \"" + batch.title +
-      "\"? If already claimed, their claim history will also be deleted.\\n\\nType DELETE to confirm:",
+      "\"? If already claimed, their claim history will also be deleted.\n\nType DELETE to confirm:",
       ""
     )
     if (input === null) return
