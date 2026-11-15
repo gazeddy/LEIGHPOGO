@@ -8,6 +8,8 @@
 - `https://dev.leighpogo.co.uk` → existing test Cloudflare route → port 3001 → `leighpogo-test.service` running a **redirect-only** Node HTTP service; redirects to the production hostname with path and query intact. No second writable database.
 - `/projects/V4/prisma/dev.db` is retained untouched as a frozen, pre-cutover reference. **Do not start the old test web app again** without first establishing that its data will not fork from production.
 
+The cutover **rotates NEXTAUTH_SECRET** to invalidate every pre-cutover production JWT: numeric user IDs can change when V3 users are remapped, and retaining old sessions would be unsafe. All users must sign in again.
+
 The merged database retains every V4 `User.id`, V4 hashed password, V4 `GiftBatch`, V4 `GiftCode`, gift claim owner, and claim timestamp. It adds V3-only users and remaps all supported user, entry, trade and notification IDs. Every V3 table with data must have an explicit merge policy; otherwise the merge aborts. Matching IGN accounts keep V4 credentials and role; conflicting password hashes or roles stop the merge until reviewed. The `--allow-password-conflicts` option is **not** a substitute for verifying that two same-IGN accounts belong to the same person.
 
 ## Preconditions
