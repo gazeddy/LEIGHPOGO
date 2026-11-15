@@ -52,7 +52,7 @@ test("first daily claim issues through atomic earliest-expiry SQL", async () => 
   expect(sql).toMatch(/NOT EXISTS/)
   expect(sql).toMatch(/recent\."claimedAt" >/)
   expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-    claim: expect.objectContaining({ code: "CODE-1" }),
+    claim: expect.objectContaining({ code: "CODE-1", redeemUrl: "https://store.pokemongo.com/offer-redemption?passcode=CODE-1" }),
   }))
 })
 test("GET never allocates a code", async () => {
