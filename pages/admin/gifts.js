@@ -27,6 +27,7 @@ export default function AdminGifts() {
   const [codesFormat, setCodesFormat] = useState("text")
   const [selectedFile, setSelectedFile] = useState("")
   const [batches, setBatches] = useState([])
+  const [removalCodes, setRemovalCodes] = useState({})
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [busy, setBusy] = useState(false)
@@ -76,6 +77,47 @@ export default function AdminGifts() {
       await refresh()
     } catch (e) { setError(e.message) }
     finally { setBusy(false) }
+  }
+  async function removeGiftCodes(payload, successLabel) {
+    setError(""); setMessage(""); setBusy(true)
+    try {
+      const response = await fetch("/api/admin/gifts", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to delete gift codes")
+      setMessage(successLabel + ": " + result.deletedCodes + " code(s) removed." +
+        (result.deletedClaims ? " " + result.deletedClaims + " claim record(s) also removed." : ""))
+      if (payload.mode === "codes") setRemovalCodes(previous => ({ ...previous, [payload.batchId]: "" }))
+      await refresh()
+    } catch (e) { setError(e.message) }
+    finally { setBusy(false) }
+  }
+  async function deleteBatch(batch) {
+    const phrase = "DELETE " + batch.title
+    const input = window.prompt(
+      "Permanently remove batch \"" + batch.title + "\" and ALL " + batch.total +
+      " codes, including " + batch.claimed + " claimed codes? This also erases their claim history.\\n\\nType " + phrase + " to confirm:",
+      ""
+    )
+    if (input === null) return
+    if (input !== phrase) { setError("Batch not deleted: confirmation did not match."); return }
+    await removeGiftCodes({ mode: "batch", batchId: batch.id, confirmation: input }, "Batch deleted")
+  }
+  async function deleteSelectedCodes(batch) {
+    const codes = removalCodes[batch.id] || ""
+    const count = codes.split(/[\\r\\n,]+/).filter(code => code.trim()).length
+    if (!count) { setError("Paste the exact test codes to remove first."); return }
+    const input = window.prompt(
+      "Permanently remove " + count + " exact code(s) from \"" + batch.title +
+      "\"? If already claimed, their claim history will also be deleted.\\n\\nType DELETE to confirm:",
+      ""
+    )
+    if (input === null) return
+    if (input !== "DELETE") { setError("Codes not deleted: confirmation did not match."); return }
+    await removeGiftCodes({ mode: "codes", batchId: batch.id, codes, confirmation: input }, "Selected codes deleted")
   }
   return <main style={{ margin: "2rem auto", maxWidth: 900, padding: "0 1rem" }}>
     <h1>Community gift batches</h1>
@@ -142,6 +184,19 @@ export default function AdminGifts() {
       <details><summary>Claimed by ({batch.claimants.length})</summary>
         <ul>{batch.claimants.map((claim, i) => <li key={i}>{claim.ign} — {new Date(claim.claimedAt).toLocaleString("en-GB")}</li>)}</ul>
       </details>
+      <details style={{ marginTop: 12 }}>
+        <summary>Remove specific test codes</summary>
+        <p>Paste the exact codes to remove from this batch (comma-separated or one per line). Claimed codes will also lose their claim records, which may affect the 24-hour cooldown.</p>
+        <textarea aria-label={"Codes to remove from " + batch.title} rows={3}
+          value={removalCodes[batch.id] || ""}
+          onChange={e => setRemovalCodes(previous => ({ ...previous, [batch.id]: e.target.value }))}
+          style={{ display: "block", width: "100%", boxSizing: "border-box" }} />
+        <button type="button" disabled={busy || !(removalCodes[batch.id] || "").trim()}
+          onClick={() => deleteSelectedCodes(batch)}>Delete listed codes</button>
+      </details>
+      <p><button type="button" disabled={busy} onClick={() => deleteBatch(batch)}>
+        Delete entire batch and all {batch.total} codes
+      </button></p>
     </section>)}
   </main>
 }
