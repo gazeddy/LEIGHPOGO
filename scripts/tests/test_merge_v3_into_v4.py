@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-spec = importlib.util.spec_from_file_location('merge', Path(__file__).with_name('merge_v3_into_v4.py'))
+spec = importlib.util.spec_from_file_location('merge', Path(__file__).resolve().parents[1] / 'merge-v3-into-v4.py')
 merge = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(merge)
 
@@ -31,14 +31,6 @@ class MigrationTest(unittest.TestCase):
             db.executescript(SCHEMA)
             db.commit();db.close()
         with sqlite3.connect(self.a) as db:
-            db.executescript('''
-INSERT INTO User(id,ign,password,role) VALUES (1,'Shared','hash1','admin'),(2,'DevOnly','hash2','user');
-INSERT INTO Entry(id,ownerId,trainerName,code,team,createdAt,updatedAt) VALUES (100,1,'Shared','1234 5678 9012','MYSTIC','2026-01','2026-02');
-INSERT INTO PokedexEntry(ownerId,dexNumber) VALUES (1,25);
-INSERT INTO GiftBatch(id,title,slug,expiresAt) VALUES ('batch-dev','Gift','gift','2026-12-12');
-INSERT INTO GiftCode(id,batchId,code,ownerId,claimedAt) VALUES (8,'batch-dev','CLAIMED-V4',2,'2026-11-15');
-INSERT INTO SiteSetting(key,value) VALUES ('theme','v4');
-''') if False else None
             db.executescript('''
 INSERT INTO User(id,ign,password,role) VALUES (1,'Shared','hash1','admin'),(2,'DevOnly','hash2','user');
 INSERT INTO Entry(id,ownerId,trainerName,code,team,createdAt,updatedAt) VALUES (100,1,'Shared','1234 5678 9012','MYSTIC','2026-01','2026-02');
