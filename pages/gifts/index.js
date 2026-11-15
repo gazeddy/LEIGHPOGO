@@ -29,11 +29,12 @@ export default function CommunityGift() {
       <p>Batch expiry: {new Date(gift.claim.expiresAt).toLocaleString("en-GB")}</p>
       <button onClick={() => navigator.clipboard?.writeText(gift.claim.code)}>Copy code</button>
       <p>
-        <a href={"https://store.pokemongo.com/offer-redemption?passcode=" + encodeURIComponent(gift.claim.code)}
+        <a href={gift.claim.redeemUrl}
           target="_blank" rel="noopener noreferrer">
-          Redeem in Pokémon GO
+          Redeem this code in Pokémon GO
         </a>
       </p>
+      <button type="button" onClick={() => navigator.clipboard?.writeText(gift.claim.redeemUrl)}>Copy redemption link</button>
       <p>If your code is not filled automatically, copy it above and paste it into the official redemption page.</p>
       <p>Use the official Pokémon GO redemption process. LeighPogo records allocation, not in-game redemption.</p>
       </>}
