@@ -177,11 +177,12 @@ done
 rsync -a "$RUN_DIR/runtime-merged/" "$LIVE_DIR/data/"
 cp -a "$RUN_DIR/live/.env" "$LIVE_DIR/.env"
 python3 - "$LIVE_DIR/.env" <<'PY'
-import re,sys
+import re,sys,secrets
 from pathlib import Path
 p=Path(sys.argv[1])
 s=p.read_text()
-for key, val in [('DATABASE_URL','file:./dev.db'), ('NEXTAUTH_URL','https://leighpogo.co.uk')]:
+# Mandatory: IDs are remapped. Old JWTs must never authenticate as a different user.
+for key, val in [('DATABASE_URL','file:./dev.db'), ('NEXTAUTH_URL','https://leighpogo.co.uk'), ('NEXTAUTH_SECRET',secrets.token_hex(48))]:
     line=f'{key}="{val}"'
     s=re.sub(rf'(?m)^{key}=.*$',lambda _: line,s) if re.search(rf'(?m)^{key}=',s) else s.rstrip('\n')+'\n'+line+'\n'
 p.write_text(s)
