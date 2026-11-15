@@ -43,6 +43,53 @@ export default async function handler(req, res) {
       claimants: codes.filter(x => x.ownerId !== null).map(x => ({ ign: x.owner?.ign ?? "Deleted account", claimedAt: x.claimedAt })),
     })))
   }
+  if (req.method === "DELETE") {
+    const { batchId, mode, confirmation, codes } = req.body || {}
+    if (typeof batchId !== "string" || !batchId) return res.status(400).json({ error: "Select a gift batch" })
+    try {
+      const batch = await prisma.giftBatch.findUnique({ where: { id: batchId }, select: { id: true, title: true } })
+      if (!batch) return res.status(404).json({ error: "Gift batch not found" })
+
+      if (mode === "batch") {
+        if (confirmation !== `DELETE ${batch.title}`) {
+          return res.status(400).json({ error: "Enter the full confirmation phrase to delete this batch" })
+        }
+        const deletedCodes = await prisma.giftCode.count({ where: { batchId } })
+        // GiftCode rows are deleted by the GiftBatch relation's onDelete: Cascade.
+        // This also clears the claim history associated with those codes.
+        await prisma.giftBatch.delete({ where: { id: batchId } })
+        return res.status(200).json({ deletedBatch: true, deletedCodes })
+      }
+
+      if (mode === "codes") {
+        if (confirmation !== "DELETE") return res.status(400).json({ error: "Confirm deletion of selected codes" })
+        const list = parseGiftCodes(codes)
+        const unique = [...new Set(list)]
+        if (!list.length || list.length > 10000 || unique.length !== list.length || unique.some(code => code.length > 256 || /\\s/.test(code))) {
+          return res.status(400).json({ error: "Paste 1–10,000 distinct valid codes to remove" })
+        }
+        // Only delete exact matches in the selected batch. No partial deletion:
+        // a typo must not silently delete just some of the submitted codes.
+        const matched = await prisma.giftCode.findMany({
+          where: { batchId, code: { in: unique } },
+          select: { ownerId: true },
+        })
+        if (matched.length !== unique.length) {
+          return res.status(404).json({ error: "One or more codes were not found in this batch; no codes removed" })
+        }
+        const removed = await prisma.giftCode.deleteMany({ where: { batchId, code: { in: unique } } })
+        return res.status(200).json({
+          deletedBatch: false,
+          deletedCodes: removed.count,
+          deletedClaims: matched.filter(code => code.ownerId !== null).length,
+        })
+      }
+      return res.status(400).json({ error: "Choose whether to delete a batch or specific codes" })
+    } catch (error) {
+      console.error("Gift code deletion failed", error)
+      return res.status(500).json({ error: "Unable to delete gift codes" })
+    }
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" })
   const { title, expiresAt, codes, codesFormat } = req.body || {}
   const cleanTitle = typeof title === "string" ? title.trim() : ""
