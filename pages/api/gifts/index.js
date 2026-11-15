@@ -48,7 +48,8 @@ export default async function handler(req, res) {
     const nextClaimAt = claim?.claimedAt ? new Date(claim.claimedAt.getTime() + GIFT_COOLDOWN_MS) : null
     return res.status(200).json({
       title: "LeighPogo Community Gift",
-      claim: claim ? { code: claim.code, claimedAt: claim.claimedAt, batchTitle: claim.batch.title, expiresAt: claim.batch.expiresAt } : null,
+      claim: claim ? { code: claim.code, claimedAt: claim.claimedAt, batchTitle: claim.batch.title, expiresAt: claim.batch.expiresAt,
+        redeemUrl: "https://store.pokemongo.com/offer-redemption?passcode=" + encodeURIComponent(claim.code) } : null,
       nextClaimAt,
       canClaim: !nextClaimAt || nextClaimAt <= new Date(),
       remaining,
