@@ -46,6 +46,19 @@ account IDs remain unmodified. This is an exact-ID allowlist, not a general
 rule to silently combine similarly named accounts. Unresolvable unique-data
 conflicts stop the rehearsal rather than discard data.
 
+**Second approved consolidation:** `Bigjewnine` is also confirmed as
+one player. The rehearsal discovers the matching V3/V4 account IDs from
+fresh SQLite snapshots, and accepts at most three case/space-insensitive
+matches in either source. It requires matching accounts in both sources,
+preserves the lowest existing V4 account ID and its password, remaps other
+V4 account references and every matching V3 source ID, and retains admin
+privileges if an approved record already has them. It validates the exact
+surviving ID, the complete existing V4 user rows, issued gift-code
+allocations and the unchanged gift audit. Unexpected counts, revoked
+accounts, ownership-uniqueness conflicts or other unexpected IGNs abort
+rather than silently changing accounts. All consolidation is performed on
+the *disposable* rehearsal candidate only.
+
 **Conflicts fail closed.** Overlapping users with different passwords or
 roles need manual ownership review before repeating the rehearsal with
 `--allow-password-conflicts`, which keeps V4 credentials and roles.
