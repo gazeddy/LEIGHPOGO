@@ -86,7 +86,7 @@ if len(get(v4,'DATABASE_URL'))!=1 or not get(v4,'DATABASE_URL')[0].startswith('f
 # lib/env.js uses NEXTAUTH_SECRET from environment or persisted
 # .nextauth-secret in the checkout; never generate a new secret at cutover.
 candidate=get(v4,'NEXTAUTH_SECRET')
-persisted=v4/'.nextauth-secret'
+persisted=v4.parent/'.nextauth-secret'
 if candidate and candidate[0] and candidate[0]!='your-secret-key-change-in-production':
     secret=candidate[0]
 elif persisted.is_file() and persisted.read_text().strip():
