@@ -331,3 +331,22 @@ model GiftCode {
   @@index([batchId, ownerId])
   @@index([ownerId, claimedAt])
 }
+
+ 
+// Independent audit trail: no relation to User or GiftBatch, so account and
+// batch deletions cannot erase previously issued redemption-code records.
+model GiftClaimAudit {
+  id                Int      @id @default(autoincrement())
+  giftCodeId        Int      @unique
+  code              String   @unique
+  batchTitle        String
+  batchExpiresAt    DateTime
+  claimantIgn       String
+  claimantIgnKey    String
+  claimantUserId    Int?
+  claimedAt         DateTime
+
+  @@index([claimantIgnKey, claimedAt])
+  @@index([claimantUserId, claimedAt])
+  @@index([claimedAt])
+}
