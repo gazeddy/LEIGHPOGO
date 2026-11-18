@@ -232,9 +232,9 @@ PY
 log "Installing exact V4 dependencies and building production release"
 ( cd "$LIVE"; npm ci; npm test -- --runInBand --silent; npm run build )
 log "Installing merged candidate into original LIVE SQLite path"
+DB_CHANGED=1
 install -m "$LIVE_MODE" -o "${LIVE_OWNER%:*}" -g "${LIVE_OWNER#*:}" \
   "$RUN_DIR/staging/candidate.sqlite3" "$LIVE_DB"
-DB_CHANGED=1
 rm -f "$LIVE_DB-wal" "$LIVE_DB-shm"
 FILES_CHANGED=1
 for rel in data content public/uploads; do
