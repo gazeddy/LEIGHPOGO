@@ -107,8 +107,7 @@ export default function AdminGifts() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Unable to delete gift codes")
-      setMessage(successLabel + ": " + result.deletedCodes + " code(s) removed." +
-        (result.deletedClaims ? " " + result.deletedClaims + " claim record(s) also removed." : ""))
+      setMessage(successLabel + ": " + result.deletedCodes + " code(s) removed. Claim audit preserved.")
       if (payload.mode === "codes") setRemovalCodes(previous => ({ ...previous, [payload.batchId]: "" }))
       await refresh()
     } catch (e) { setError(e.message) }
@@ -118,7 +117,7 @@ export default function AdminGifts() {
     const phrase = "DELETE " + batch.title
     const input = window.prompt(
       "Permanently remove batch \"" + batch.title + "\" and ALL " + batch.total +
-      " codes, including " + batch.claimed + " claimed codes? This also erases their claim history.\n\nType " + phrase + " to confirm:",
+      " codes, including " + batch.claimed + " claimed codes? The permanent claim audit remains intact.\n\nType " + phrase + " to confirm:",
       ""
     )
     if (input === null) return
@@ -131,7 +130,7 @@ export default function AdminGifts() {
     if (!count) { setError("Paste the exact test codes to remove first."); return }
     const input = window.prompt(
       "Permanently remove " + count + " exact code(s) from \"" + batch.title +
-      "\"? If already claimed, their claim history will also be deleted.\n\nType DELETE to confirm:",
+      "\"? The permanent claim audit will remain intact.\n\nType DELETE to confirm:",
       ""
     )
     if (input === null) return
