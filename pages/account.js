@@ -210,7 +210,7 @@ export default function Account({ entry }) {
         <h2>Delete account</h2>
         <p>
           Permanently deletes your LeighPogo account and account-linked friend-code, Pokédex, trade,
-          notification, preference and import data. This cannot be undone.
+          notification, preference and import data. This cannot be undone. Community gift claim records\n          (the code issued, IGN and claim time) are retained separately to prevent repeat allocations,\n          including after account deletion. See the Privacy Policy for details.
         </p>
         <form onSubmit={handleDeleteAccount} className="stack">
           <label>
