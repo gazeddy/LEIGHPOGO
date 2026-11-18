@@ -189,6 +189,8 @@ python3 - "$RUN_DIR/staging/candidate.sqlite3" "$RUN_DIR/v4/source.sqlite3" "$RU
 import json,sqlite3,sys
 candidate,original,report=sys.argv[1:]
 r=json.load(open(report))
+if r.get('role_conflicts'):
+    sys.exit('Unapproved user role conflicts: '+repr(r['role_conflicts']))
 if not r.get('gift_audit_unchanged') or not r.get('gift_codes_unchanged_except_approved_owner'):
     sys.exit('Protected gift record check failed')
 with sqlite3.connect(candidate) as merged,sqlite3.connect(original) as before:
