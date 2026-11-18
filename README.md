@@ -34,6 +34,18 @@ and `GiftClaimAudit` tables. It saves `merge-report.json` and
 `rehearsal-status.json` under:
 `/projects/backups/leighpogo/v4-rehearsals/rehearsal-<timestamp>-<pid>/`.
 
+**Approved one-player consolidation:** This rehearsal explicitly recognises
+`Pigtailedboxer` from V4 account IDs `8` and `39`, and V3 account
+IDs `8` and `35`, as the same trainer. Only on the disposable candidate,
+it keeps V4 user `8`, moves V4 account `39`'s linked records to that
+account, maps V3 IDs `8` and `35` to it, and sets the surviving role to
+`admin` (because V3 user `35` is a confirmed administrator). It retains
+the existing V4 user `8` password hash; the administrator can reset the
+password separately. The independent gift claim audit's historic original
+account IDs remain unmodified. This is an exact-ID allowlist, not a general
+rule to silently combine similarly named accounts. Unresolvable unique-data
+conflicts stop the rehearsal rather than discard data.
+
 **Conflicts fail closed.** Overlapping users with different passwords or
 roles need manual ownership review before repeating the rehearsal with
 `--allow-password-conflicts`, which keeps V4 credentials and roles.
