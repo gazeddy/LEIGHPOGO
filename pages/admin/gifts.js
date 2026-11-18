@@ -27,6 +27,7 @@ export default function AdminGifts() {
   const [codesFormat, setCodesFormat] = useState("text")
   const [selectedFile, setSelectedFile] = useState("")
   const [batches, setBatches] = useState([])
+  const [audit, setAudit] = useState([])
   const [giftQr, setGiftQr] = useState(null)
   const [qrError, setQrError] = useState("")
   const [removalCodes, setRemovalCodes] = useState({})
@@ -36,6 +37,8 @@ export default function AdminGifts() {
   async function refresh() {
     const response = await fetch("/api/admin/gifts")
     if (response.ok) setBatches(await response.json())
+    const auditResponse = await fetch("/api/admin/gifts/audit", { cache: "no-store" })
+    if (auditResponse.ok) setAudit(await auditResponse.json())
   }
   useEffect(() => {
     refresh()
@@ -201,6 +204,24 @@ export default function AdminGifts() {
       </>}
       {!giftQr && !qrError && <p>Loading current QR…</p>}
     </section>
+    <section style={{ border: "1px solid #888", borderRadius: 8, padding: 16, marginBottom: 20 }}>
+      <h2>Permanent gift claim history</h2>
+      <p>Latest 1,000 claims. Entries remain after account or batch deletion. Claim details are restricted to administrators.</p>
+      <details>
+        <summary>View recorded claims ({audit.length} shown)</summary>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th>Trainer IGN</th><th>Code issued</th><th>Batch</th><th>Claim time</th></tr></thead>
+            <tbody>{audit.map(record => <tr key={record.id}>
+              <td>{record.claimantIgn}</td>
+              <td style={{ overflowWrap: "anywhere" }}>{record.code}</td>
+              <td>{record.batchTitle}</td>
+              <td>{new Date(record.claimedAt).toLocaleString("en-GB")}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    </section>
     <h2>Existing batches</h2>
     {batches.map(batch => <section key={batch.id} style={{ border: "1px solid #888", borderRadius: 8, padding: 16, marginBottom: 16 }}>
       <h3>{batch.title}</h3>
@@ -210,7 +231,7 @@ export default function AdminGifts() {
       </details>
       <details style={{ marginTop: 12 }}>
         <summary>Remove specific test codes</summary>
-        <p>Paste the exact codes to remove from this batch (comma-separated or one per line). Claimed codes will also lose their claim records, which may affect the 24-hour cooldown.</p>
+        <p>Paste the exact codes to remove from this batch (comma-separated or one per line). The permanent claim audit and cooldown remain intact.</p>
         <textarea aria-label={"Codes to remove from " + batch.title} rows={3}
           value={removalCodes[batch.id] || ""}
           onChange={e => setRemovalCodes(previous => ({ ...previous, [batch.id]: e.target.value }))}
