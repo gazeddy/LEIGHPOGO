@@ -163,19 +163,48 @@ def main():
         after = {name: snapshot_digest(candidate, name) for name in FINGERPRINT_TABLES}
         for table in FINGERPRINT_TABLES:
             if table == "User":
-                # Matching V4 user records must never be overwritten.
                 with sqlite3.connect(v4_snapshot) as before_db, sqlite3.connect(candidate) as after_db:
                     before_db.row_factory = after_db.row_factory = sqlite3.Row
                     columns = [row[1] for row in before_db.execute('PRAGMA table_info("User")')]
                     select = ",".join('"' + c + '"' for c in columns)
                     for entry in before_db.execute(f'SELECT {select} FROM "User"'):
                         match = after_db.execute(f'SELECT {select} FROM "User" WHERE "id"=?', (entry["id"],)).fetchone()
-                        if match is None or dict(entry) != dict(match):
-                            stop(f"Existing V4 user altered during merger: user ID {entry['id']}")
+                        if entry["id"] == 39:
+                            if match is not None:
+                                stop("Approved duplicate V4 user 39 was not merged")
+                            continue
+                        if match is None:
+                            stop(f"V4 user {entry['id']} unexpectedly removed")
+                        expected = dict(entry)
+                        if entry["id"] == 8:
+                            expected["role"] = "admin"
+                        if dict(match) != expected:
+                            stop(f"Existing V4 user altered unexpectedly: user ID {entry['id']}")
+                    aliases = after_db.execute(
+                        "SELECT id FROM User WHERE lower(trim(ign))='pigtailedboxer'"
+                    ).fetchall()
+                    if [row[0] for row in aliases] != [8]:
+                        stop("Approved player did not consolidate to precisely V4 user 8")
+            elif table == "GiftCode":
+                with sqlite3.connect(v4_snapshot) as before_db, sqlite3.connect(candidate) as after_db:
+                    before_db.row_factory = after_db.row_factory = sqlite3.Row
+                    original_codes = {
+                        row["id"]: dict(row) for row in before_db.execute('SELECT * FROM "GiftCode"')
+                    }
+                    merged_codes = {
+                        row["id"]: dict(row) for row in after_db.execute('SELECT * FROM "GiftCode"')
+                    }
+                    if original_codes.keys() != merged_codes.keys():
+                        stop("Existing gift code IDs changed")
+                    for code_id, entry in original_codes.items():
+                        if entry["ownerId"] == 39:
+                            entry["ownerId"] = 8
+                        if entry != merged_codes[code_id]:
+                            stop(f"GiftCode {code_id} was unexpectedly altered")
             elif original[table] != after[table]:
                 stop(f"V4 {table} changed unexpectedly during merge")
         status.update(result="PASS", original_v4=original, merged=after)
-        print("PASS: integrity, foreign keys, original V4 users, batches, codes and gift audit preserved.")
+        print("PASS: V4 player 8 consolidated with 39 and promoted to admin, protected gift data preserved, integrity/foreign keys valid.")
         print("Merge report:", report)
     except Exception as exc:
         status.update(result="FAIL", error=str(exc))
