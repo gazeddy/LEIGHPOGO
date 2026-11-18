@@ -8,7 +8,7 @@ BACKUP_DIR="${BACKUP_DIR:-/projects/backups/leighpogo/v4-updates}"
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
-for command in git python3 npm npx systemctl; do
+for command in git python3 npm npx sudo systemctl; do
   command -v "$command" >/dev/null 2>&1 || die "Missing required command: $command"
 done
 
