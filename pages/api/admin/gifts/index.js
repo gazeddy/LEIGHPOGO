@@ -121,6 +121,10 @@ export default async function handler(req, res) {
   }
   const slug = randomUUID()
   try {
+    const alreadyIssued = await prisma.giftClaimAudit.findFirst({
+      where: { code: { in: unique } }, select: { code: true },
+    })
+    if (alreadyIssued) return res.status(409).json({ error: "One or more gift codes were previously issued and cannot be uploaded again" })
     const batch = await prisma.giftBatch.create({
       data: { title: cleanTitle, slug, expiresAt: expiry, codes: { create: unique.map(code => ({ code })) } },
       select: { id: true, slug: true, title: true },
