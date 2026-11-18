@@ -3,7 +3,7 @@ import { useState } from "react"
 import { getSession } from "next-auth/react"
 import { useRouter } from "next/router"
 
-function isGiftDestination(value) { return value === "/gifts" || /^\/gifts\/[a-zA-Z0-9-]+$/.test(value) }
+function isGiftDestination(value) { return value === "/gifts" || /^\/gifts\/[a-zA-Z0-9-]+$/.test(value) || /^\/gifts\?qr=[0-9]+\.[a-f0-9]{64}$/.test(value) }
 
 export default function Register() {
   const [name, setName] = useState("")
