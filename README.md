@@ -11,6 +11,45 @@ The Prisma schema and migration history now describe the same layout:
 - `SearchString`: saved searches
 - `PokedexEntry`: per-user Pokédex records
 
+## Rehearsing the V3-to-V4 primary migration (no cutover)
+
+Once the gift claim audit migration is deployed to V4, run the *read-only*
+migration rehearsal from the V4 branch:
+
+```bash
+cd /projects/V4 && git pull --ff-only origin v4 && python3 scripts/rehearse-v4-migration.py
+```
+
+The Python script reads the SQLite `DATABASE_URL` from each checkout
+(default `/projects/V4` and `/projects/LIVE`; relative paths resolve
+against each checkout's `prisma/` directory), takes **online SQLite
+backups** of both databases, and creates a **disposable V4-primary candidate**
+from the V4 snapshot. It invokes `scripts/merge-v3-into-v4.py` against the
+candidate only. Neither active database is migrated, swapped, modified or
+restored, and neither systemd service is stopped or restarted.
+
+The rehearsal checks SQLite integrity and foreign keys, validates V4
+accounts are unchanged, and verifies unchanged `GiftBatch`, `GiftCode`,
+and `GiftClaimAudit` tables. It saves `merge-report.json` and
+`rehearsal-status.json` under:
+`/projects/backups/leighpogo/v4-rehearsals/rehearsal-<timestamp>-<pid>/`.
+
+**Conflicts fail closed.** Overlapping users with different passwords or
+roles need manual ownership review before repeating the rehearsal with
+`--allow-password-conflicts`, which keeps V4 credentials and roles.
+Missing tables, unknown populated V3 tables, or other incompatible schema
+also stop the rehearsal for explicit resolution. A failed rehearsal does
+not touch either production or development database. Do not attempt the
+actual cutover until the report is reviewed and conflicts addressed.
+
+Useful overrides: `--v3-dir`, `--v4-dir`, `--v3-db`, `--v4-db`,
+`--backup-root`; database overrides must still point *inside* their
+respective checkouts. The process must have read permission for both
+SQLite databases and write access to the backup destination. This
+rehearsal does not yet merge non-SQLite runtime content (uploaded guide
+images, event overrides, gym files), so those must be handled by the
+subsequent production cutover procedure.
+
 ## V4 updates with automatic SQLite backup
 
 For the V4 development service only, run:
