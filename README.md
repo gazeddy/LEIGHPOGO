@@ -75,6 +75,54 @@ rehearsal does not yet merge non-SQLite runtime content (uploaded guide
 images, event overrides, gym files), so those must be handled by the
 subsequent production cutover procedure.
 
+## Promoting tested V4 to LIVE
+
+**Destructive production operation — requires a recent successful rehearsal and a
+maintenance window.** The dedicated V4 cutover script is
+`deploy/promote-v4-to-live.sh`; never run the old V2 cutover script for V4.
+It requires the two explicit arguments `--activate --allow-password-conflicts`
+to make the choice to retain V4 credentials explicit. It accepts no arbitrary
+database or service paths. Verify production's `leighpogo.service` launches
+the LIVE checkout on port 3000 before using it.
+
+From the V4 checkout:
+
+```bash
+cd /projects/V4 && git pull --ff-only origin v4 && bash -n deploy/promote-v4-to-live.sh && sudo bash deploy/promote-v4-to-live.sh --activate --allow-password-conflicts
+```
+
+The cutover checks for current GitHub V4 source, clean checkouts, both running
+services and distinct SQLite paths. It stops *both* sites before taking final
+validated SQLite snapshots, saving complete runtime `data`, `content` and
+`public/uploads` trees and both `.env` files under
+`/projects/backups/leighpogo/v4-cutovers/`. It reruns the approved V4-primary
+merger on a copy of those final snapshots, verifying gifts and audit records
+remain intact, and retains a JSON merge report. Password conflicts preserve
+V4 credentials. The existing V4 accounts and IDs take precedence; approved
+case-insensitive account consolidations remain limited to the known players.
+
+Only after a valid candidate exists does it switch the LIVE checkout to the
+exact V4 Git commit, create a production environment from the tested V4 one
+(with `NEXTAUTH_URL=https://leighpogo.co.uk` and the *existing LIVE database
+path*), install/test/build V4, install the merged candidate DB, overlay
+runtime files V4-first (V3-only paths retained), validate Prisma status,
+and check the production HTTP endpoint. Errors trigger a best-effort rollback
+of LIVE code, database, runtime files and environment from saved snapshots,
+plus restoration of both original services. **Verify a restored site manually
+after an error.** A rollback can never guarantee recovery from external
+writes or effects outside these directories.
+
+On success, `leighpogo-test.service` remains **stopped** to prevent
+new signups and gift claims on a now-stale development database. The original
+V4 database remains untouched and backed up. Redirect the old V4 test
+hostname to the production site and generate fresh QR codes so community
+scans continue working; a test-host QR link will otherwise fail. Review
+production secrets, push credentials, Cloudflare tunnels and other
+external configuration before starting. The production source checkout is
+left detached at the verified V4 commit; the GitHub `main` branch is **not**
+automatically changed. Promote or reconcile `main` as a separate,
+post-verification operation so a future LIVE deployment does not revert V4.
+
 ## V4 updates with automatic SQLite backup
 
 For the V4 development service only, run:
