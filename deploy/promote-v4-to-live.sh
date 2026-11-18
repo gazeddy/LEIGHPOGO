@@ -247,17 +247,22 @@ systemctl start "$LIVE_SERVICE"
 systemctl is-active --quiet "$LIVE_SERVICE" || die "LIVE service failed to start"
 # Verify HTTP response on known local service port.
 python3 - <<'PY'
-import urllib.request,time,sys
-url='http://127.0.0.1:3000/'
+import http.client,time,sys
 for attempt in range(10):
     try:
-        with urllib.request.urlopen(url,timeout=3) as r:
-            if r.status in (200,301,302,303,307,308):
-                print('LIVE HTTP check:',r.status);break
+        connection=http.client.HTTPConnection('127.0.0.1',3000,timeout=3)
+        connection.request('GET','/',headers={'Host':'leighpogo.co.uk'})
+        response=connection.getresponse()
+        status=response.status
+        connection.close()
+        if 200 <= status < 400:
+            print('LIVE HTTP check:',status)
+            break
     except Exception:
-        time.sleep(2)
+        pass
+    time.sleep(2)
 else:
-    sys.exit('LIVE did not respond on localhost:3000')
+    sys.exit('LIVE did not respond successfully on localhost:3000')
 PY
 # Leave the original V4 test service STOPPED on success: otherwise new
 # registrations/QR gift claims would split across two independent databases.
