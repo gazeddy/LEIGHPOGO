@@ -81,15 +81,23 @@ def get(path,key):
         if test.startswith(key+'='):
             result.append(test.partition('=')[2].strip().strip('"').strip("'"))
     return result
-for key in ('NEXTAUTH_SECRET','DATABASE_URL'):
-    if len(get(v4,key))!=1 or not get(v4,key)[0]:
-        sys.exit('V4 environment is missing '+key)
-if not get(v4,'DATABASE_URL')[0].startswith('file:'):
-    sys.exit('V4 database is not SQLite')
-if not get(live,'NEXTAUTH_SECRET'):
-    sys.exit('LIVE missing auth secret')
+if len(get(v4,'DATABASE_URL'))!=1 or not get(v4,'DATABASE_URL')[0].startswith('file:'):
+    sys.exit('V4 environment has missing or invalid SQLite DATABASE_URL')
+# lib/env.js uses NEXTAUTH_SECRET from environment or persisted
+# .nextauth-secret in the checkout; never generate a new secret at cutover.
+candidate=get(v4,'NEXTAUTH_SECRET')
+persisted=v4/'.nextauth-secret'
+if candidate and candidate[0] and candidate[0]!='your-secret-key-change-in-production':
+    secret=candidate[0]
+elif persisted.is_file() and persisted.read_text().strip():
+    secret=persisted.read_text().strip()
+else:
+    sys.exit('Cannot determine V4 effective NextAuth secret from .env or .nextauth-secret')
+if '\\n' in secret or '\\r' in secret or '"' in secret:
+    sys.exit('Unexpected V4 NextAuth secret format')
 content=target.read_text().splitlines()
-content=[line for line in content if not line.strip().removeprefix('export ').startswith('NEXTAUTH_URL=')]
+content=[line for line in content if not line.strip().removeprefix('export ').split('=',1)[0] in ('NEXTAUTH_URL','NEXTAUTH_SECRET')]
+content.append('NEXTAUTH_SECRET="'+secret+'"')
 content.append('NEXTAUTH_URL="https://leighpogo.co.uk"')
 target.write_text('\n'.join(content)+'\n')
 target.chmod(0o600)
@@ -139,6 +147,11 @@ rollback() {
       done
     fi
     [[ -f "$RUN_DIR/live/.env" ]] && cp -a "$RUN_DIR/live/.env" "$LIVE/.env"
+    if [[ -f "$RUN_DIR/live/.nextauth-secret" ]]; then
+      cp -a "$RUN_DIR/live/.nextauth-secret" "$LIVE/.nextauth-secret"
+    else
+      rm -f "$LIVE/.nextauth-secret"
+    fi
     if (( CODE_CHANGED )); then
       ( cd "$LIVE"; npm ci && npm run build ) || echo "WARNING: LIVE rollback build needs manual repair" >&2
     fi
@@ -169,6 +182,8 @@ for source,destination in ((p[0],p[1]),(p[2],p[3])):
 PY
 cp -a "$LIVE/.env" "$RUN_DIR/live/.env"
 cp -a "$V4/.env" "$RUN_DIR/v4/.env"
+if [[ -f "$LIVE/.nextauth-secret" ]]; then cp -a "$LIVE/.nextauth-secret" "$RUN_DIR/live/.nextauth-secret"; fi
+if [[ -f "$V4/.nextauth-secret" ]]; then cp -a "$V4/.nextauth-secret" "$RUN_DIR/v4/.nextauth-secret"; fi
 for rel in data content public/uploads; do
   for root in live v4; do
     src="$LIVE"; [[ "$root" == v4 ]] && src="$V4"
@@ -217,6 +232,13 @@ log "Switching LIVE checkout to exact verified V4 commit (main branch untouched)
 CODE_CHANGED=1
 safe_git "$LIVE" checkout -f --detach "$HEAD_V4"
 cp "$RUN_DIR/staging/.env" "$LIVE/.env"
+# Preserve the exact V4 generated secret file as well, even though the
+# authoritative value is pinned into the production .env above.
+if [[ -f "$RUN_DIR/v4/.nextauth-secret" ]]; then
+  cp -a "$RUN_DIR/v4/.nextauth-secret" "$LIVE/.nextauth-secret"
+else
+  rm -f "$LIVE/.nextauth-secret"
+fi
 # V4's DATABASE_URL may name the usual prisma/prisma/dev.db relative file.
 # Never silently use a different file: override only if resolved paths differ.
 python3 - "$LIVE/.env" "$LIVE_DB" "$LIVE" <<'PY'
