@@ -33,6 +33,7 @@ export default async function handler(req, res) {
 
   const ownerId = Number(session.user.id)
   if (!Number.isSafeInteger(ownerId) || ownerId < 1) return res.status(401).json({ error: "Invalid account" })
+  res.setHeader("Cache-Control", "private, no-store")
   try {
     // Load current IGN from the database, never trust an IGN sent by the client.
     const account = await prisma.user.findUnique({ where: { id: ownerId }, select: { ign: true } })
@@ -106,7 +107,8 @@ export default async function handler(req, res) {
     const nextClaimAt = claim?.claimedAt ? new Date(claim.claimedAt.getTime() + GIFT_COOLDOWN_MS) : null
     return res.status(200).json({
       title: "LeighPogo Community Gift",
-      claim: responseClaim(claim),
+      // A reused IGN retains cooldown, but cannot view another account's old code.
+      claim: claim?.claimantUserId === ownerId ? responseClaim(claim) : null,
       nextClaimAt,
       canClaim: !nextClaimAt || nextClaimAt <= new Date(),
       remaining,
