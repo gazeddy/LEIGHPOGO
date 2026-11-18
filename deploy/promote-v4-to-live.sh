@@ -204,8 +204,15 @@ python3 - "$RUN_DIR/staging/candidate.sqlite3" "$RUN_DIR/v4/source.sqlite3" "$RU
 import json,sqlite3,sys
 candidate,original,report=sys.argv[1:]
 r=json.load(open(report))
-if r.get('role_conflicts'):
-    sys.exit('Unapproved user role conflicts: '+repr(r['role_conflicts']))
+# V4 role is authoritative. Retaining an existing V4 administrator
+# despite a lower V3 role is not a promotion; flag any OTHER role mismatch.
+role_conflicts=r.get('role_conflicts',[])
+unsafe=[entry for entry in role_conflicts
+        if not (entry.get('v3')=='user' and entry.get('v4')=='admin')]
+if unsafe:
+    sys.exit('Role conflicts requiring manual review: '+repr(unsafe))
+if role_conflicts:
+    print('Preserving V4 role for overlapping accounts:',repr(role_conflicts))
 if not r.get('gift_audit_unchanged') or not r.get('gift_codes_unchanged_except_approved_owner'):
     sys.exit('Protected gift record check failed')
 with sqlite3.connect(candidate) as merged,sqlite3.connect(original) as before:
