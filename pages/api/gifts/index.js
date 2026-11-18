@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth/next"
 import prisma from "../../../lib/prisma"
+import { validGiftQr } from "../../../lib/giftQr"
 import { authOptions } from "../auth/[...nextauth]"
 
 export const GIFT_COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -11,6 +12,8 @@ export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions)
   if (!session?.user?.id) return res.status(401).json({ error: "Sign in to claim gifts" })
   if (!session.user.privacyPolicyAccepted) return res.status(403).json({ error: "Accept the current privacy policy first" })
+  const qrToken = req.method === "GET" ? req.query?.qr : req.body?.qr
+  if (!validGiftQr(qrToken)) return res.status(410).json({ error: "This gift QR has expired or is invalid. Scan the current QR to claim a code." })
   const ownerId = Number(session.user.id)
   const lastClaim = async () => prisma.giftCode.findFirst({
     where: { ownerId },
