@@ -30,3 +30,12 @@ FROM "GiftCode" gc
 JOIN "GiftBatch" gb ON gb."id" = gc."batchId"
 LEFT JOIN "User" u ON u."id" = gc."ownerId"
 WHERE gc."claimedAt" IS NOT NULL;
+
+-- Even when an administrator deletes a claimed batch, its already-issued
+-- redemption codes must never be made eligible for future allocation.
+CREATE TRIGGER "GiftCode_prevent_reissued_code"
+BEFORE INSERT ON "GiftCode"
+WHEN EXISTS (SELECT 1 FROM "GiftClaimAudit" audit WHERE audit."code" = NEW."code")
+BEGIN
+  SELECT RAISE(ABORT, 'Previously issued gift codes cannot be uploaded again');
+END;
