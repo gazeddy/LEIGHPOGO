@@ -63,6 +63,7 @@ V4_DB="$(printf '%s\n' "$DBS" | sed -n '2p')"
 [[ -n "$LIVE_DB" && -n "$V4_DB" && "$LIVE_DB" != "$V4_DB" ]] || die "Cannot distinguish databases"
 LIVE_OWNER="$(stat -c '%u:%g' "$LIVE_DB")"
 LIVE_MODE="$(stat -c '%a' "$LIVE_DB")"
+LIVE_RUNTIME_OWNER="$(stat -c '%u:%g' "$LIVE")"
 
 # Production config derives from the existing working V4 config and uses
 # the public production URL. Keep the V4 auth/QR/VAPID secrets for its users.
@@ -127,8 +128,8 @@ rollback() {
       chown "$LIVE_OWNER" "$LIVE_DB"
       chmod "$LIVE_MODE" "$LIVE_DB"
     fi
-    if (( FILES_CHANGED )); then
-      for rel in data content/guides public/uploads/guides; do
+    if (( FILES_CHANGED || CODE_CHANGED )); then
+      for rel in data content public/uploads; do
         mkdir -p "$LIVE/$rel"
         if [[ -d "$RUN_DIR/live/$rel" ]]; then
           rsync -a --delete "$RUN_DIR/live/$rel/" "$LIVE/$rel/" || :
@@ -168,7 +169,7 @@ for source,destination in ((p[0],p[1]),(p[2],p[3])):
 PY
 cp -a "$LIVE/.env" "$RUN_DIR/live/.env"
 cp -a "$V4/.env" "$RUN_DIR/v4/.env"
-for rel in data content/guides public/uploads/guides; do
+for rel in data content public/uploads; do
   for root in live v4; do
     src="$LIVE"; [[ "$root" == v4 ]] && src="$V4"
     if [[ -d "$src/$rel" ]]; then
@@ -201,7 +202,7 @@ print('Fresh candidate validated; V4 gift audit and batches unchanged')
 PY
 
 # Stage production runtime files: LIVE-only files retained, V4 files win.
-for rel in data content/guides public/uploads/guides; do
+for rel in data content public/uploads; do
   mkdir -p "$RUN_DIR/staging/$rel"
   for source in live v4; do
     if [[ -d "$RUN_DIR/$source/$rel" ]]; then
@@ -211,8 +212,8 @@ for rel in data content/guides public/uploads/guides; do
 done
 
 log "Switching LIVE checkout to exact verified V4 commit (main branch untouched)"
-safe_git "$LIVE" checkout -f --detach "$HEAD_V4"
 CODE_CHANGED=1
+safe_git "$LIVE" checkout -f --detach "$HEAD_V4"
 cp "$RUN_DIR/staging/.env" "$LIVE/.env"
 # V4's DATABASE_URL may name the usual prisma/prisma/dev.db relative file.
 # Never silently use a different file: override only if resolved paths differ.
@@ -234,9 +235,10 @@ install -m "$LIVE_MODE" -o "${LIVE_OWNER%:*}" -g "${LIVE_OWNER#*:}" \
 DB_CHANGED=1
 rm -f "$LIVE_DB-wal" "$LIVE_DB-shm"
 FILES_CHANGED=1
-for rel in data content/guides public/uploads/guides; do
+for rel in data content public/uploads; do
   mkdir -p "$LIVE/$rel"
   rsync -a --delete "$RUN_DIR/staging/$rel/" "$LIVE/$rel/"
+  chown -R "$LIVE_RUNTIME_OWNER" "$LIVE/$rel"
 done
 log "Checking final LIVE Prisma migrations"
 ( cd "$LIVE"; npm run db:status )
