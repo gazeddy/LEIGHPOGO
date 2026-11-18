@@ -8,6 +8,14 @@ const urlBase64ToUint8Array = (value) => {
   return Uint8Array.from(raw, (character) => character.charCodeAt(0))
 }
 
+const subscriptionUsesKey = (subscription, publicKey) => {
+  const current = subscription?.options?.applicationServerKey
+  if (!current || !publicKey) return null
+  const expected = urlBase64ToUint8Array(publicKey)
+  const actual = new Uint8Array(current)
+  return actual.length === expected.length && actual.every((byte, index) => byte === expected[index])
+}
+
 const unsupportedMessage =
   "Push notifications are not available in this browser. On iPhone or iPad, install LEIGHPOGO to the Home Screen first."
 
@@ -105,7 +113,9 @@ export default function PushNotificationSettings() {
           : { preferences: DEFAULT_PUSH_PREFERENCES }
         const existingSubscription = await registration.pushManager.getSubscription()
 
-        if (existingSubscription) {
+        // The global push bootstrap migrates subscriptions with old VAPID keys.
+        // Never re-save a known V3 subscription as if it were valid for V4.
+        if (existingSubscription && subscriptionUsesKey(existingSubscription, config.publicKey) !== false) {
           saveSubscription(existingSubscription).catch((error) => {
             console.warn("Unable to sync push subscription timezone", error)
           })
