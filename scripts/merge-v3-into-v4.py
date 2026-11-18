@@ -132,28 +132,42 @@ SAFE_MEMBERSHIP_KEYS = {
 }
 
 
-def users_by_ign(db, label):
+# Second specifically authorised player. Resolve source IDs from actual
+# snapshots rather than guessing their numbers. Never generalise to other IGNs.
+SECOND_IDENTITY_KEY = "bigjewnine"
+
+
+def identity_groups(db):
     groups = {}
     for row in db_rows(db, "User"):
         key = IGN_KEY(row["ign"])
         if not key:
-            raise RuntimeError(f"{label}: invalid IGN on user ID {row['id']}")
+            raise RuntimeError(f"Invalid IGN on user ID {row['id']}")
         groups.setdefault(key, []).append(row)
+    return groups
+
+
+def users_by_ign(db, label):
     result = {}
-    for key, rows in groups.items():
+    for key, rows in identity_groups(db).items():
         if len(rows) > 1:
             actual = {row["id"] for row in rows}
-            allowed = V4_ALIAS_IDS if label == "V4" else V3_ALIAS_IDS
-            if key != IDENTITY_KEY or actual != allowed:
+            if key == IDENTITY_KEY:
+                allowed = V4_ALIAS_IDS if label == "V4" else V3_ALIAS_IDS
+                if actual != allowed:
+                    raise RuntimeError(f"{label}: Pigtailedboxer IDs changed: {sorted(actual)}")
+                survivor = SURVIVOR_ID
+            elif key == SECOND_IDENTITY_KEY and len(rows) <= 3:
+                survivor = min(actual)
+            else:
                 raise RuntimeError(
                     f"{label}: unapproved IGN collision for {key!r} "
                     f"with user IDs {sorted(actual)}"
                 )
-            result[key] = next(row for row in rows if row["id"] == SURVIVOR_ID)
+            result[key] = next(row for row in rows if row["id"] == survivor)
         else:
             result[key] = rows[0]
     return result
-
 
 def user_fk_columns(db):
     result = {}
@@ -237,6 +251,93 @@ def consolidate_v4_identity(db, report):
 
 
 
+def consolidate_second_identity(v4, live, report):
+    v4_rows = identity_groups(v4).get(SECOND_IDENTITY_KEY, [])
+    v3_rows = identity_groups(live).get(SECOND_IDENTITY_KEY, [])
+    if not v4_rows or not v3_rows:
+        raise RuntimeError("Bigjewnine must exist in both snapshots for approved identity mapping")
+    if len(v4_rows) > 3 or len(v3_rows) > 3 or len(v4_rows) + len(v3_rows) < 3:
+        raise RuntimeError(
+            "Unexpected Bigjewnine account counts: V4={} V3={}; review IDs before merging".format(
+                len(v4_rows), len(v3_rows)
+            )
+        )
+    primary = min(v4_rows, key=lambda row: row["id"])
+    survivor = primary["id"]
+    duplicates = sorted((row["id"] for row in v4_rows if row["id"] != survivor))
+    for row in v4_rows:
+        if v4.execute('SELECT 1 FROM "AccountRevocation" WHERE userId=?',
+                      (row["id"],)).fetchone():
+            raise RuntimeError(f"Bigjewnine V4 account {row['id']} is revoked; manual review required")
+    if table_exists(live, "AccountRevocation"):
+        for row in v3_rows:
+            if live.execute('SELECT 1 FROM "AccountRevocation" WHERE userId=?',
+                            (row["id"],)).fetchone():
+                raise RuntimeError(f"Bigjewnine V3 account {row['id']} is revoked; manual review required")
+
+    has_admin = any(row["role"] == "admin" for row in v4_rows + v3_rows)
+    role = "admin" if has_admin else primary["role"]
+    summary = {
+        "ign": SECOND_IDENTITY_KEY,
+        "survivor": survivor,
+        "absorbed_v4_ids": duplicates,
+        "mapped_v3_ids": sorted(row["id"] for row in v3_rows),
+        "password_kept_from_v4_id": survivor,
+        "role": role,
+        "transferred": {}, "deduplicated_memberships": {},
+    }
+    report["second_identity_consolidation"] = summary
+    for duplicate in duplicates:
+        move_user_references(v4, duplicate, survivor, summary)
+        v4.execute('DELETE FROM "User" WHERE id=?', (duplicate,))
+    if has_admin and primary["role"] != "admin":
+        v4.execute('UPDATE "User" SET role=? WHERE id=?', ("admin", survivor))
+    return survivor, duplicates, [row["id"] for row in v3_rows]
+
+
+def move_user_references(db, duplicate, survivor, report):
+    refs = user_fk_columns(db)
+    for table, columns in refs.items():
+        if table == "User":
+            raise RuntimeError("Unexpected User self-reference")
+        for column in columns:
+            rows = db.execute(
+                f'SELECT rowid AS _record_rowid, * FROM "{table}" WHERE "{column}"=?',
+                (duplicate,)
+            ).fetchall()
+            for row in rows:
+                try:
+                    db.execute(
+                        f'UPDATE "{table}" SET "{column}"=? WHERE rowid=?',
+                        (survivor, row["_record_rowid"])
+                    )
+                    report["transferred"][table] = report["transferred"].get(table, 0) + 1
+                except sqlite3.IntegrityError as exc:
+                    if table not in SAFE_MEMBERSHIP_KEYS or column != "ownerId":
+                        raise RuntimeError(
+                            f"Unsafe duplicate {table}.{column} while merging account "
+                            f"{duplicate} to {survivor}: {exc}"
+                        ) from exc
+                    keys = SAFE_MEMBERSHIP_KEYS[table]
+                    where = ' AND '.join(['"ownerId"=?'] + [f'"{key}"=?' for key in keys])
+                    params = (survivor,) + tuple(row[key] for key in keys)
+                    existing = db.execute(f'SELECT * FROM "{table}" WHERE {where}', params).fetchone()
+                    if existing is None:
+                        raise RuntimeError(f"Conflicting {table} membership missing") from exc
+                    if table == "UserTickerPreference" and row["enabled"] != existing["enabled"]:
+                        raise RuntimeError("Conflicting ticker preferences: manual review needed") from exc
+                    db.execute(f'DELETE FROM "{table}" WHERE rowid=?', (row["_record_rowid"],))
+                    report["deduplicated_memberships"][table] = (
+                        report["deduplicated_memberships"].get(table, 0) + 1
+                    )
+    for table, columns in refs.items():
+        for column in columns:
+            if db.execute(
+                f'SELECT 1 FROM "{table}" WHERE "{column}"=? LIMIT 1', (duplicate,)
+            ).fetchone():
+                raise RuntimeError(f"Unmigrated user reference: {table}.{column}={duplicate}")
+
+
 def merge(v4, live, allow_conflicts):
     report = {"users_v4_before": 0, "users_v3_before": 0, "users_added": 0,
               "matched_users": 0, "password_conflicts": [], "role_conflicts": [],
@@ -262,6 +363,7 @@ def merge(v4, live, allow_conflicts):
     }
     v4_users = users_by_ign(v4, "V4")
     live_users = users_by_ign(live, "V3")
+    big_v4_original_ids = sorted(row["id"] for row in identity_groups(v4).get(SECOND_IDENTITY_KEY, []))
     report["users_v4_before"] = v4.execute('SELECT count(*) FROM "User"').fetchone()[0]
     report["users_v3_before"] = live.execute('SELECT count(*) FROM "User"').fetchone()[0]
     expected_admin = live.execute('SELECT role, ign FROM "User" WHERE id=35').fetchone()
@@ -278,9 +380,9 @@ def merge(v4, live, allow_conflicts):
         if candidate is None:
             continue
         report["matched_users"] += 1
-        if source["password"] != candidate["password"] and key != IDENTITY_KEY:
+        if source["password"] != candidate["password"] and key not in (IDENTITY_KEY, SECOND_IDENTITY_KEY):
             report["password_conflicts"].append(source["ign"])
-        if source["role"] != candidate["role"] and key != IDENTITY_KEY:
+        if source["role"] != candidate["role"] and key not in (IDENTITY_KEY, SECOND_IDENTITY_KEY):
             report["role_conflicts"].append({"ign": source["ign"], "v3": source["role"], "v4": candidate["role"]})
     if report["password_conflicts"] and not allow_conflicts:
         raise RuntimeError("Overlapping IGNs have different password hashes: " + ", ".join(report["password_conflicts"]) + ". Verify ownership and rerun only with --allow-password-conflicts; V4 passwords will win.")
@@ -291,6 +393,7 @@ def merge(v4, live, allow_conflicts):
     users = {}
     v4.execute("BEGIN IMMEDIATE")
     consolidate_v4_identity(v4, report)
+    big_survivor, big_duplicates, big_v3_ids = consolidate_second_identity(v4, live, report)
     for key, source in live_users.items():
         candidate = v4_users.get(key)
         if candidate:
@@ -298,6 +401,9 @@ def merge(v4, live, allow_conflicts):
             if key == IDENTITY_KEY:
                 # Both V3 source accounts belong to the approved player.
                 users[35] = SURVIVOR_ID
+            elif key == SECOND_IDENTITY_KEY:
+                for old_user_id in big_v3_ids:
+                    users[old_user_id] = big_survivor
         else:
             payload = {k: source[k] for k in source.keys() if k != "id"}
             users[source["id"]] = insert(v4, "User", payload)
@@ -359,9 +465,12 @@ def merge(v4, live, allow_conflicts):
         after = final_codes[code_id]
         if original["ownerId"] == 39:
             original["ownerId"] = SURVIVOR_ID
+        if original["ownerId"] in big_duplicates:
+            original["ownerId"] = big_survivor
         if after != original:
             raise RuntimeError(f"Gift code {code_id} changed unexpectedly")
     report["gift_codes_unchanged_except_approved_owner"] = True
+    report["second_identity_consolidation"]["original_v4_ids"] = big_v4_original_ids
     v4.commit()
     report["users_after"] = actual_users
     return report
