@@ -28,7 +28,7 @@ const allocated = {
   batch: { title: "Early expiry batch", expiresAt: issued.batchExpiresAt },
 }
 function makeRes() {
-  return { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() }
+  return { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis(), setHeader: jest.fn() }
 }
 beforeEach(() => {
   jest.resetAllMocks()
@@ -121,5 +121,5 @@ test("a deleted and re-registered account with the same IGN retains cooldown", a
     where: { OR: [{ claimantUserId: 99 }, { claimantIgnKey: "trainer42" }] },
   }))
   expect(prisma.$executeRaw).not.toHaveBeenCalled()
-  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ canClaim: false }))
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ canClaim: false, claim: null }))
 })
