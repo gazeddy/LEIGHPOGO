@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
           <li>Your optional display name, Pokémon GO in-game name (IGN), account role and password hash.</li>
           <li>Your trainer team and friend code when you choose to add them.</li>
           <li>Your Pokédex progress, saved search strings, wanted trades, trade listings and related notifications.</li>
-          <li>Community gift redemption batches, the code allocated to your account, and the date it was claimed. Administrators can see which members claimed gifts.</li>
+          <li>Community gift redemption batches, the code allocated to your account, the claim date, your IGN and an internal account identifier. Administrators can inspect gift-claim records for distribution audits and to prevent repeated claims.</li>
           <li>
             Pokédex screenshots you upload for import. They are stored privately while the import is queued
             or processed and are removed when the import is cleared or your account is deleted.
@@ -105,10 +105,14 @@ export default function PrivacyPolicy() {
         <p>
           Account deletion removes your account credentials and account-linked profile, friend-code, Pokédex,
           trade, notification, preference, import and usage records. Any queued Pokédex screenshot files for
-          your account are also removed. LeighPogo retains only the former numeric internal user ID and the
-          deletion timestamp as a non-profile security tombstone so authentication tokens issued before deletion
-          can be rejected. Ordinary infrastructure/security logs may remain for their normal operational lifetime
-          where they are required for security or fault investigation.
+          your account are also removed. A limited community gift-claim audit is retained separately, including
+          the code issued, the IGN used at the time, the former internal account identifier, the batch and the
+          claim time. This is used to prevent repeated allocations and account-deletion abuse, and to reconcile
+          distributed gift codes. Claim records can remain after an account or gift batch is deleted.
+          LeighPogo also retains the former numeric internal user ID and the deletion timestamp as a security
+          tombstone so previously issued sessions can be rejected. Ordinary infrastructure/security logs may
+          remain for their normal operational lifetime. You can contact us to exercise applicable data rights,
+          including asking us to review whether continued retention of a particular audit record is necessary.
         </p>
       </section>
 
