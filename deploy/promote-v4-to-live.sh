@@ -93,7 +93,7 @@ elif persisted.is_file() and persisted.read_text().strip():
     secret=persisted.read_text().strip()
 else:
     sys.exit('Cannot determine V4 effective NextAuth secret from .env or .nextauth-secret')
-if '\\n' in secret or '\\r' in secret or '"' in secret:
+if chr(10) in secret or chr(13) in secret or '"' in secret:
     sys.exit('Unexpected V4 NextAuth secret format')
 content=target.read_text().splitlines()
 content=[line for line in content if not line.strip().removeprefix('export ').split('=',1)[0] in ('NEXTAUTH_URL','NEXTAUTH_SECRET')]
