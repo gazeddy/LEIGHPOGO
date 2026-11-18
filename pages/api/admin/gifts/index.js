@@ -34,13 +34,24 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const batches = await prisma.giftBatch.findMany({
       orderBy: { createdAt: "desc" },
-      include: { codes: { select: { ownerId: true, claimedAt: true, owner: { select: { ign: true } } } } },
+      include: { codes: { select: { id: true, ownerId: true, claimedAt: true, owner: { select: { ign: true } } } } },
     })
+    const claimedIds = batches.flatMap(batch => batch.codes.filter(code => code.claimedAt).map(code => code.id))
+    const audits = claimedIds.length
+      ? await prisma.giftClaimAudit.findMany({
+          where: { giftCodeId: { in: claimedIds } },
+          select: { giftCodeId: true, claimantIgn: true, claimedAt: true },
+        })
+      : []
+    const names = new Map(audits.map(audit => [audit.giftCodeId, audit.claimantIgn]))
     return res.status(200).json(batches.map(({ codes, ...batch }) => ({
       ...batch,
       total: codes.length,
-      claimed: codes.filter(x => x.ownerId !== null).length,
-      claimants: codes.filter(x => x.ownerId !== null).map(x => ({ ign: x.owner?.ign ?? "Deleted account", claimedAt: x.claimedAt })),
+      claimed: codes.filter(code => code.claimedAt !== null).length,
+      claimants: codes.filter(code => code.claimedAt !== null).map(code => ({
+        ign: names.get(code.id) ?? code.owner?.ign ?? "Deleted account",
+        claimedAt: code.claimedAt,
+      })),
     })))
   }
   if (req.method === "DELETE") {
@@ -56,7 +67,7 @@ export default async function handler(req, res) {
         }
         const deletedCodes = await prisma.giftCode.count({ where: { batchId } })
         // GiftCode rows are deleted by the GiftBatch relation's onDelete: Cascade.
-        // This also clears the claim history associated with those codes.
+        // The independent GiftClaimAudit records remain intact.
         await prisma.giftBatch.delete({ where: { id: batchId } })
         return res.status(200).json({ deletedBatch: true, deletedCodes })
       }
@@ -81,7 +92,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
           deletedBatch: false,
           deletedCodes: removed.count,
-          deletedClaims: matched.filter(code => code.ownerId !== null).length,
+          deletedClaims: 0,
+          preservedAuditEntries: matched.filter(code => code.ownerId !== null).length,
         })
       }
       return res.status(400).json({ error: "Choose whether to delete a batch or specific codes" })
