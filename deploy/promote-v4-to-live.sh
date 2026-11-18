@@ -259,12 +259,13 @@ for attempt in range(10):
 else:
     sys.exit('LIVE did not respond on localhost:3000')
 PY
-# Keep the V4 test site running on its original database, which has NOT
-# been overwritten. Do not let a stale test QR imply this is the live site.
-systemctl start "$V4_SERVICE"
-systemctl is-active --quiet "$V4_SERVICE" || die "V4 service failed to restart"
+# Leave the original V4 test service STOPPED on success: otherwise new
+# registrations/QR gift claims would split across two independent databases.
+# Redirect the old test hostname and reprint QR codes for the production URL.
 SUCCESS=1
 trap - ERR EXIT
 log "V4 production promotion complete"
 log "Backup + merge report: $RUN_DIR"
 log "Live git checkout is detached at $HEAD_V4; main branch has NOT changed."
+log "The V4 test service remains STOPPED to prevent split-database claims."
+log "Set up a redirect from the old V4 test hostname to https://leighpogo.co.uk and regenerate event QR codes."
