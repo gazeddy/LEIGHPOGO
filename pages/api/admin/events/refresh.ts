@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
+import { startEventInfographicAutomation } from "../../../../lib/event-infographic-automation";
 import { forceRefreshEventsCache } from "../../../../lib/events-server";
 import { authOptions } from "../../auth/[...nextauth]";
 
@@ -34,11 +35,13 @@ export default async function handler(
     return res.status(403).json({ error: "Access denied" });
   }
 
+  startEventInfographicAutomation();
+
   try {
     const data = await forceRefreshEventsCache();
 
     return res.status(200).json({
-      message: `Event data refreshed successfully (${data.events.length} upcoming events).`,
+      message: `Event data refreshed successfully (${data.events.length} upcoming events). Public event infographics are regenerating in the background.`,
       fetchedAt: data.fetchedAt,
       count: data.events.length,
     });

@@ -131,8 +131,16 @@ export default function Admin({ users, entries, searchStrings }) {
           <NavButton id="entries">Entries ({counts.entries})</NavButton>
           <NavButton id="users">Users ({counts.users})</NavButton>
           <NavButton id="searches">Saved search strings ({counts.searches})</NavButton>
+          <Link href="/admin/gifts" className="admin-navbtn admin-navlink">
+            <span>Community gift QR codes</span>
+            <span className="admin-navbtn-caret">→</span>
+          </Link>
           <Link href="/admin/gyms" className="admin-navbtn admin-navlink">
             <span>Gym data</span>
+            <span className="admin-navbtn-caret">→</span>
+          </Link>
+          <Link href="/admin/infographics" className="admin-navbtn admin-navlink">
+            <span>Event infographics</span>
             <span className="admin-navbtn-caret">→</span>
           </Link>
         </aside>

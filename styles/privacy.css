@@ -1,0 +1,85 @@
+.privacy-page h1,
+.privacy-gate h1 {
+  margin-bottom: 8px;
+}
+
+.privacy-page h2,
+.danger-zone h2 {
+  margin-bottom: 10px;
+}
+
+.privacy-page p,
+.privacy-page li,
+.privacy-gate p,
+.danger-zone p {
+  line-height: 1.6;
+}
+
+.privacy-page ul {
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.privacy-page .card p + p {
+  margin-top: 10px;
+}
+
+.privacy-gate {
+  min-height: 80vh;
+  display: grid;
+  place-items: center;
+}
+
+.privacy-gate-card {
+  width: min(100%, 640px);
+}
+
+.consent-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  font-weight: 500;
+}
+
+.consent-checkbox input {
+  width: auto;
+  margin-top: 4px;
+  flex: 0 0 auto;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.form-error {
+  margin-top: 10px;
+  color: #ff7b72;
+}
+
+.danger-zone {
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid #f85149;
+  border-radius: 10px;
+  background: rgba(248, 81, 73, 0.08);
+}
+
+.danger-zone form {
+  margin-top: 16px;
+}
+
+.site-footer {
+  max-width: 900px;
+  margin: 36px auto 18px;
+  padding: 14px 20px;
+  text-align: center;
+  border-top: 1px solid #30363d;
+  color: #8b949e;
+}
+
+.site-footer a {
+  color: #9ecbff;
+}

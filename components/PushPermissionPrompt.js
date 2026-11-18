@@ -11,6 +11,15 @@ const urlBase64ToUint8Array = (value) => {
   return Uint8Array.from(raw, (character) => character.charCodeAt(0))
 }
 
+// Compare the browser's existing VAPID key with the one served by this deployment.
+const subscriptionUsesKey = (subscription, publicKey) => {
+  const current = subscription?.options?.applicationServerKey
+  if (!current) return null // Unknown: do not destructively replace this subscription.
+  const expected = urlBase64ToUint8Array(publicKey)
+  const actual = new Uint8Array(current)
+  return actual.length === expected.length && actual.every((byte, index) => byte === expected[index])
+}
+
 const browserTimeZone = () => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"
@@ -52,10 +61,8 @@ export default function PushPermissionPrompt() {
 
   useEffect(() => {
     if (status !== "authenticated" || typeof window === "undefined") return
-    if (promptWasHandled()) return
 
     let cancelled = false
-
     const inspect = async () => {
       const supported =
         "serviceWorker" in navigator &&
@@ -63,7 +70,6 @@ export default function PushPermissionPrompt() {
         "Notification" in window
 
       if (!supported) return
-
       if (Notification.permission === "denied") {
         markPromptHandled()
         return
@@ -74,33 +80,54 @@ export default function PushPermissionPrompt() {
           navigator.serviceWorker.ready,
           fetch("/api/push/config", { cache: "no-store" }),
         ])
-
-        if (!configResponse.ok) return
-
+        if (!configResponse.ok || cancelled) return
         const config = await configResponse.json()
-        if (!config.configured || !config.publicKey) return
+        if (!config.configured || !config.publicKey || cancelled) return
 
-        const existingSubscription = await registration.pushManager.getSubscription()
-        if (existingSubscription) {
-          await saveSubscription(existingSubscription).catch(() => {})
+        let subscription = await registration.pushManager.getSubscription()
+        if (subscription) {
+          const matches = subscriptionUsesKey(subscription, config.publicKey)
+          if (matches === false && Notification.permission === "granted") {
+            // Browsers only permit one push subscription per service worker.
+            // No permission prompt is needed for an already-granted permission.
+            const previousEndpoint = subscription.endpoint
+            const removed = await subscription.unsubscribe()
+            if (!removed) return
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+            })
+            const saved = await saveSubscription(subscription)
+            if (!saved.ok) throw new Error("Unable to save migrated push subscription")
+            // Only retire the old server record after the V4 subscription is saved.
+            if (previousEndpoint !== subscription.endpoint) {
+              await fetch("/api/push/subscription", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ endpoint: previousEndpoint }),
+              }).catch(() => {})
+            }
+          } else {
+            // Do not re-upload a subscription known to belong to an old key.
+            const saved = await saveSubscription(subscription)
+            if (!saved.ok) return
+          }
           markPromptHandled()
           return
         }
 
-        if (!cancelled) {
-          setPublicKey(config.publicKey)
-          setVisible(true)
-        }
-      } catch {
-        // Keep this prompt non-blocking if push state cannot be inspected.
+        // Never silently opt in a user who has explicitly dismissed the prompt.
+        if (promptWasHandled() || cancelled) return
+        setPublicKey(config.publicKey)
+        setVisible(true)
+      } catch (error) {
+        // Retry at the next sign-in/page load; never ask for permission while migrating.
+        console.warn("Unable to synchronise push subscription", error)
       }
     }
 
-    inspect()
-
-    return () => {
-      cancelled = true
-    }
+    void inspect()
+    return () => { cancelled = true }
   }, [status])
 
   const dismiss = () => {

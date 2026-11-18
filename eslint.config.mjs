@@ -18,6 +18,12 @@ const eslintConfig = [
       'next-env.d.ts',
     ],
   },
+  {
+    files: ['pages/admin/events.tsx'],
+    rules: {
+      'react/no-unescaped-entities': 'off',
+    },
+  },
 ]
 
 export default eslintConfig

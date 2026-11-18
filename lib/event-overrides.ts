@@ -10,12 +10,25 @@ const EVENT_TYPE_RULES_PATH =
   process.env.EVENT_TYPE_RULES_PATH?.trim() ||
   path.join(process.cwd(), "data", "event-type-rules.json");
 
+export interface CampfireMeetupInput {
+  label?: string | null;
+  url: string;
+  activeFrom: string;
+}
+
+export interface CampfireMeetup {
+  label: string | null;
+  url: string;
+  activeFrom: string;
+}
+
 export interface EventOverrideInput {
   eventID: string;
   name: string;
   heading: string;
   description?: string | null;
   campfireUrl?: string | null;
+  campfireMeetups?: CampfireMeetupInput[];
   image?: string | null;
   tags?: string[];
   hidden?: boolean;
@@ -28,6 +41,7 @@ export interface EventOverride {
   heading: string;
   description: string | null;
   campfireUrl: string | null;
+  campfireMeetups: CampfireMeetup[];
   image: string | null;
   tags: string[];
   hidden: boolean;
@@ -114,20 +128,92 @@ function validateUrl(value: string | null, field: string): string | null {
   return parsed.toString();
 }
 
-function validateHideAt(value: unknown): string | null {
-  const hideAt = optionalString(value);
+function validateDateTime(value: unknown, field: string): string | null {
+  const dateTime = optionalString(value);
 
-  if (!hideAt) {
+  if (!dateTime) {
     return null;
   }
 
-  const timestamp = Date.parse(hideAt);
+  const timestamp = Date.parse(dateTime);
 
   if (!Number.isFinite(timestamp)) {
-    throw new Error("Scheduled hide time must be a valid date and time");
+    throw new Error(`${field} must be a valid date and time`);
   }
 
   return new Date(timestamp).toISOString();
+}
+
+function validateHideAt(value: unknown): string | null {
+  return validateDateTime(value, "Scheduled hide time");
+}
+
+function normaliseCampfireMeetups(value: unknown): CampfireMeetup[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((rawMeetup, index): CampfireMeetup | null => {
+      if (!rawMeetup || typeof rawMeetup !== "object" || Array.isArray(rawMeetup)) {
+        return null;
+      }
+
+      const candidate = rawMeetup as Record<string, unknown>;
+      const url = validateUrl(
+        optionalString(candidate.url),
+        `Campfire meetup ${index + 1} URL`,
+      );
+      const activeFrom = validateDateTime(
+        candidate.activeFrom,
+        `Campfire meetup ${index + 1} switch time`,
+      );
+
+      if (!url || !activeFrom) {
+        throw new Error(
+          `Campfire meetup ${index + 1} requires a URL and switch time`,
+        );
+      }
+
+      return {
+        label: optionalString(candidate.label),
+        url,
+        activeFrom,
+      };
+    })
+    .filter((meetup): meetup is CampfireMeetup => meetup !== null)
+    .sort((left, right) => left.activeFrom.localeCompare(right.activeFrom))
+    .slice(0, 14);
+}
+
+export function activeCampfireMeetup(
+  override: Pick<EventOverride, "campfireUrl" | "campfireMeetups">,
+  now: Date = new Date(),
+): CampfireMeetup | null {
+  const meetups = override.campfireMeetups ?? [];
+
+  if (meetups.length === 0) {
+    return override.campfireUrl
+      ? {
+          label: null,
+          url: override.campfireUrl,
+          activeFrom: new Date(0).toISOString(),
+        }
+      : null;
+  }
+
+  const nowMs = now.getTime();
+  let active = meetups[0];
+
+  for (const meetup of meetups) {
+    const switchAt = Date.parse(meetup.activeFrom);
+    if (!Number.isFinite(switchAt) || switchAt > nowMs) {
+      break;
+    }
+    active = meetup;
+  }
+
+  return active;
 }
 
 function normaliseOverride(value: unknown): EventOverride | null {
@@ -144,6 +230,7 @@ function normaliseOverride(value: unknown): EventOverride | null {
       heading: requiredString(candidate.heading, "Heading"),
       description: optionalString(candidate.description),
       campfireUrl: validateUrl(optionalString(candidate.campfireUrl), "Campfire URL"),
+      campfireMeetups: normaliseCampfireMeetups(candidate.campfireMeetups),
       image: validateUrl(optionalString(candidate.image), "Image URL"),
       tags: normaliseTags(candidate.tags),
       hidden: candidate.hidden === true,
@@ -225,6 +312,7 @@ export async function saveEventOverride(
     heading: requiredString(input.heading, "Heading"),
     description: optionalString(input.description),
     campfireUrl: validateUrl(optionalString(input.campfireUrl), "Campfire URL"),
+    campfireMeetups: normaliseCampfireMeetups(input.campfireMeetups),
     image: validateUrl(optionalString(input.image), "Image URL"),
     tags: normaliseTags(input.tags),
     hidden: input.hidden === true,
@@ -334,16 +422,19 @@ export async function applyEventOverrides(
       return [event];
     }
 
+    const activeMeetup = activeCampfireMeetup(override, now);
+    const campfireUrl = activeMeetup?.url ?? null;
+
     return [
       {
         ...event,
         name: override.name,
         heading: override.heading,
         description: override.description,
-        campfireUrl: override.campfireUrl,
+        campfireUrl,
         image: override.image,
         tags: override.tags,
-        link: override.campfireUrl || event.link,
+        link: campfireUrl || event.link,
       },
     ];
   });

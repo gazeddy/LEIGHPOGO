@@ -19,11 +19,17 @@ interface EventFeedAdminProps {
   warning: string | null;
 }
 
+interface CampfireMeetupDraft {
+  label: string;
+  url: string;
+  activeFrom: string;
+}
+
 interface OverrideDraft {
   name: string;
   heading: string;
   description: string;
-  campfireUrl: string;
+  campfireMeetups: CampfireMeetupDraft[];
   image: string;
   tags: string;
   hidden: boolean;
@@ -57,20 +63,65 @@ function toDateTimeLocal(value: string | null | undefined): string {
   return local.toISOString().slice(0, 16);
 }
 
+function legacyMeetup(
+  event: PokemonGoEventSummary,
+  override?: EventOverride,
+): CampfireMeetupDraft[] {
+  const url = override?.campfireUrl ?? event.campfireUrl ?? "";
+
+  if (!url) {
+    return [];
+  }
+
+  return [
+    {
+      label: "Day 1",
+      url,
+      activeFrom: toDateTimeLocal(event.start),
+    },
+  ];
+}
+
 function draftForEvent(
   event: PokemonGoEventSummary,
   override?: EventOverride,
 ): OverrideDraft {
+  const scheduledMeetups = override?.campfireMeetups ?? [];
+
   return {
     name: override?.name ?? event.name,
     heading: override?.heading ?? event.heading,
     description: override?.description ?? event.description ?? "",
-    campfireUrl: override?.campfireUrl ?? event.campfireUrl ?? "",
+    campfireMeetups:
+      scheduledMeetups.length > 0
+        ? scheduledMeetups.map((meetup) => ({
+            label: meetup.label ?? "",
+            url: meetup.url,
+            activeFrom: toDateTimeLocal(meetup.activeFrom),
+          }))
+        : legacyMeetup(event, override),
     image: override?.image ?? event.image ?? "",
     tags: (override?.tags ?? event.tags ?? []).join(", "),
     hidden: override?.hidden ?? false,
     hideAt: toDateTimeLocal(override?.hideAt),
   };
+}
+
+function nextMeetupStart(
+  event: PokemonGoEventSummary,
+  meetups: CampfireMeetupDraft[],
+): string {
+  if (meetups.length === 0) {
+    return toDateTimeLocal(event.start);
+  }
+
+  const previous = new Date(meetups[meetups.length - 1].activeFrom);
+  if (Number.isNaN(previous.getTime())) {
+    return toDateTimeLocal(event.start);
+  }
+
+  previous.setDate(previous.getDate() + 1);
+  return toDateTimeLocal(previous.toISOString());
 }
 
 export const getServerSideProps: GetServerSideProps<EventFeedAdminProps> = async (
@@ -149,6 +200,49 @@ export default function EventFeedAdminPage({
     setDraft(null);
   }
 
+  function addCampfireMeetup(event: PokemonGoEventSummary) {
+    if (!draft) return;
+
+    const index = draft.campfireMeetups.length;
+    setDraft({
+      ...draft,
+      campfireMeetups: [
+        ...draft.campfireMeetups,
+        {
+          label: `Day ${index + 1}`,
+          url: "",
+          activeFrom: nextMeetupStart(event, draft.campfireMeetups),
+        },
+      ],
+    });
+  }
+
+  function updateCampfireMeetup(
+    index: number,
+    field: keyof CampfireMeetupDraft,
+    value: string,
+  ) {
+    if (!draft) return;
+
+    setDraft({
+      ...draft,
+      campfireMeetups: draft.campfireMeetups.map((meetup, meetupIndex) =>
+        meetupIndex === index ? { ...meetup, [field]: value } : meetup,
+      ),
+    });
+  }
+
+  function removeCampfireMeetup(index: number) {
+    if (!draft) return;
+
+    setDraft({
+      ...draft,
+      campfireMeetups: draft.campfireMeetups.filter(
+        (_, meetupIndex) => meetupIndex !== index,
+      ),
+    });
+  }
+
   async function saveOverride(
     submitEvent: FormEvent,
     event: PokemonGoEventSummary,
@@ -156,6 +250,15 @@ export default function EventFeedAdminPage({
     submitEvent.preventDefault();
 
     if (!draft) {
+      return;
+    }
+
+    const incompleteMeetup = draft.campfireMeetups.find(
+      (meetup) => !meetup.url.trim() || !meetup.activeFrom,
+    );
+
+    if (incompleteMeetup) {
+      setError("Each Campfire meetup requires a URL and switch time.");
       return;
     }
 
@@ -172,7 +275,12 @@ export default function EventFeedAdminPage({
           name: draft.name,
           heading: draft.heading,
           description: draft.description,
-          campfireUrl: draft.campfireUrl,
+          campfireUrl: null,
+          campfireMeetups: draft.campfireMeetups.map((meetup) => ({
+            label: meetup.label,
+            url: meetup.url,
+            activeFrom: new Date(meetup.activeFrom).toISOString(),
+          })),
           image: draft.image,
           tags: draft.tags
             .split(",")
@@ -247,8 +355,8 @@ export default function EventFeedAdminPage({
           <h1>Event feed</h1>
           <p>
             Override imported event details without changing the downloaded feed.
-            A Campfire URL replaces the external event link everywhere the event
-            is shown.
+            Campfire meetups can be scheduled per event day so the card and ticker
+            automatically switch to the next meetup link.
           </p>
         </div>
         <div className="header-links">
@@ -289,6 +397,7 @@ export default function EventFeedAdminPage({
           const editing = editingEventID === event.eventID && draft;
           const hideReached =
             override?.hideAt && Date.parse(override.hideAt) <= Date.now();
+          const meetupCount = override?.campfireMeetups?.length ?? 0;
 
           return (
             <article key={event.eventID} className="event-row">
@@ -300,6 +409,11 @@ export default function EventFeedAdminPage({
                 </div>
                 <div className="status-pills">
                   {override && <span className="overridden">Overridden</span>}
+                  {meetupCount > 1 && (
+                    <span className="campfire-scheduled">
+                      {meetupCount} Campfire days
+                    </span>
+                  )}
                   {override?.hidden && <span className="hidden">Hidden now</span>}
                   {override?.hideAt && !hideReached && (
                     <span className="scheduled">
@@ -335,24 +449,102 @@ export default function EventFeedAdminPage({
                     </label>
                   </div>
 
-                  <label>
-                    Campfire meetup URL
-                    <input
-                      type="url"
-                      value={draft.campfireUrl}
-                      placeholder="https://campfire.nianticlabs.com/..."
-                      onChange={(changeEvent) =>
-                        setDraft({
-                          ...draft,
-                          campfireUrl: changeEvent.target.value,
-                        })
-                      }
-                    />
-                    <small>
-                      When set, this replaces the LeekDuck link on event cards and
-                      supplies the Meetup link in the ticker.
-                    </small>
-                  </label>
+                  <fieldset className="campfire-fieldset">
+                    <legend>Campfire meetups</legend>
+                    <p className="field-help">
+                      The first link is shown before the event starts. Add another
+                      meetup for each later event day and set its switch time to the
+                      moment the previous day ends.
+                    </p>
+
+                    <div className="campfire-meetup-list">
+                      {draft.campfireMeetups.map((meetup, index) => (
+                        <div className="campfire-meetup" key={`${index}-${meetup.activeFrom}`}>
+                          <div className="campfire-row-heading">
+                            <strong>{meetup.label || `Meetup ${index + 1}`}</strong>
+                            <button
+                              type="button"
+                              className="danger compact"
+                              onClick={() => removeCampfireMeetup(index)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          <div className="campfire-grid">
+                            <label>
+                              Label
+                              <input
+                                value={meetup.label}
+                                placeholder={`Day ${index + 1}`}
+                                onChange={(changeEvent) =>
+                                  updateCampfireMeetup(
+                                    index,
+                                    "label",
+                                    changeEvent.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              Campfire URL
+                              <input
+                                required
+                                type="url"
+                                value={meetup.url}
+                                placeholder="https://campfire.nianticlabs.com/..."
+                                onChange={(changeEvent) =>
+                                  updateCampfireMeetup(
+                                    index,
+                                    "url",
+                                    changeEvent.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            {index === 0 ? (
+                              <div className="first-meetup-note">
+                                <strong>Initial meetup</strong>
+                                <span>
+                                  Shown before the event and until the next meetup's
+                                  switch time.
+                                </span>
+                              </div>
+                            ) : (
+                              <label>
+                                Switch to this meetup at
+                                <input
+                                  required
+                                  type="datetime-local"
+                                  value={meetup.activeFrom}
+                                  onChange={(changeEvent) =>
+                                    updateCampfireMeetup(
+                                      index,
+                                      "activeFrom",
+                                      changeEvent.target.value,
+                                    )
+                                  }
+                                />
+                                <small>
+                                  Set this to the end of the previous event day.
+                                </small>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="add-meetup"
+                      onClick={() => addCampfireMeetup(event)}
+                    >
+                      + Add Campfire meetup day
+                    </button>
+                  </fieldset>
 
                   <label>
                     Description
@@ -441,9 +633,13 @@ export default function EventFeedAdminPage({
                     <code>{event.eventID}</code>
                   </div>
                   <div>
-                    <small>Current destination</small>
+                    <small>Campfire</small>
                     <span>
-                      {override?.campfireUrl || event.link || "No external link"}
+                      {meetupCount > 0
+                        ? `${meetupCount} scheduled meetup${meetupCount === 1 ? "" : "s"}`
+                        : override?.campfireUrl
+                          ? "1 legacy meetup link"
+                          : "No Campfire meetup"}
                     </span>
                   </div>
                   <div className="row-actions">
@@ -500,18 +696,29 @@ export default function EventFeedAdminPage({
         .status-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-content: flex-start; }
         .status-pills span { padding: 5px 8px; border-radius: 999px; font-size: .7rem; font-weight: 800; }
         .overridden { background: #1f6feb; color: #fff; }
+        .campfire-scheduled { background: #238636; color: #fff; }
         .hidden { background: #da3633; color: #fff; }
         .scheduled { background: #9e6a03; color: #fff; }
         form { display: grid; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #30363d; }
         label, fieldset { display: grid; gap: 7px; color: #f0f6fc; font-weight: 700; }
-        label small { color: #8b949e; font-weight: 400; line-height: 1.45; }
+        label small, .field-help { color: #8b949e; font-weight: 400; line-height: 1.45; }
         .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         fieldset { padding: 12px; border: 1px solid #30363d; border-radius: 8px; }
+        .campfire-fieldset { gap: 12px; }
+        .campfire-fieldset .field-help { margin: 0; }
+        .campfire-meetup-list { display: grid; gap: 10px; }
+        .campfire-meetup { display: grid; gap: 10px; padding: 12px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; }
+        .campfire-row-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .campfire-grid { display: grid; grid-template-columns: minmax(120px, .55fr) minmax(220px, 1.4fr) minmax(210px, 1fr); gap: 10px; align-items: start; }
+        .first-meetup-note { display: grid; gap: 4px; padding: 8px 0; color: #8b949e; font-size: .84rem; font-weight: 400; line-height: 1.4; }
+        .first-meetup-note strong { color: #7ee787; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+        .add-meetup { justify-self: start; border-color: #238636; color: #7ee787; }
         .checkbox-label { display: flex; gap: 9px; align-items: center; }
         .checkbox-label input { width: auto; }
         .actions, .row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         button { border: 1px solid #30363d; border-radius: 7px; padding: 9px 12px; background: #21262d; color: #f0f6fc; font-weight: 800; cursor: pointer; }
         button:hover { border-color: #58a6ff; }
+        .compact { padding: 6px 9px; font-size: .75rem; }
         .primary { border-color: #238636; background: #238636; }
         .danger { border-color: #f85149; color: #ff7b72; background: transparent; }
         .event-details { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(220px, 1.4fr) auto; gap: 14px; align-items: end; margin-top: 15px; padding-top: 14px; border-top: 1px solid #30363d; }
@@ -519,6 +726,7 @@ export default function EventFeedAdminPage({
         .event-details small { color: #8b949e; }
         .event-details code, .event-details span { overflow-wrap: anywhere; }
         .empty { padding: 28px; text-align: center; color: #8b949e; }
+        @media (max-width: 900px) { .campfire-grid { grid-template-columns: 1fr; } }
         @media (max-width: 800px) {
           .page-header, .event-heading { flex-direction: column; }
           .status-pills { justify-content: flex-start; }

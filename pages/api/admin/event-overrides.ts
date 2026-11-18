@@ -2,6 +2,12 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import {
+  canonicaliseEventOverrideCampfireLinks,
+  findCampfireDuplicateAssignments,
+  formatCampfireDuplicateWarning,
+} from "../../../lib/campfire-links";
+import { startEventInfographicAutomation } from "../../../lib/event-infographic-automation";
+import {
   deleteEventOverride,
   readEventOverrides,
   saveEventOverride,
@@ -37,17 +43,28 @@ export default async function handler(
     return res.status(403).json({ error: "Access denied" });
   }
 
+  startEventInfographicAutomation();
+
   try {
     if (req.method === "GET") {
       return res.status(200).json({ overrides: await readEventOverrides() });
     }
 
     if (req.method === "POST") {
-      const override = await saveEventOverride(req.body as EventOverrideInput);
+      const verifiedInput = await canonicaliseEventOverrideCampfireLinks(
+        req.body as EventOverrideInput,
+      );
+      const override = await saveEventOverride(verifiedInput);
+      const overrides = await readEventOverrides();
+      const duplicateWarning = formatCampfireDuplicateWarning(
+        await findCampfireDuplicateAssignments(override.eventID, overrides),
+      );
 
       return res.status(200).json({
         override,
-        message: "Event feed override saved.",
+        message: duplicateWarning
+          ? `Event feed override saved. ${duplicateWarning}`
+          : "Event feed override saved. Campfire meetup links were verified; cmpf.re share links were preserved for Campfire app hand-off. Public event infographics will regenerate in the background.",
       });
     }
 
@@ -65,7 +82,9 @@ export default async function handler(
         return res.status(404).json({ error: "Event override not found" });
       }
 
-      return res.status(200).json({ message: "Event override reset." });
+      return res.status(200).json({
+        message: "Event override reset. Public event infographics will regenerate in the background.",
+      });
     }
 
     res.setHeader("Allow", "GET, POST, DELETE");

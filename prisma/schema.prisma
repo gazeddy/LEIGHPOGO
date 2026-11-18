@@ -26,6 +26,8 @@ model User {
   friendCodeCopies            FriendCodeGrabNotification[] @relation("FriendCodeGrabActor")
   usageEvents                 UsageEvent[]
   tickerPreferences           UserTickerPreference[]
+  privacyAcceptances          PrivacyAcceptance[]
+  giftClaims                  GiftCode[]
 }
 
 model UserTickerPreference {
@@ -244,6 +246,22 @@ model PushSubscription {
   @@index([ownerId])
 }
 
+model PrivacyAcceptance {
+  id            Int      @id @default(autoincrement())
+  ownerId       Int
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  policyVersion String
+  acceptedAt    DateTime @default(now())
+
+  @@unique([ownerId, policyVersion])
+  @@index([ownerId, acceptedAt])
+}
+
+model AccountRevocation {
+  userId    Int      @id
+  revokedAt DateTime @default(now())
+}
+
 model RaidBossProfile {
   id               Int       @id @default(autoincrement())
   key              String    @unique
@@ -288,4 +306,47 @@ model SiteSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model GiftBatch {
+  id        String     @id @default(cuid())
+  title     String
+  slug      String     @unique
+  expiresAt DateTime
+  createdAt DateTime   @default(now())
+  codes     GiftCode[]
+
+  @@index([expiresAt])
+}
+
+model GiftCode {
+  id        Int        @id @default(autoincrement())
+  batchId   String
+  batch     GiftBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  code      String     @unique
+  ownerId   Int?
+  owner     User?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  claimedAt DateTime?
+
+  @@index([batchId, ownerId])
+  @@index([ownerId, claimedAt])
+}
+
+ 
+// Independent audit trail: no relation to User or GiftBatch, so account and
+// batch deletions cannot erase previously issued redemption-code records.
+model GiftClaimAudit {
+  id                Int      @id @default(autoincrement())
+  giftCodeId        Int      @unique
+  code              String   @unique
+  batchTitle        String
+  batchExpiresAt    DateTime
+  claimantIgn       String
+  claimantIgnKey    String
+  claimantUserId    Int?
+  claimedAt         DateTime
+
+  @@index([claimantIgnKey, claimedAt])
+  @@index([claimantUserId, claimedAt])
+  @@index([claimedAt])
 }

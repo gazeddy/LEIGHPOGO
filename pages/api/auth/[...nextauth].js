@@ -3,11 +3,64 @@ import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { ensureNextAuthUrl, getNextAuthSecret } from "../../../lib/env"
 import prisma from "../../../lib/prisma"
+import {
+  PRIVACY_POLICY_VERSION,
+  hasCurrentPrivacyAcceptance,
+} from "../../../lib/privacyPolicy"
 
-// Ensure critical env defaults exist so production builds can boot even when
-// NEXTAUTH_URL or NEXTAUTH_SECRET are not explicitly set.
 ensureNextAuthUrl()
 const nextAuthSecret = getNextAuthSecret()
+
+async function refreshTokenAccountState(token) {
+  const userId = Number(token?.id)
+  if (!Number.isInteger(userId)) return token
+
+  const revoked = await prisma.accountRevocation.findUnique({
+    where: { userId },
+    select: { userId: true },
+  })
+
+  if (revoked) {
+    return {
+      ...token,
+      id: null,
+      accountRevoked: true,
+      privacyPolicyVersion: null,
+    }
+  }
+
+  const activeUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      ign: true,
+      role: true,
+      privacyAcceptances: {
+        where: { policyVersion: PRIVACY_POLICY_VERSION },
+        select: { policyVersion: true },
+        take: 1,
+      },
+    },
+  })
+
+  if (!activeUser) {
+    return {
+      ...token,
+      id: null,
+      accountRevoked: true,
+      privacyPolicyVersion: null,
+    }
+  }
+
+  return {
+    ...token,
+    id: activeUser.id,
+    ign: activeUser.ign,
+    role: activeUser.role,
+    accountRevoked: false,
+    privacyPolicyVersion: activeUser.privacyAcceptances[0]?.policyVersion || null,
+  }
+}
 
 export const authOptions = {
   session: { strategy: "jwt" },
@@ -26,6 +79,17 @@ export const authOptions = {
 
         const user = await prisma.user.findUnique({
           where: { ign: credentials.ign },
+          select: {
+            id: true,
+            ign: true,
+            role: true,
+            password: true,
+            privacyAcceptances: {
+              where: { policyVersion: PRIVACY_POLICY_VERSION },
+              select: { policyVersion: true },
+              take: 1,
+            },
+          },
         })
         if (!user) return null
 
@@ -36,22 +100,35 @@ export const authOptions = {
           id: user.id,
           ign: user.ign,
           role: user.role,
+          privacyPolicyVersion: user.privacyAcceptances[0]?.policyVersion || null,
         }
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
+      let nextToken = token
+
       if (user) {
-        token.id = user.id
-        token.ign = user.ign
-        token.role = user.role
+        nextToken = {
+          ...token,
+          id: user.id,
+          ign: user.ign,
+          role: user.role,
+          accountRevoked: false,
+          privacyPolicyVersion: user.privacyPolicyVersion || null,
+        }
       }
-      return token
+
+      if (nextToken?.id) {
+        nextToken = await refreshTokenAccountState(nextToken)
+      }
+
+      return nextToken
     },
     async session({ session, token }) {
-      if (!token?.id) {
-        return session ?? null
+      if (!token?.id || token.accountRevoked) {
+        return null
       }
 
       const baseSession = session ?? {}
@@ -63,6 +140,8 @@ export const authOptions = {
           id: token.id,
           ign: token.ign,
           role: token.role,
+          privacyPolicyVersion: token.privacyPolicyVersion || null,
+          privacyPolicyAccepted: hasCurrentPrivacyAcceptance(token.privacyPolicyVersion),
         },
       }
     },
@@ -71,8 +150,8 @@ export const authOptions = {
     },
   },
   pages: {
-    signIn: "/login", // your custom login page
+    signIn: "/login",
   },
-};
+}
 
-export default NextAuth(authOptions);
+export default NextAuth(authOptions)

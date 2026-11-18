@@ -269,11 +269,13 @@ export default function Navbar() {
                   </button>
                   <div id="admin-navigation" className="nav-submenu">
                     <Link href="/admin" className="nav-item nav-subitem">Admin Panel</Link>
+                    <Link href="/admin/gifts" className="nav-item nav-subitem">Community Gifts</Link>
                     <Link href="/admin/site-settings" className="nav-item nav-subitem">Site Settings</Link>
                     <Link href="/admin/usage" className="nav-item nav-subitem">Usage</Link>
                     <Link href="/admin/pokedex" className="nav-item nav-subitem">Pokédex Availability</Link>
                     <Link href="/admin/events" className="nav-item nav-subitem">Event Feed</Link>\n                    <Link href="/admin/local-events" className="nav-item nav-subitem">Manual Event Cards</Link>
                     <Link href="/admin/event-types" className="nav-item nav-subitem">Event Types</Link>
+                    <Link href="/admin/campfire-reminders" className="nav-item nav-subitem">Campfire Reminders</Link>
                     <Link href="/admin/content" className="nav-item nav-subitem">Guide Creator / Editor</Link>
                     <Link href="/admin/gyms" className="nav-item nav-subitem">Gym Data</Link>
                     <Link href="/admin/gym-removals" className="nav-item nav-subitem">Gym Removals</Link>

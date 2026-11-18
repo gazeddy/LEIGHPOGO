@@ -1,16 +1,26 @@
 import prisma from "../../../lib/prisma"
 import bcrypt from "bcryptjs"
+import { PRIVACY_POLICY_VERSION } from "../../../lib/privacyPolicy"
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" })
   }
 
-  const { name, ign, password } = req.body
+  const { name, ign, password, over13, privacyAcknowledged } = req.body
 
-  // ✅ Only IGN + password are required
   if (!ign || !password) {
     return res.status(400).json({ error: "IGN and password are required" })
+  }
+
+  if (over13 !== true) {
+    return res.status(400).json({ error: "You must confirm that you are 13 or over." })
+  }
+
+  if (privacyAcknowledged !== true) {
+    return res.status(400).json({
+      error: "You must read and acknowledge the Privacy Policy before registering.",
+    })
   }
 
   if (password.length < 8) {
@@ -32,11 +42,15 @@ export default async function handler(req, res) {
 
     await prisma.user.create({
       data: {
-        // ✅ Default name to IGN if not provided
         name: name && name.trim() ? name.trim() : ign,
         ign,
         password: hashedPassword,
         role: "user",
+        privacyAcceptances: {
+          create: {
+            policyVersion: PRIVACY_POLICY_VERSION,
+          },
+        },
       },
     })
 

@@ -11,6 +11,150 @@ The Prisma schema and migration history now describe the same layout:
 - `SearchString`: saved searches
 - `PokedexEntry`: per-user Pokédex records
 
+## Rehearsing the V3-to-V4 primary migration (no cutover)
+
+Once the gift claim audit migration is deployed to V4, run the *read-only*
+migration rehearsal from the V4 branch:
+
+```bash
+cd /projects/V4 && git pull --ff-only origin v4 && python3 scripts/rehearse-v4-migration.py
+```
+
+The Python script reads the SQLite `DATABASE_URL` from each checkout
+(default `/projects/V4` and `/projects/LIVE`; relative paths resolve
+against each checkout's `prisma/` directory), takes **online SQLite
+backups** of both databases, and creates a **disposable V4-primary candidate**
+from the V4 snapshot. It invokes `scripts/merge-v3-into-v4.py` against the
+candidate only. Neither active database is migrated, swapped, modified or
+restored, and neither systemd service is stopped or restarted.
+
+The rehearsal checks SQLite integrity and foreign keys, validates V4
+accounts are unchanged, and verifies unchanged `GiftBatch`, `GiftCode`,
+and `GiftClaimAudit` tables. It saves `merge-report.json` and
+`rehearsal-status.json` under:
+`/projects/backups/leighpogo/v4-rehearsals/rehearsal-<timestamp>-<pid>/`.
+
+**Approved one-player consolidation:** This rehearsal explicitly recognises
+`Pigtailedboxer` from V4 account IDs `8` and `39`, and V3 account
+IDs `8` and `35`, as the same trainer. Only on the disposable candidate,
+it keeps V4 user `8`, moves V4 account `39`'s linked records to that
+account, maps V3 IDs `8` and `35` to it, and sets the surviving role to
+`admin` (because V3 user `35` is a confirmed administrator). It retains
+the existing V4 user `8` password hash; the administrator can reset the
+password separately. The independent gift claim audit's historic original
+account IDs remain unmodified. This is an exact-ID allowlist, not a general
+rule to silently combine similarly named accounts. Unresolvable unique-data
+conflicts stop the rehearsal rather than discard data.
+
+**Second approved consolidation:** `Bigjewnine` is also confirmed as
+one player. The rehearsal discovers the matching V3/V4 account IDs from
+fresh SQLite snapshots, and accepts at most three case/space-insensitive
+matches in either source. It requires matching accounts in both sources,
+preserves the lowest existing V4 account ID and its password, remaps other
+V4 account references and every matching V3 source ID, and retains admin
+privileges if an approved record already has them. It validates the exact
+surviving ID, the complete existing V4 user rows, issued gift-code
+allocations and the unchanged gift audit. Unexpected counts, revoked
+accounts, ownership-uniqueness conflicts or other unexpected IGNs abort
+rather than silently changing accounts. All consolidation is performed on
+the *disposable* rehearsal candidate only.
+
+**Conflicts fail closed.** Overlapping users with different passwords or
+roles need manual ownership review before repeating the rehearsal with
+`--allow-password-conflicts`, which keeps V4 credentials and roles.
+Missing tables, unknown populated V3 tables, or other incompatible schema
+also stop the rehearsal for explicit resolution. A failed rehearsal does
+not touch either production or development database. Do not attempt the
+actual cutover until the report is reviewed and conflicts addressed.
+
+Useful overrides: `--v3-dir`, `--v4-dir`, `--v3-db`, `--v4-db`,
+`--backup-root`; database overrides must still point *inside* their
+respective checkouts. The process must have read permission for both
+SQLite databases and write access to the backup destination. This
+rehearsal does not yet merge non-SQLite runtime content (uploaded guide
+images, event overrides, gym files), so those must be handled by the
+subsequent production cutover procedure.
+
+## Promoting tested V4 to LIVE
+
+**Destructive production operation — requires a recent successful rehearsal and a
+maintenance window.** The dedicated V4 cutover script is
+`deploy/promote-v4-to-live.sh`; never run the old V2 cutover script for V4.
+It requires the two explicit arguments `--activate --allow-password-conflicts`
+to make the choice to retain V4 credentials explicit. It accepts no arbitrary
+database or service paths. Verify production's `leighpogo.service` launches
+the LIVE checkout on port 3000 before using it.
+
+From the V4 checkout:
+
+```bash
+cd /projects/V4 && git pull --ff-only origin v4 && bash -n deploy/promote-v4-to-live.sh && sudo bash deploy/promote-v4-to-live.sh --activate --allow-password-conflicts
+```
+
+The cutover checks for current GitHub V4 source, clean checkouts, both running
+services and distinct SQLite paths. It stops *both* sites before taking final
+validated SQLite snapshots, saving complete runtime `data`, `content` and
+`public/uploads` trees and both `.env` files under
+`/projects/backups/leighpogo/v4-cutovers/`. It reruns the approved V4-primary
+merger on a copy of those final snapshots, verifying gifts and audit records
+remain intact, and retains a JSON merge report. Password conflicts preserve
+V4 credentials. The existing V4 accounts and IDs take precedence; approved
+case-insensitive account consolidations remain limited to the known players.
+
+Only after a valid candidate exists does it switch the LIVE checkout to the
+exact V4 Git commit, create a production environment from the tested V4 one
+(with `NEXTAUTH_URL=https://leighpogo.co.uk` and the *existing LIVE database
+path*), install/test/build V4, install the merged candidate DB, overlay
+runtime files V4-first (V3-only paths retained), validate Prisma status,
+and check the production HTTP endpoint. Errors trigger a best-effort rollback
+of LIVE code, database, runtime files and environment from saved snapshots,
+plus restoration of both original services. **Verify a restored site manually
+after an error.** A rollback can never guarantee recovery from external
+writes or effects outside these directories.
+
+On success, `leighpogo-test.service` remains **stopped** to prevent
+new signups and gift claims on a now-stale development database. The original
+V4 database remains untouched and backed up. Redirect the old V4 test
+hostname to the production site and generate fresh QR codes so community
+scans continue working; a test-host QR link will otherwise fail. Review
+production secrets, push credentials, Cloudflare tunnels and other
+external configuration before starting. The production source checkout is
+left detached at the verified V4 commit; the GitHub `main` branch is **not**
+automatically changed. Promote or reconcile `main` as a separate,
+post-verification operation so a future LIVE deployment does not revert V4.
+
+## V4 updates with automatic SQLite backup
+
+For the V4 development service only, run:
+
+```bash
+cd /projects/V4 && bash deploy/update-v4.sh
+```
+
+The script resolves `DATABASE_URL` from the V4 environment, confirms the
+database file belongs to `/projects/V4`, and uses Python's SQLite online
+backup API to take a consistent snapshot while the site is running. It runs
+`PRAGMA integrity_check` on the snapshot and **aborts before updating code
+or applying Prisma migrations** if the backup is missing or invalid.
+
+Backups default to `/projects/backups/leighpogo/v4-updates` with restricted
+permissions and timestamped names. The verified snapshot is retained even
+when a subsequent update step fails; no automatic deletion or rotation is
+performed. Set `BACKUP_DIR` to a different writable location if needed.
+
+After the backup, the script pulls the `v4` branch with fast-forward-only,
+runs `npm ci`, applies committed Prisma migrations, regenerates the client,
+runs tests and the build, then restarts **only**
+`leighpogo-test.service`. It stops immediately on errors. No automatic
+database rollback is attempted, because applying a rollback safely may
+require stopping the service and reconciling any subsequent writes.
+Restore from a snapshot only after stopping the service and checking the
+required recovery steps.
+
+For the initial installation of this script, pull the `v4` branch once
+to obtain the file; merely pulling code does not run migrations. After that,
+use the single command above for future V4 updates.
+
 ## Installing application updates
 
 Installing dependencies regenerates the Prisma client but does **not** apply database migrations automatically:

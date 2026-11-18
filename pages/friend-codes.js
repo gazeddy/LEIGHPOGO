@@ -123,18 +123,17 @@ export default function FriendCodes({ entries, mobileDevice }) {
   return (
     <>
       <Head>
-        <title>Friend Codes | Leigh Pokémon Go Community</title>
+        <title>Pokémon GO Friend Codes in Leigh | LeighPogo</title>
         <meta
           name="description"
-          content="Browse Pokémon GO friend codes from the Leigh community and add your own."
+          content="Browse Pokémon GO friend codes from trainers in Leigh, Greater Manchester, and add your own code to the LeighPogo community list."
         />
       </Head>
       <div className="container">
         <div className="card">
-          <h1>Pokémon GO Friend Codes</h1>
+          <h1>Pokémon GO Friend Codes in Leigh</h1>
           <p className="muted">
-            Browse the latest codes from the community and add your own to let others
-            connect with you.
+            Browse friend codes from Pokémon GO trainers in Leigh, Greater Manchester, and add your own to help local players connect.
           </p>
         </div>
 
