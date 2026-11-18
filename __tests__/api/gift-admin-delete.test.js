@@ -61,7 +61,7 @@ test("specific-code deletion only removes requested exact codes from the selecte
   const where = { batchId: "batch-1", code: { in: ["CODE1", "CODE2"] } }
   expect(prisma.giftCode.findMany).toHaveBeenCalledWith({ where, select: { ownerId: true } })
   expect(prisma.giftCode.deleteMany).toHaveBeenCalledWith({ where })
-  expect(res.json).toHaveBeenCalledWith({ deletedBatch: false, deletedCodes: 2, deletedClaims: 1 })
+  expect(res.json).toHaveBeenCalledWith({ deletedBatch: false, deletedCodes: 2, deletedClaims: 0, preservedAuditEntries: 1 })
 })
 
 test("cannot remove codes without explicit confirmation", async () => {
