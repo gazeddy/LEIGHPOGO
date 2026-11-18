@@ -118,14 +118,123 @@ def remap_fk(table, r, users, ids):
     return r
 
 
-def users_by_ign(db):
+# Only this identity has been confirmed by the administrator.
+# The source databases are never edited, only the disposable V4 candidate.
+IDENTITY_KEY = "pigtailedboxer"
+V4_ALIAS_IDS = {8, 39}
+V3_ALIAS_IDS = {8, 35}
+SURVIVOR_ID = 8
+SAFE_MEMBERSHIP_KEYS = {
+    "PokedexEntry": ("dexNumber",),
+    "PrivacyAcceptance": ("policyVersion",),
+    "UserTickerPreference": ("tickerType",),
+    "PokedexQueueAlert": (),
+}
+
+
+def users_by_ign(db, label):
+    groups = {}
+    for row in db_rows(db, "User"):
+        key = IGN_KEY(row["ign"])
+        if not key:
+            raise RuntimeError(f"{label}: invalid IGN on user ID {row['id']}")
+        groups.setdefault(key, []).append(row)
     result = {}
-    for r in db_rows(db, "User"):
-        key = IGN_KEY(r["ign"])
-        if not key or key in result:
-            raise RuntimeError(f"Invalid or colliding IGN: {r['ign']!r}")
-        result[key] = r
+    for key, rows in groups.items():
+        if len(rows) > 1:
+            actual = {row["id"] for row in rows}
+            allowed = V4_ALIAS_IDS if label == "V4" else V3_ALIAS_IDS
+            if key != IDENTITY_KEY or actual != allowed:
+                raise RuntimeError(
+                    f"{label}: unapproved IGN collision for {key!r} "
+                    f"with user IDs {sorted(actual)}"
+                )
+            result[key] = next(row for row in rows if row["id"] == SURVIVOR_ID)
+        else:
+            result[key] = rows[0]
     return result
+
+
+def user_fk_columns(db):
+    result = {}
+    for record in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ):
+        table = record[0]
+        columns = [
+            item[3] for item in db.execute(f'PRAGMA foreign_key_list("{table}")')
+            if item[2] == "User"
+        ]
+        if columns:
+            result[table] = columns
+    return result
+
+
+def consolidate_v4_identity(db, report):
+    primary = db.execute('SELECT ign FROM "User" WHERE id=?', (SURVIVOR_ID,)).fetchone()
+    alias = db.execute('SELECT ign FROM "User" WHERE id=39').fetchone()
+    if not primary or not alias or any(
+        IGN_KEY(row["ign"]) != IDENTITY_KEY for row in (primary, alias)
+    ):
+        raise RuntimeError("Approved V4 identity IDs/IGNs changed; refusing merge")
+    for user_id in V4_ALIAS_IDS:
+        if db.execute('SELECT 1 FROM "AccountRevocation" WHERE userId=?', (user_id,)).fetchone():
+            raise RuntimeError(f"V4 identity {user_id} has an account revocation; manual review needed")
+
+    report["identity_consolidation"] = {
+        "ign": IDENTITY_KEY, "survivor": SURVIVOR_ID, "absorbed_v4_id": 39,
+        "mapped_v3_ids": sorted(V3_ALIAS_IDS), "password_kept_from_v4_id": SURVIVOR_ID,
+        "role": "admin", "transferred": {}, "deduplicated_memberships": {},
+    }
+    result = report["identity_consolidation"]
+    refs = user_fk_columns(db)
+    for table, columns in refs.items():
+        if table == "User":
+            raise RuntimeError("Unexpected User self-reference")
+        for column in columns:
+            rows = db.execute(
+                f'SELECT rowid AS _record_rowid, * FROM "{table}" WHERE "{column}"=?',
+                (39,)
+            ).fetchall()
+            for row in rows:
+                try:
+                    db.execute(
+                        f'UPDATE "{table}" SET "{column}"=? WHERE rowid=?',
+                        (SURVIVOR_ID, row["_record_rowid"])
+                    )
+                    result["transferred"][table] = result["transferred"].get(table, 0) + 1
+                except sqlite3.IntegrityError as exc:
+                    if table not in SAFE_MEMBERSHIP_KEYS or column != "ownerId":
+                        raise RuntimeError(
+                            f"Unsafe collision in {table}.{column} for duplicate user 39: {exc}"
+                        ) from exc
+                    keys = SAFE_MEMBERSHIP_KEYS[table]
+                    where = ' AND '.join(['"ownerId"=?'] + [f'"{key}"=?' for key in keys])
+                    params = (SURVIVOR_ID,) + tuple(row[key] for key in keys)
+                    existing = db.execute(
+                        f'SELECT * FROM "{table}" WHERE {where}', params
+                    ).fetchone()
+                    if existing is None:
+                        raise RuntimeError(f"Conflicting {table} row not found") from exc
+                    if table == "UserTickerPreference" and row["enabled"] != existing["enabled"]:
+                        raise RuntimeError("Conflicting ticker preferences; review manually") from exc
+                    # Only duplicate owner-scoped memberships are discarded.
+                    # The complete originals remain in the saved V4 snapshot.
+                    db.execute(
+                        f'DELETE FROM "{table}" WHERE rowid=?', (row["_record_rowid"],)
+                    )
+                    result["deduplicated_memberships"][table] = (
+                        result["deduplicated_memberships"].get(table, 0) + 1
+                    )
+    for table, columns in refs.items():
+        for column in columns:
+            if db.execute(
+                f'SELECT 1 FROM "{table}" WHERE "{column}"=39 LIMIT 1'
+            ).fetchone():
+                raise RuntimeError(f"Unmigrated user reference: {table}.{column}")
+    db.execute('DELETE FROM "User" WHERE id=39')
+    db.execute('UPDATE "User" SET role=? WHERE id=?', ("admin", SURVIVOR_ID))
+
 
 
 def merge(v4, live, allow_conflicts):
@@ -145,19 +254,33 @@ def merge(v4, live, allow_conflicts):
         if table not in source_known and db_rows(live, table):
             raise RuntimeError(f"Non-empty unrecognised V3 table: {table} (refusing data loss)")
 
-    original_gifts = {table: fingerprint(v4, table) for table in ("GiftBatch", "GiftCode")}
-    v4_users = users_by_ign(v4)
-    live_users = users_by_ign(live)
-    report["users_v4_before"] = len(v4_users)
-    report["users_v3_before"] = len(live_users)
+    original_gifts = {table: fingerprint(v4, table) for table in ("GiftBatch", "GiftClaimAudit")}
+    # Compare every original code row after normalising only the approved
+    # absorbed owner ID; all codes, dates and batches must remain unchanged.
+    original_code_rows = {
+        row["id"]: dict(row) for row in db_rows(v4, "GiftCode")
+    }
+    v4_users = users_by_ign(v4, "V4")
+    live_users = users_by_ign(live, "V3")
+    report["users_v4_before"] = v4.execute('SELECT count(*) FROM "User"').fetchone()[0]
+    report["users_v3_before"] = live.execute('SELECT count(*) FROM "User"').fetchone()[0]
+    expected_admin = live.execute('SELECT role, ign FROM "User" WHERE id=35').fetchone()
+    if (not expected_admin or expected_admin["role"] != "admin"
+            or IGN_KEY(expected_admin["ign"]) != IDENTITY_KEY):
+        raise RuntimeError("V3 user 35 is no longer the approved admin identity")
+    for user_id in V3_ALIAS_IDS:
+        if table_exists(live, "AccountRevocation") and live.execute(
+            'SELECT 1 FROM "AccountRevocation" WHERE userId=?', (user_id,)
+        ).fetchone():
+            raise RuntimeError(f"V3 identity {user_id} has account revocation; manual review required")
     for key, source in live_users.items():
         candidate = v4_users.get(key)
         if candidate is None:
             continue
         report["matched_users"] += 1
-        if source["password"] != candidate["password"]:
+        if source["password"] != candidate["password"] and key != IDENTITY_KEY:
             report["password_conflicts"].append(source["ign"])
-        if source["role"] != candidate["role"]:
+        if source["role"] != candidate["role"] and key != IDENTITY_KEY:
             report["role_conflicts"].append({"ign": source["ign"], "v3": source["role"], "v4": candidate["role"]})
     if report["password_conflicts"] and not allow_conflicts:
         raise RuntimeError("Overlapping IGNs have different password hashes: " + ", ".join(report["password_conflicts"]) + ". Verify ownership and rerun only with --allow-password-conflicts; V4 passwords will win.")
@@ -167,10 +290,14 @@ def merge(v4, live, allow_conflicts):
     ids = {name: {} for name in TABLES}
     users = {}
     v4.execute("BEGIN IMMEDIATE")
+    consolidate_v4_identity(v4, report)
     for key, source in live_users.items():
         candidate = v4_users.get(key)
         if candidate:
             users[source["id"]] = candidate["id"]
+            if key == IDENTITY_KEY:
+                # Both V3 source accounts belong to the approved player.
+                users[35] = SURVIVOR_ID
         else:
             payload = {k: source[k] for k in source.keys() if k != "id"}
             users[source["id"]] = insert(v4, "User", payload)
@@ -220,11 +347,21 @@ def merge(v4, live, allow_conflicts):
     violations = v4.execute("PRAGMA foreign_key_check").fetchall()
     if violations:
         raise RuntimeError(f"V4 candidate has {len(violations)} foreign-key violations")
-    for table in ("GiftBatch", "GiftCode"):
+    for table in ("GiftBatch", "GiftClaimAudit"):
         unchanged = original_gifts[table] == fingerprint(v4, table)
-        report[{"GiftBatch": "gift_batches_unchanged", "GiftCode": "gift_codes_unchanged"}[table]] = unchanged
+        report[{"GiftBatch": "gift_batches_unchanged", "GiftClaimAudit": "gift_audit_unchanged"}[table]] = unchanged
         if not unchanged:
-            raise RuntimeError(f"Gift allocations altered in {table}: aborting")
+            raise RuntimeError(f"Protected {table} table was altered: aborting")
+    final_codes = {row["id"]: dict(row) for row in db_rows(v4, "GiftCode")}
+    if set(original_code_rows) != set(final_codes):
+        raise RuntimeError("Gift code records added or removed")
+    for code_id, original in original_code_rows.items():
+        after = final_codes[code_id]
+        if original["ownerId"] == 39:
+            original["ownerId"] = SURVIVOR_ID
+        if after != original:
+            raise RuntimeError(f"Gift code {code_id} changed unexpectedly")
+    report["gift_codes_unchanged_except_approved_owner"] = True
     v4.commit()
     report["users_after"] = actual_users
     return report
