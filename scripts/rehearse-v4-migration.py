@@ -161,6 +161,15 @@ def main():
             stop("V3/V4 merger refused or failed: " + (result.stderr.strip() or result.stdout.strip()))
         validate(candidate)
         after = {name: snapshot_digest(candidate, name) for name in FINGERPRINT_TABLES}
+        with report.open() as report_file:
+            merge_details = json.load(report_file)
+        second = merge_details.get("second_identity_consolidation")
+        if not second or second.get("ign") != "bigjewnine":
+            stop("Missing explicitly approved Bigjewnine reconciliation report")
+        big_survivor = second["survivor"]
+        big_removed = set(second["absorbed_v4_ids"])
+        allowed_owner_changes = {duplicate: big_survivor for duplicate in big_removed}
+        allowed_owner_changes[39] = 8
         for table in FINGERPRINT_TABLES:
             if table == "User":
                 with sqlite3.connect(v4_snapshot) as before_db, sqlite3.connect(candidate) as after_db:
@@ -169,15 +178,17 @@ def main():
                     select = ",".join('"' + c + '"' for c in columns)
                     for entry in before_db.execute(f'SELECT {select} FROM "User"'):
                         match = after_db.execute(f'SELECT {select} FROM "User" WHERE "id"=?', (entry["id"],)).fetchone()
-                        if entry["id"] == 39:
+                        if entry["id"] == 39 or entry["id"] in big_removed:
                             if match is not None:
-                                stop("Approved duplicate V4 user 39 was not merged")
+                                stop(f"Approved duplicate V4 user {entry['id']} was not merged")
                             continue
                         if match is None:
                             stop(f"V4 user {entry['id']} unexpectedly removed")
                         expected = dict(entry)
                         if entry["id"] == 8:
                             expected["role"] = "admin"
+                        if entry["id"] == big_survivor:
+                            expected["role"] = second["role"]
                         if dict(match) != expected:
                             stop(f"Existing V4 user altered unexpectedly: user ID {entry['id']}")
                     aliases = after_db.execute(
@@ -185,6 +196,11 @@ def main():
                     ).fetchall()
                     if [row[0] for row in aliases] != [8]:
                         stop("Approved player did not consolidate to precisely V4 user 8")
+                    big_aliases = after_db.execute(
+                        "SELECT id FROM User WHERE lower(trim(ign))='bigjewnine'"
+                    ).fetchall()
+                    if [row[0] for row in big_aliases] != [big_survivor]:
+                        stop("Bigjewnine did not consolidate to the approved V4 survivor")
             elif table == "GiftCode":
                 with sqlite3.connect(v4_snapshot) as before_db, sqlite3.connect(candidate) as after_db:
                     before_db.row_factory = after_db.row_factory = sqlite3.Row
@@ -197,14 +213,16 @@ def main():
                     if original_codes.keys() != merged_codes.keys():
                         stop("Existing gift code IDs changed")
                     for code_id, entry in original_codes.items():
-                        if entry["ownerId"] == 39:
-                            entry["ownerId"] = 8
+                        if entry["ownerId"] in allowed_owner_changes:
+                            entry["ownerId"] = allowed_owner_changes[entry["ownerId"]]
                         if entry != merged_codes[code_id]:
                             stop(f"GiftCode {code_id} was unexpectedly altered")
             elif original[table] != after[table]:
                 stop(f"V4 {table} changed unexpectedly during merge")
         status.update(result="PASS", original_v4=original, merged=after)
-        print("PASS: V4 player 8 consolidated with 39 and promoted to admin, protected gift data preserved, integrity/foreign keys valid.")
+        print("PASS: approved Pigtailedboxer and Bigjewnine aliases reconciled in candidate only.")
+        print("Bigjewnine V4 survivor:", big_survivor, "merged V4 IDs:", sorted(big_removed))
+        print("PASS: protected gift data unchanged (except approved owner remaps), integrity and foreign keys valid.")
         print("Merge report:", report)
     except Exception as exc:
         status.update(result="FAIL", error=str(exc))
