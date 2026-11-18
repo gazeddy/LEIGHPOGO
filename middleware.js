@@ -111,7 +111,7 @@ export async function middleware(req) {
     const signInUrl = req.nextUrl.clone()
     signInUrl.pathname = "/login"
     if (pathname === "/gifts" || /^\/gifts\/[a-zA-Z0-9-]+$/.test(pathname)) {
-      signInUrl.searchParams.set("next", pathname)
+      signInUrl.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search)
     } else {
       signInUrl.searchParams.set("callbackUrl", req.nextUrl.pathname + req.nextUrl.search)
     }
