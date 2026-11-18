@@ -27,6 +27,8 @@ export default function AdminGifts() {
   const [codesFormat, setCodesFormat] = useState("text")
   const [selectedFile, setSelectedFile] = useState("")
   const [batches, setBatches] = useState([])
+  const [giftQr, setGiftQr] = useState(null)
+  const [qrError, setQrError] = useState("")
   const [removalCodes, setRemovalCodes] = useState({})
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -37,12 +39,26 @@ export default function AdminGifts() {
   }
   useEffect(() => {
     refresh()
+    let mounted = true
+    async function refreshQr() {
+      try {
+        const response = await fetch("/api/admin/gifts/qr", { cache: "no-store" })
+        if (!response.ok) throw new Error("Unable to load current QR")
+        const data = await response.json()
+        if (mounted) { setGiftQr(data); setQrError("") }
+      } catch (error) { if (mounted) setQrError(error.message) }
+    }
+    refreshQr()
+    const timer = setInterval(refreshQr, 15000)
+    const onFocus = () => refreshQr()
+    window.addEventListener("focus", onFocus)
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     setExpiryYear(String(tomorrow.getFullYear()))
     setExpiryMonth(String(tomorrow.getMonth() + 1))
     setExpiryDay(String(tomorrow.getDate()))
     setCurrentYear(tomorrow.getFullYear())
+    return () => { mounted = false; clearInterval(timer); window.removeEventListener("focus", onFocus) }
   }, [])
   const daysInMonth = expiryYear && expiryMonth ? new Date(Number(expiryYear), Number(expiryMonth), 0).getDate() : 31
   async function importCsv(event) {
@@ -167,15 +183,23 @@ export default function AdminGifts() {
     {error && <p role="alert" className="form-error">{error}</p>}
     {message && <p>{message}</p>}
     <section style={{ border: "1px solid #888", borderRadius: 8, padding: 16, marginBottom: 20 }}>
-      <h2>One QR for all gift batches</h2>
-      <p>Print this QR once. All batches share this link; the soonest-expiring available codes are issued first. Each member can claim one code every rolling 24 hours, with the earliest-expiring available codes issued first.</p>
-      <p><a href="/gifts" target="_blank" rel="noreferrer">{typeof window !== "undefined" ? window.location.origin + "/gifts" : "https://leighpogo.co.uk/gifts"}</a></p>
-      <Image unoptimized
-        src={"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "https://leighpogo.co.uk") + "/gifts")}
-        alt="Shared LeighPogo community gift QR"
-        width={240} height={240}
-      />
-      <p><a href={"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "https://leighpogo.co.uk") + "/gifts")} target="_blank" rel="noreferrer">Open printable shared QR</a></p>
+      <h2>Rotating community gift QR</h2>
+      <p>This QR and its link expire every 24 hours (at 00:00 UTC). A new QR is generated automatically; saved or printed copies stop working after the expiry. Claim limits remain one code per account per rolling 24 hours.</p>
+      {qrError && <p role="alert" className="form-error">{qrError}</p>}
+      {giftQr && <>
+        <p>Expires: <strong>{new Date(giftQr.expiresAt).toLocaleString("en-GB")}</strong></p>
+        <p style={{ overflowWrap: "anywhere" }}>
+          <a href={giftQr.urlPath} target="_blank" rel="noreferrer">{typeof window !== "undefined" ? window.location.origin + giftQr.urlPath : giftQr.urlPath}</a>
+        </p>
+        <Image unoptimized
+          key={giftQr.urlPath}
+          src={"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "") + giftQr.urlPath)}
+          alt="Current 24-hour LeighPogo community gift QR"
+          width={240} height={240}
+        />
+        <p><a href={"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "") + giftQr.urlPath)} target="_blank" rel="noreferrer">Open current printable QR</a></p>
+      </>}
+      {!giftQr && !qrError && <p>Loading current QR…</p>}
     </section>
     <h2>Existing batches</h2>
     {batches.map(batch => <section key={batch.id} style={{ border: "1px solid #888", borderRadius: 8, padding: 16, marginBottom: 16 }}>
