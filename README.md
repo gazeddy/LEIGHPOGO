@@ -11,6 +11,38 @@ The Prisma schema and migration history now describe the same layout:
 - `SearchString`: saved searches
 - `PokedexEntry`: per-user Pokédex records
 
+## V4 updates with automatic SQLite backup
+
+For the V4 development service only, run:
+
+```bash
+cd /projects/V4 && bash deploy/update-v4.sh
+```
+
+The script resolves `DATABASE_URL` from the V4 environment, confirms the
+database file belongs to `/projects/V4`, and uses Python's SQLite online
+backup API to take a consistent snapshot while the site is running. It runs
+`PRAGMA integrity_check` on the snapshot and **aborts before updating code
+or applying Prisma migrations** if the backup is missing or invalid.
+
+Backups default to `/projects/backups/leighpogo/v4-updates` with restricted
+permissions and timestamped names. The verified snapshot is retained even
+when a subsequent update step fails; no automatic deletion or rotation is
+performed. Set `BACKUP_DIR` to a different writable location if needed.
+
+After the backup, the script pulls the `v4` branch with fast-forward-only,
+runs `npm ci`, applies committed Prisma migrations, regenerates the client,
+runs tests and the build, then restarts **only**
+`leighpogo-test.service`. It stops immediately on errors. No automatic
+database rollback is attempted, because applying a rollback safely may
+require stopping the service and reconciling any subsequent writes.
+Restore from a snapshot only after stopping the service and checking the
+required recovery steps.
+
+For the initial installation of this script, pull the `v4` branch once
+to obtain the file; merely pulling code does not run migrations. After that,
+use the single command above for future V4 updates.
+
 ## Installing application updates
 
 Installing dependencies regenerates the Prisma client but does **not** apply database migrations automatically:
