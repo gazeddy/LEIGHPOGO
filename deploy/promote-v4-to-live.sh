@@ -148,9 +148,9 @@ rollback() {
 }
 trap rollback ERR EXIT
 
+STARTED=1
 systemctl stop "$LIVE_SERVICE"
 systemctl stop "$V4_SERVICE"
-STARTED=1
 systemctl is-active --quiet "$LIVE_SERVICE" && die "LIVE would not stop"
 systemctl is-active --quiet "$V4_SERVICE" && die "V4 would not stop"
 log "Taking fresh offline-consistent SQLite snapshots"
