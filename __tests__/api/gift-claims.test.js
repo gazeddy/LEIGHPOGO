@@ -1,8 +1,10 @@
 import handler from "../../pages/api/gifts"
 import prisma from "../../lib/prisma"
 import { getServerSession } from "next-auth/next"
+import { validGiftQr } from "../../lib/giftQr"
 
 jest.mock("next-auth/next", () => ({ getServerSession: jest.fn() }))
+jest.mock("../../lib/giftQr", () => ({ validGiftQr: jest.fn() }))
 jest.mock("../../pages/api/auth/[...nextauth]", () => ({ authOptions: {} }))
 jest.mock("../../lib/prisma", () => ({
   __esModule: true,
@@ -23,8 +25,16 @@ function makeRes() {
 beforeEach(() => {
   jest.resetAllMocks()
   getServerSession.mockResolvedValue({ user: { id: 42, privacyPolicyAccepted: true } })
+  validGiftQr.mockReturnValue(true)
   prisma.giftCode.count.mockResolvedValue(2)
   prisma.$executeRaw.mockResolvedValue(1)
+})
+test("expired QR never allocates", async () => {
+  validGiftQr.mockReturnValue(false)
+  const res = makeRes()
+  await handler({ method: "POST", body: { qr: "expired" } }, res)
+  expect(res.status).toHaveBeenCalledWith(410)
+  expect(prisma.$executeRaw).not.toHaveBeenCalled()
 })
 test("anonymous scans cannot claim codes", async () => {
   getServerSession.mockResolvedValue(null)
